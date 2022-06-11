@@ -1,6 +1,5 @@
 use std::io;
 use std::io::Stdout;
-use std::ops::Sub;
 
 use crossterm::event::{
     read, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyModifiers,
@@ -11,11 +10,10 @@ use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
 use tui::backend::CrosstermBackend;
-use tui::buffer::Buffer;
 use tui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Style};
 use tui::text::{Span, Text};
-use tui::widgets::{Block, Borders, Paragraph, Widget, Wrap};
+use tui::widgets::{Block, Borders, Paragraph, Wrap};
 use tui::{Frame, Terminal};
 
 trait Panel {
@@ -235,8 +233,8 @@ fn main() -> Result<(), io::Error> {
         vec![UserSplits::Panel(0)],
     )];
     let mut panels: Vec<(usize, Box<dyn Panel>)> = vec![(0, Box::new(TextEditPanel::new()))];
-    let mut prompt_panel = PromptPanel::new();
-    let mut active_panel = 0;
+    let prompt_panel = PromptPanel::new();
+    let active_panel = 0;
 
     loop {
         terminal.draw(|f| {
@@ -308,7 +306,7 @@ fn main() -> Result<(), io::Error> {
                                             panel.make_widget(f, chunk);
                                         }
                                     },
-                                    UserSplits::Split(split_i, children) => (), // recurse
+                                    UserSplits::Split(_split_i, _children) => (), // recurse
                                 }
                             }
                         }
@@ -330,8 +328,9 @@ fn main() -> Result<(), io::Error> {
                                 None => {
                                     // println!("no active panel")
                                 }
-                                Some((split_i, panel)) => {
-                                    match splits.get_mut(*split_i) {
+                                Some((split_i, _panel)) => {
+                                    let split_i = *split_i;
+                                    match splits.get_mut(split_i) {
                                         None => {
                                             // println!("no split on active panel")
                                         }
@@ -340,10 +339,10 @@ fn main() -> Result<(), io::Error> {
                                                 UserSplits::Panel(_) => {
                                                     // println!("panel when expected split")
                                                 } // shouldn't happen
-                                                UserSplits::Split(direction, children) => {
+                                                UserSplits::Split(_direction, children) => {
                                                     let i = panels.len();
                                                     panels.push((
-                                                        *split_i,
+                                                        split_i,
                                                         Box::new(TextEditPanel::new()),
                                                     ));
 
