@@ -18,7 +18,7 @@ use tui::widgets::{Block, Borders, Paragraph, Wrap};
 use tui::{Frame, Terminal};
 
 trait Panel {
-    fn make_widget(&self, frame: &mut EditorFrame, rect: Rect);
+    fn make_widget(&self, frame: &mut EditorFrame, rect: Rect, is_active: bool);
     fn get_cursor(&self, rect: &Rect) -> (u16, u16);
     fn get_id(&self) -> char;
     fn set_id(&mut self, id: char);
@@ -49,9 +49,15 @@ impl TextEditPanel {
 }
 
 impl Panel for TextEditPanel {
-    fn make_widget(&self, frame: &mut EditorFrame, rect: Rect) {
+    fn make_widget(&self, frame: &mut EditorFrame, rect: Rect, is_active: bool) {
         let para_text = Text::from(self.text.clone());
-        let para_block = Block::default().title("Block").borders(Borders::ALL);
+        let para_block = Block::default()
+            .title(Span::styled("Block", Style::default().fg(Color::White)))
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(match is_active {
+                true => Color::Green,
+                false => Color::White,
+            }));
         let para = Paragraph::new(para_text)
             .block(para_block)
             .style(Style::default().fg(Color::White).bg(Color::Black))
@@ -148,9 +154,15 @@ impl PromptPanel {
 }
 
 impl Panel for PromptPanel {
-    fn make_widget(&self, frame: &mut EditorFrame, rect: Rect) {
+    fn make_widget(&self, frame: &mut EditorFrame, rect: Rect, is_active: bool) {
         let para_text = Span::from(self.text.clone());
-        let para_block = Block::default().title("Prompt").borders(Borders::ALL);
+        let para_block = Block::default()
+            .title(Span::styled("Prompt", Style::default().fg(Color::White)))
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(match is_active {
+                true => Color::Green,
+                false => Color::White,
+            }));
         let para = Paragraph::new(para_text)
             .block(para_block)
             .style(Style::default().fg(Color::White).bg(Color::Black))
@@ -387,12 +399,13 @@ fn render_split(
             UserSplits::Panel(panel_i) => match panels.get(*panel_i) {
                 None => (), // error
                 Some((_, panel)) => {
-                    if *panel_i == active_panel {
+                    let is_active = *panel_i == active_panel;
+                    if is_active {
                         let (x, y) = panel.get_cursor(&chunk);
                         frame.set_cursor(x, y);
                     }
 
-                    panel.make_widget(frame, chunk);
+                    panel.make_widget(frame, chunk, is_active);
                 }
             },
             UserSplits::Split(split_index) => {
@@ -475,7 +488,7 @@ fn main() -> Result<(), io::Error> {
 
             let (prompt_chunk, user_chunk) = (chunks[0], chunks[1]);
 
-            prompt_panel.make_widget(frame, prompt_chunk);
+            prompt_panel.make_widget(frame, prompt_chunk, false);
 
             render_split(
                 &splits[0],
