@@ -1,7 +1,7 @@
 use tui::layout::Direction;
 
 use crate::panels::{Panel, TextEditPanel};
-use crate::{first_available_id, AppState};
+use crate::AppState;
 
 pub struct PanelSplit {
     pub direction: Direction,
@@ -28,6 +28,7 @@ fn split(app: &mut AppState, direction: Direction) {
             let split_i = *split_i;
             let active_panel_id = active_panel.get_id();
             let split_count = app.splits.len();
+            let new_id = app.first_available_id();
             let new_split = match app.splits.get_mut(split_i) {
                 None => {
                     panic!("split not found")
@@ -39,7 +40,7 @@ fn split(app: &mut AppState, direction: Direction) {
                     // create panel
                     let new_panel_index = app.panels.len();
                     let mut p = TextEditPanel::new();
-                    p.set_id(first_available_id(&app.panels));
+                    p.set_id(new_id);
                     app.panels.push((new_split_index, Box::new(p)));
 
                     // update active panel split index

@@ -26,26 +26,6 @@ mod splits;
 
 pub type EditorFrame<'a> = Frame<'a, CrosstermBackend<Stdout>>;
 
-fn first_available_id(panels: &Vec<(usize, Box<dyn Panel>)>) -> char {
-    let mut current = HashSet::new();
-
-    for (_, panel) in panels {
-        current.insert(panel.get_id());
-    }
-
-    let options = ('a'..'z').chain('A'..'Z');
-
-    let mut id = '\0';
-    for c in options {
-        if !current.contains(&c) {
-            id = c;
-            break;
-        }
-    }
-
-    id
-}
-
 pub struct AppState {
     panels: Vec<(usize, Box<dyn Panel>)>,
     splits: Vec<PanelSplit>,
@@ -75,6 +55,26 @@ impl AppState {
             splits,
             active_panel,
         })
+    }
+
+    pub fn first_available_id(&mut self) -> char {
+        let mut current = HashSet::new();
+
+        for (_, panel) in self.panels.iter() {
+            current.insert(panel.get_id());
+        }
+
+        let options = ('a'..'z').chain('A'..'Z');
+
+        let mut id = '\0';
+        for c in options {
+            if !current.contains(&c) {
+                id = c;
+                break;
+            }
+        }
+
+        id
     }
 }
 
