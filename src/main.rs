@@ -251,7 +251,7 @@ enum UserSplits {
 }
 
 enum KeyChord {
-    Part(char, HashMap<char, KeyChord>),
+    Node(KeyCode, HashMap<KeyCode, KeyChord>),
     Command(fn(usize, &mut Vec<(usize, Box<dyn Panel>)>, &mut Vec<PanelSplit>)),
 }
 
@@ -451,14 +451,21 @@ fn main() -> Result<(), io::Error> {
     // setup chord commands
     let mut chord_map = HashMap::new();
     chord_map.insert(
-        's',
-        KeyChord::Part('s', {
+        KeyCode::Char('s'),
+        KeyChord::Node(KeyCode::Char('s'), {
             let mut h = HashMap::new();
-            h.insert('h', KeyChord::Command(split_horizontal));
-            h.insert('v', KeyChord::Command(split_vertical));
+            h.insert(KeyCode::Char('h'), KeyChord::Command(split_horizontal));
+            h.insert(KeyCode::Char('v'), KeyChord::Command(split_vertical));
             h
         }),
     );
+
+    chord_map.insert(KeyCode::Char('a'), KeyChord::Node(KeyCode::Char('s'), {
+        let mut h = HashMap::new();
+        h.insert(KeyCode::Null, KeyChord::Command(split_horizontal));
+        h
+    }));
+
     let mut current_chord: Option<&KeyChord> = None;
 
     let mut splits: Vec<PanelSplit> = vec![PanelSplit::new(
@@ -509,9 +516,8 @@ fn main() -> Result<(), io::Error> {
                     // soft error, just reset
                     // command should've been executed, before being set as current
                     (Some(KeyChord::Command(_)), _) => current_chord = None,
-                    // chords can only be formed of chars
-                    (Some(KeyChord::Part(_, children)), KeyCode::Char(c)) => {
-                        match children.get(&c) {
+                    (Some(KeyChord::Node(_, children)), code) => {
+                        match children.get(&code) {
                             None => current_chord = None, // end chord
                             Some(KeyChord::Command(f)) => {
                                 // end of chord, execute function
@@ -524,28 +530,18 @@ fn main() -> Result<(), io::Error> {
                             }
                         }
                     }
-                    // in chord but not a char, exit chord
-                    (Some(KeyChord::Part(_, _)), _) => {
-                        // end chord
-                        current_chord = None;
-                    }
                     // not in chord, check other commands
                     (None, code) => {
                         // not in chord, but could start one
                         if event.modifiers.contains(KeyModifiers::CONTROL) {
                             // CTRL means a global command including chords
                             // chords without CONTROL will be deferred to active panel
-                            match code {
-                                KeyCode::Char(c) => {
-                                    match chord_map.get(&c) {
-                                        Some(chord) => {
-                                            current_chord = Some(chord);
-                                            continue; // revisit, might not always be last part of loop
-                                        }
-                                        None => (),
-                                    }
+                            match chord_map.get(&code) {
+                                Some(chord) => {
+                                    current_chord = Some(chord);
+                                    continue; // revisit, might not always be last part of loop
                                 }
-                                _ => (), // not an operation, ignore
+                                None => (),
                             }
                         } else {
                             // defer to active panel
