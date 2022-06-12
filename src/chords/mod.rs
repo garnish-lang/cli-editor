@@ -6,10 +6,12 @@ use crate::AppState;
 
 use crate::splits::{split_horizontal, split_vertical};
 
+pub type ChordAction = fn(&mut AppState);
+
 #[derive(Clone)]
 pub enum KeyChord {
-    Node(KeyCode, HashMap<KeyCode, KeyChord>),
-    Command(fn(&mut AppState)),
+    Node(HashMap<KeyCode, KeyChord>, Option<ChordAction>),
+    Command(ChordAction),
 }
 
 pub struct Chords {
@@ -23,21 +25,21 @@ impl Chords {
         let mut chord_map = HashMap::new();
         chord_map.insert(
             KeyCode::Char('s'),
-            KeyChord::Node(KeyCode::Char('s'), {
+            KeyChord::Node({
                 let mut h = HashMap::new();
                 h.insert(KeyCode::Char('h'), KeyChord::Command(split_horizontal));
                 h.insert(KeyCode::Char('v'), KeyChord::Command(split_vertical));
                 h
-            }),
+            }, None),
         );
 
         chord_map.insert(
             KeyCode::Char('a'),
-            KeyChord::Node(KeyCode::Char('s'), {
+            KeyChord::Node({
                 let mut h = HashMap::new();
                 h.insert(KeyCode::Null, KeyChord::Command(split_horizontal));
                 h
-            }),
+            }, None),
         );
 
         Chords {

@@ -101,7 +101,7 @@ fn main() -> Result<(), io::Error> {
                     // soft error, just reset
                     // command should've been executed, before being set as current
                     (Some(KeyChord::Command(_)), _) => None,
-                    (Some(KeyChord::Node(_, children)), code) => {
+                    (Some(KeyChord::Node(children, _action)), code) => {
                         match children.get(&code) {
                             None => None, // end chord
                             Some(KeyChord::Command(f)) => {
