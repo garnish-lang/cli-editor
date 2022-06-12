@@ -21,6 +21,9 @@ trait Panel {
     fn make_widget(&self, frame: &mut EditorFrame, rect: Rect, is_active: bool, block: Block);
     fn get_cursor(&self, rect: &Rect) -> (u16, u16);
     fn get_title(&self) -> String;
+    fn get_length(&self) -> u16 {
+        0
+    }
     fn get_id(&self) -> char;
     fn set_id(&mut self, id: char);
     fn receive_key(&mut self, event: KeyEvent) -> bool;
@@ -50,7 +53,7 @@ impl TextEditPanel {
 }
 
 impl Panel for TextEditPanel {
-    fn make_widget(&self, frame: &mut EditorFrame, rect: Rect, is_active: bool, block: Block) {
+    fn make_widget(&self, frame: &mut EditorFrame, rect: Rect, _is_active: bool, block: Block) {
         let para_text = Text::from(self.text.clone());
         let para = Paragraph::new(para_text)
             .block(block)
@@ -152,7 +155,7 @@ impl PromptPanel {
 }
 
 impl Panel for PromptPanel {
-    fn make_widget(&self, frame: &mut EditorFrame, rect: Rect, is_active: bool, block: Block) {
+    fn make_widget(&self, frame: &mut EditorFrame, rect: Rect, _is_active: bool, block: Block) {
         let para_text = Span::from(self.text.clone());
 
         let para = Paragraph::new(para_text)
@@ -170,6 +173,10 @@ impl Panel for PromptPanel {
 
     fn get_title(&self) -> String {
         "Prompt".to_string()
+    }
+
+    fn get_length(&self) -> u16 {
+        3
     }
 
     fn get_id(&self) -> char {
@@ -250,8 +257,6 @@ enum KeyChord {
     Node(KeyCode, HashMap<KeyCode, KeyChord>),
     Command(fn(usize, &mut Vec<(usize, Box<dyn Panel>)>, &mut Vec<PanelSplit>)),
 }
-
-const PROMPT_HEIGHT: u16 = 3;
 
 type EditorFrame<'a> = Frame<'a, CrosstermBackend<Stdout>>;
 
@@ -362,26 +367,32 @@ fn render_split(
         Direction::Vertical => chunk.height,
     };
 
-    let lengths = match split.panels.len() {
-        0 => vec![], // error?
-        1 => vec![Constraint::Length(total)],
-        n => {
-            let part_size = total / n as u16;
-            let mut remaining = total;
-            let mut lengths = vec![];
+    let lengths = if split.panels.len() > 0 {
+        let part_size = total / split.panels.len() as u16;
+        let mut remaining = total;
 
-            // loop for all but last item n - 1, range is exclusive on end
-            // and set length to part size
-            // subtract from remaining which will be last item's lengths
-            for _ in 0..(n - 1) {
-                remaining -= part_size;
-                lengths.push(Constraint::Length(part_size));
-            }
+        let mut lengths: Vec<Constraint> = split.panels.iter().take(split.panels.len() - 1).map(|s| {
+            let l = match s {
+                UserSplits::Panel(index) => match panels.get(*index) {
+                    Some((_, panel)) => if panel.get_length() == 0 {
+                        part_size
+                    } else {
+                        panel.get_length()
+                    }
+                    None => part_size
+                }
+                UserSplits::Split(_) => part_size
+            };
 
-            lengths.push(Constraint::Length(remaining));
+            remaining -= l;
+            Constraint::Length(l)
+        }).collect();
 
-            lengths
-        }
+        lengths.push(Constraint::Length(remaining));
+
+        lengths
+    } else {
+        vec![]
     };
 
     let chunks = Layout::default()
@@ -446,6 +457,15 @@ fn first_available_id(panels: &Vec<(usize, Box<dyn Panel>)>) -> char {
     id
 }
 
+struct App<'a> {
+    terminal: Terminal<CrosstermBackend<Stdout>>,
+    chord_map: HashMap<KeyCode, KeyChord>,
+    current_chord: Option<&'a KeyChord>,
+    panels: Vec<(usize, Box<dyn Panel>)>,
+    splits: Vec<PanelSplit>,
+    active_panel: usize,
+}
+
 fn main() -> Result<(), io::Error> {
     enable_raw_mode()?;
 
@@ -478,51 +498,24 @@ fn main() -> Result<(), io::Error> {
     let mut current_chord: Option<&KeyChord> = None;
 
     let mut splits: Vec<PanelSplit> = vec![PanelSplit::new(
-        Direction::Horizontal,
-        vec![UserSplits::Panel(0)],
+        Direction::Vertical,
+        vec![UserSplits::Panel(0), UserSplits::Panel(1)],
     )];
 
     let mut text_panel = TextEditPanel::new();
     text_panel.set_id('a');
 
-    let mut panels: Vec<(usize, Box<dyn Panel>)> = vec![(0, Box::new(text_panel))];
-
     let mut prompt_panel = PromptPanel::new();
     prompt_panel.set_id('$');
-    let active_panel = 0;
+
+    let mut panels: Vec<(usize, Box<dyn Panel>)> =
+        vec![(0, Box::new(prompt_panel)), (0, Box::new(text_panel))];
+
+    let active_panel = 1;
 
     loop {
         terminal.draw(|frame| {
-            let size = frame.size();
-
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Length(PROMPT_HEIGHT),
-                    Constraint::Length(size.height - PROMPT_HEIGHT),
-                ])
-                .split(size);
-
-            let (prompt_chunk, user_chunk) = (chunks[0], chunks[1]);
-
-            let block = Block::default()
-                .title(Span::styled(
-                    prompt_panel.get_title(),
-                    Style::default().fg(Color::White),
-                ))
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::White));
-
-            prompt_panel.make_widget(frame, prompt_chunk, false, block);
-
-            render_split(
-                &splits[0],
-                active_panel,
-                &splits,
-                &panels,
-                frame,
-                user_chunk,
-            )
+            render_split(&splits[0], active_panel, &splits, &panels, frame, frame.size())
         })?;
 
         match read()? {
