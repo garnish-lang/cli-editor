@@ -18,8 +18,9 @@ use tui::widgets::{Block, Borders, Paragraph, Wrap};
 use tui::{Frame, Terminal};
 
 trait Panel {
-    fn make_widget(&self, frame: &mut EditorFrame, rect: Rect, is_active: bool);
+    fn make_widget(&self, frame: &mut EditorFrame, rect: Rect, is_active: bool, block: Block);
     fn get_cursor(&self, rect: &Rect) -> (u16, u16);
+    fn get_title(&self) -> String;
     fn get_id(&self) -> char;
     fn set_id(&mut self, id: char);
     fn receive_key(&mut self, event: KeyEvent) -> bool;
@@ -49,17 +50,10 @@ impl TextEditPanel {
 }
 
 impl Panel for TextEditPanel {
-    fn make_widget(&self, frame: &mut EditorFrame, rect: Rect, is_active: bool) {
+    fn make_widget(&self, frame: &mut EditorFrame, rect: Rect, is_active: bool, block: Block) {
         let para_text = Text::from(self.text.clone());
-        let para_block = Block::default()
-            .title(Span::styled("Block", Style::default().fg(Color::White)))
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(match is_active {
-                true => Color::Green,
-                false => Color::White,
-            }));
         let para = Paragraph::new(para_text)
-            .block(para_block)
+            .block(block)
             .style(Style::default().fg(Color::White).bg(Color::Black))
             .alignment(Alignment::Left)
             .wrap(Wrap { trim: true });
@@ -69,6 +63,10 @@ impl Panel for TextEditPanel {
 
     fn get_cursor(&self, rect: &Rect) -> (u16, u16) {
         (rect.x + self.cursor_x, rect.y + self.cursor_y)
+    }
+
+    fn get_title(&self) -> String {
+        "Editor".to_string()
     }
 
     fn get_id(&self) -> char {
@@ -154,17 +152,11 @@ impl PromptPanel {
 }
 
 impl Panel for PromptPanel {
-    fn make_widget(&self, frame: &mut EditorFrame, rect: Rect, is_active: bool) {
+    fn make_widget(&self, frame: &mut EditorFrame, rect: Rect, is_active: bool, block: Block) {
         let para_text = Span::from(self.text.clone());
-        let para_block = Block::default()
-            .title(Span::styled("Prompt", Style::default().fg(Color::White)))
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(match is_active {
-                true => Color::Green,
-                false => Color::White,
-            }));
+
         let para = Paragraph::new(para_text)
-            .block(para_block)
+            .block(block)
             .style(Style::default().fg(Color::White).bg(Color::Black))
             .alignment(Alignment::Left)
             .wrap(Wrap { trim: true });
@@ -174,6 +166,10 @@ impl Panel for PromptPanel {
 
     fn get_cursor(&self, rect: &Rect) -> (u16, u16) {
         (rect.x + self.cursor_x, rect.y + self.cursor_y)
+    }
+
+    fn get_title(&self) -> String {
+        "Prompt".to_string()
     }
 
     fn get_id(&self) -> char {
@@ -405,7 +401,17 @@ fn render_split(
                         frame.set_cursor(x, y);
                     }
 
-                    panel.make_widget(frame, chunk, is_active);
+                    let title = panel.get_title();
+
+                    let block = Block::default()
+                        .title(Span::styled(title, Style::default().fg(Color::White)))
+                        .borders(Borders::ALL)
+                        .border_style(Style::default().fg(match is_active {
+                            true => Color::Green,
+                            false => Color::White,
+                        }));
+
+                    panel.make_widget(frame, chunk, is_active, block);
                 }
             },
             UserSplits::Split(split_index) => {
@@ -460,11 +466,14 @@ fn main() -> Result<(), io::Error> {
         }),
     );
 
-    chord_map.insert(KeyCode::Char('a'), KeyChord::Node(KeyCode::Char('s'), {
-        let mut h = HashMap::new();
-        h.insert(KeyCode::Null, KeyChord::Command(split_horizontal));
-        h
-    }));
+    chord_map.insert(
+        KeyCode::Char('a'),
+        KeyChord::Node(KeyCode::Char('s'), {
+            let mut h = HashMap::new();
+            h.insert(KeyCode::Null, KeyChord::Command(split_horizontal));
+            h
+        }),
+    );
 
     let mut current_chord: Option<&KeyChord> = None;
 
@@ -477,6 +486,7 @@ fn main() -> Result<(), io::Error> {
     text_panel.set_id('a');
 
     let mut panels: Vec<(usize, Box<dyn Panel>)> = vec![(0, Box::new(text_panel))];
+
     let mut prompt_panel = PromptPanel::new();
     prompt_panel.set_id('$');
     let active_panel = 0;
@@ -495,7 +505,15 @@ fn main() -> Result<(), io::Error> {
 
             let (prompt_chunk, user_chunk) = (chunks[0], chunks[1]);
 
-            prompt_panel.make_widget(frame, prompt_chunk, false);
+            let block = Block::default()
+                .title(Span::styled(
+                    prompt_panel.get_title(),
+                    Style::default().fg(Color::White),
+                ))
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::White));
+
+            prompt_panel.make_widget(frame, prompt_chunk, false, block);
 
             render_split(
                 &splits[0],
