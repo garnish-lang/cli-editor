@@ -353,83 +353,86 @@ fn split_vertical(
     split(active_panel_index, Direction::Vertical, panels, splits)
 }
 
-fn render_split(
-    split: &PanelSplit,
-    active_panel: usize,
-    splits: &Vec<PanelSplit>,
-    panels: &Vec<(usize, Box<dyn Panel>)>,
-    frame: &mut EditorFrame,
-    chunk: Rect,
-) {
-    // calculate child width
-    let total = match split.direction {
-        Direction::Horizontal => chunk.width,
-        Direction::Vertical => chunk.height,
-    };
-
-    let lengths = if split.panels.len() > 0 {
-        let part_size = total / split.panels.len() as u16;
-        let mut remaining = total;
-
-        let mut lengths: Vec<Constraint> = split.panels.iter().take(split.panels.len() - 1).map(|s| {
-            let l = match s {
-                UserSplits::Panel(index) => match panels.get(*index) {
-                    Some((_, panel)) => if panel.get_length() == 0 {
-                        part_size
-                    } else {
-                        panel.get_length()
-                    }
-                    None => part_size
-                }
-                UserSplits::Split(_) => part_size
+fn render_split(split: usize, app: &App, frame: &mut EditorFrame, chunk: Rect) {
+    match app.splits.get(split) {
+        None => (), // error
+        Some(split) => {
+            // calculate child width
+            let total = match split.direction {
+                Direction::Horizontal => chunk.width,
+                Direction::Vertical => chunk.height,
             };
 
-            remaining -= l;
-            Constraint::Length(l)
-        }).collect();
+            let lengths = if split.panels.len() > 0 {
+                let part_size = total / split.panels.len() as u16;
+                let mut remaining = total;
 
-        lengths.push(Constraint::Length(remaining));
+                let mut lengths: Vec<Constraint> = split
+                    .panels
+                    .iter()
+                    .take(split.panels.len() - 1)
+                    .map(|s| {
+                        let l = match s {
+                            UserSplits::Panel(index) => match app.panels.get(*index) {
+                                Some((_, panel)) => {
+                                    if panel.get_length() == 0 {
+                                        part_size
+                                    } else {
+                                        panel.get_length()
+                                    }
+                                }
+                                None => part_size,
+                            },
+                            UserSplits::Split(_) => part_size,
+                        };
 
-        lengths
-    } else {
-        vec![]
-    };
+                        remaining -= l;
+                        Constraint::Length(l)
+                    })
+                    .collect();
 
-    let chunks = Layout::default()
-        .direction(split.direction.clone())
-        .constraints(lengths)
-        .split(chunk);
+                lengths.push(Constraint::Length(remaining));
 
-    // loop through children and render
-    for (child, chunk) in split.panels.iter().zip(chunks) {
-        match child {
-            UserSplits::Panel(panel_i) => match panels.get(*panel_i) {
-                None => (), // error
-                Some((_, panel)) => {
-                    let is_active = *panel_i == active_panel;
-                    if is_active {
-                        let (x, y) = panel.get_cursor(&chunk);
-                        frame.set_cursor(x, y);
-                    }
+                lengths
+            } else {
+                vec![]
+            };
 
-                    let title = panel.get_title();
+            let chunks = Layout::default()
+                .direction(split.direction.clone())
+                .constraints(lengths)
+                .split(chunk);
 
-                    let block = Block::default()
-                        .title(Span::styled(title, Style::default().fg(Color::White)))
-                        .borders(Borders::ALL)
-                        .border_style(Style::default().fg(match is_active {
-                            true => Color::Green,
-                            false => Color::White,
-                        }));
+            // loop through children and render
+            for (child, chunk) in split.panels.iter().zip(chunks) {
+                match child {
+                    UserSplits::Panel(panel_i) => match app.panels.get(*panel_i) {
+                        None => (), // error
+                        Some((_, panel)) => {
+                            let is_active = *panel_i == app.active_panel;
+                            if is_active {
+                                let (x, y) = panel.get_cursor(&chunk);
+                                frame.set_cursor(x, y);
+                            }
 
-                    panel.make_widget(frame, chunk, is_active, block);
-                }
-            },
-            UserSplits::Split(split_index) => {
-                match splits.get(*split_index) {
-                    None => (), // error
-                    Some(child_split) => {
-                        render_split(child_split, active_panel, splits, panels, frame, chunk)
+                            let title = panel.get_title();
+
+                            let block = Block::default()
+                                .title(Span::styled(title, Style::default().fg(Color::White)))
+                                .borders(Borders::ALL)
+                                .border_style(Style::default().fg(match is_active {
+                                    true => Color::Green,
+                                    false => Color::White,
+                                }));
+
+                            panel.make_widget(frame, chunk, is_active, block);
+                        }
+                    },
+                    UserSplits::Split(split_index) => {
+                        match app.splits.get(*split_index) {
+                            None => (), // error
+                            Some(_) => render_split(*split_index, app, frame, chunk),
+                        }
                     }
                 }
             }
@@ -458,7 +461,6 @@ fn first_available_id(panels: &Vec<(usize, Box<dyn Panel>)>) -> char {
 }
 
 struct App<'a> {
-    terminal: Terminal<CrosstermBackend<Stdout>>,
     chord_map: HashMap<KeyCode, KeyChord>,
     current_chord: Option<&'a KeyChord>,
     panels: Vec<(usize, Box<dyn Panel>)>,
@@ -468,11 +470,6 @@ struct App<'a> {
 
 impl App<'_> {
     fn new() -> Result<Self, io::Error> {
-        let mut stdout = io::stdout();
-        execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-        let backend = CrosstermBackend::new(stdout);
-        let terminal = Terminal::new(backend)?;
-
         // setup chord commands
         let mut chord_map = HashMap::new();
         chord_map.insert(
@@ -513,7 +510,6 @@ impl App<'_> {
         let active_panel = 1;
 
         Ok(App {
-            terminal,
             chord_map,
             current_chord,
             panels,
@@ -526,12 +522,15 @@ impl App<'_> {
 fn main() -> Result<(), io::Error> {
     enable_raw_mode()?;
 
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+
     let mut app = App::new()?;
 
     loop {
-        app.terminal.draw(|frame| {
-            render_split(&app.splits[0], app.active_panel, &app.splits, &app.panels, frame, frame.size())
-        })?;
+        terminal.draw(|frame| render_split(0, &app, frame, frame.size()))?;
 
         match read()? {
             Event::Key(event) => {
@@ -588,7 +587,7 @@ fn main() -> Result<(), io::Error> {
             }
             Event::Mouse(_event) => (), // println!("{:?}", event),
             Event::Resize(width, height) => execute!(
-                app.terminal.backend_mut(),
+                terminal.backend_mut(),
                 Print(format!("New size {}x{}", width, height))
             )?,
         }
@@ -596,11 +595,11 @@ fn main() -> Result<(), io::Error> {
 
     disable_raw_mode()?;
     execute!(
-        app.terminal.backend_mut(),
+        terminal.backend_mut(),
         LeaveAlternateScreen,
         DisableMouseCapture
     )?;
-    app.terminal.show_cursor()?;
+    terminal.show_cursor()?;
 
     Ok(())
 }
