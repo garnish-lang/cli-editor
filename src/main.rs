@@ -466,56 +466,71 @@ struct App<'a> {
     active_panel: usize,
 }
 
+impl App<'_> {
+    fn new() -> Result<Self, io::Error> {
+        let mut stdout = io::stdout();
+        execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+        let backend = CrosstermBackend::new(stdout);
+        let terminal = Terminal::new(backend)?;
+
+        // setup chord commands
+        let mut chord_map = HashMap::new();
+        chord_map.insert(
+            KeyCode::Char('s'),
+            KeyChord::Node(KeyCode::Char('s'), {
+                let mut h = HashMap::new();
+                h.insert(KeyCode::Char('h'), KeyChord::Command(split_horizontal));
+                h.insert(KeyCode::Char('v'), KeyChord::Command(split_vertical));
+                h
+            }),
+        );
+
+        chord_map.insert(
+            KeyCode::Char('a'),
+            KeyChord::Node(KeyCode::Char('s'), {
+                let mut h = HashMap::new();
+                h.insert(KeyCode::Null, KeyChord::Command(split_horizontal));
+                h
+            }),
+        );
+
+        let current_chord: Option<&KeyChord> = None;
+
+        let splits: Vec<PanelSplit> = vec![PanelSplit::new(
+            Direction::Vertical,
+            vec![UserSplits::Panel(0), UserSplits::Panel(1)],
+        )];
+
+        let mut text_panel = TextEditPanel::new();
+        text_panel.set_id('a');
+
+        let mut prompt_panel = PromptPanel::new();
+        prompt_panel.set_id('$');
+
+        let panels: Vec<(usize, Box<dyn Panel>)> =
+            vec![(0, Box::new(prompt_panel)), (0, Box::new(text_panel))];
+
+        let active_panel = 1;
+
+        Ok(App {
+            terminal,
+            chord_map,
+            current_chord,
+            panels,
+            splits,
+            active_panel,
+        })
+    }
+}
+
 fn main() -> Result<(), io::Error> {
     enable_raw_mode()?;
 
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-
-    // setup chord commands
-    let mut chord_map = HashMap::new();
-    chord_map.insert(
-        KeyCode::Char('s'),
-        KeyChord::Node(KeyCode::Char('s'), {
-            let mut h = HashMap::new();
-            h.insert(KeyCode::Char('h'), KeyChord::Command(split_horizontal));
-            h.insert(KeyCode::Char('v'), KeyChord::Command(split_vertical));
-            h
-        }),
-    );
-
-    chord_map.insert(
-        KeyCode::Char('a'),
-        KeyChord::Node(KeyCode::Char('s'), {
-            let mut h = HashMap::new();
-            h.insert(KeyCode::Null, KeyChord::Command(split_horizontal));
-            h
-        }),
-    );
-
-    let mut current_chord: Option<&KeyChord> = None;
-
-    let mut splits: Vec<PanelSplit> = vec![PanelSplit::new(
-        Direction::Vertical,
-        vec![UserSplits::Panel(0), UserSplits::Panel(1)],
-    )];
-
-    let mut text_panel = TextEditPanel::new();
-    text_panel.set_id('a');
-
-    let mut prompt_panel = PromptPanel::new();
-    prompt_panel.set_id('$');
-
-    let mut panels: Vec<(usize, Box<dyn Panel>)> =
-        vec![(0, Box::new(prompt_panel)), (0, Box::new(text_panel))];
-
-    let active_panel = 1;
+    let mut app = App::new()?;
 
     loop {
-        terminal.draw(|frame| {
-            render_split(&splits[0], active_panel, &splits, &panels, frame, frame.size())
+        app.terminal.draw(|frame| {
+            render_split(&app.splits[0], app.active_panel, &app.splits, &app.panels, frame, frame.size())
         })?;
 
         match read()? {
@@ -523,21 +538,21 @@ fn main() -> Result<(), io::Error> {
                 // check if we're in a chord right now
                 // if not, check if we're going to start a chord
                 // then finally defer to non-chord commands
-                match (&current_chord, event.code) {
+                match (&app.current_chord, event.code) {
                     // soft error, just reset
                     // command should've been executed, before being set as current
-                    (Some(KeyChord::Command(_)), _) => current_chord = None,
+                    (Some(KeyChord::Command(_)), _) => app.current_chord = None,
                     (Some(KeyChord::Node(_, children)), code) => {
                         match children.get(&code) {
-                            None => current_chord = None, // end chord
+                            None => app.current_chord = None, // end chord
                             Some(KeyChord::Command(f)) => {
                                 // end of chord, execute function
-                                current_chord = None;
-                                f(active_panel, &mut panels, &mut splits)
+                                app.current_chord = None;
+                                f(app.active_panel, &mut app.panels, &mut app.splits)
                             }
                             Some(chord) => {
                                 // set this chord as current chord
-                                current_chord = Some(chord);
+                                app.current_chord = Some(chord);
                             }
                         }
                     }
@@ -547,16 +562,16 @@ fn main() -> Result<(), io::Error> {
                         if event.modifiers.contains(KeyModifiers::CONTROL) {
                             // CTRL means a global command including chords
                             // chords without CONTROL will be deferred to active panel
-                            match chord_map.get(&code) {
+                            match app.chord_map.get(&code) {
                                 Some(chord) => {
-                                    current_chord = Some(chord);
+                                    app.current_chord = Some(chord);
                                     continue; // revisit, might not always be last part of loop
                                 }
                                 None => (),
                             }
                         } else {
                             // defer to active panel
-                            match panels.get_mut(active_panel) {
+                            match app.panels.get_mut(app.active_panel) {
                                 Some((_, panel)) => {
                                     if !panel.receive_key(event) {
                                         match event.code {
@@ -573,7 +588,7 @@ fn main() -> Result<(), io::Error> {
             }
             Event::Mouse(_event) => (), // println!("{:?}", event),
             Event::Resize(width, height) => execute!(
-                terminal.backend_mut(),
+                app.terminal.backend_mut(),
                 Print(format!("New size {}x{}", width, height))
             )?,
         }
@@ -581,11 +596,11 @@ fn main() -> Result<(), io::Error> {
 
     disable_raw_mode()?;
     execute!(
-        terminal.backend_mut(),
+        app.terminal.backend_mut(),
         LeaveAlternateScreen,
         DisableMouseCapture
     )?;
-    terminal.show_cursor()?;
+    app.terminal.show_cursor()?;
 
     Ok(())
 }
