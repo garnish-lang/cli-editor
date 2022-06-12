@@ -253,28 +253,27 @@ enum UserSplits {
     Panel(usize),
 }
 
+#[derive(Clone)]
 enum KeyChord {
     Node(KeyCode, HashMap<KeyCode, KeyChord>),
-    Command(fn(usize, &mut Vec<(usize, Box<dyn Panel>)>, &mut Vec<PanelSplit>)),
+    Command(fn(&mut App)),
 }
 
 type EditorFrame<'a> = Frame<'a, CrosstermBackend<Stdout>>;
 
 fn split(
-    active_panel_index: usize,
+    app: &mut App,
     direction: Direction,
-    panels: &mut Vec<(usize, Box<dyn Panel>)>,
-    splits: &mut Vec<PanelSplit>,
 ) {
-    match panels.get(active_panel_index) {
+    match app.panels.get(app.active_panel) {
         None => {
             panic!("active panel not found")
         }
         Some((split_i, active_panel)) => {
             let split_i = *split_i;
             let active_panel_id = active_panel.get_id();
-            let split_count = splits.len();
-            let new_split = match splits.get_mut(split_i) {
+            let split_count = app.splits.len();
+            let new_split = match app.splits.get_mut(split_i) {
                 None => {
                     panic!("split not found")
                 }
@@ -283,26 +282,26 @@ fn split(
                     let new_split_index = split_count;
 
                     // create panel
-                    let new_panel_index = panels.len();
+                    let new_panel_index = app.panels.len();
                     let mut p = TextEditPanel::new();
-                    p.set_id(first_available_id(panels));
-                    panels.push((new_split_index, Box::new(p)));
+                    p.set_id(first_available_id(&app.panels));
+                    app.panels.push((new_split_index, Box::new(p)));
 
                     // update active panel split index
                     let mut child_index = 0;
-                    for (i, (_, child)) in panels.iter().enumerate() {
+                    for (i, (_, child)) in app.panels.iter().enumerate() {
                         if child.get_id() == active_panel_id {
                             child_index = i;
                             break;
                         }
                     }
 
-                    panels[child_index].0 = new_split_index;
+                    app.panels[child_index].0 = new_split_index;
 
                     let new_panel_split = PanelSplit::new(
                         direction,
                         vec![
-                            UserSplits::Panel(active_panel_index),
+                            UserSplits::Panel(app.active_panel),
                             UserSplits::Panel(new_panel_index),
                         ],
                     );
@@ -313,7 +312,7 @@ fn split(
                         match child {
                             UserSplits::Split(_) => (),
                             UserSplits::Panel(addr) => {
-                                match panels.get(*addr) {
+                                match app.panels.get(*addr) {
                                     None => (), // error?
                                     Some((_, p)) => {
                                         if p.get_id() == active_panel_id {
@@ -332,25 +331,21 @@ fn split(
                 }
             };
 
-            splits.push(new_split);
+            app.splits.push(new_split);
         }
     }
 }
 
 fn split_horizontal(
-    active_panel_index: usize,
-    panels: &mut Vec<(usize, Box<dyn Panel>)>,
-    splits: &mut Vec<PanelSplit>,
+    app: &mut App,
 ) {
-    split(active_panel_index, Direction::Horizontal, panels, splits)
+    split(app, Direction::Horizontal)
 }
 
 fn split_vertical(
-    active_panel_index: usize,
-    panels: &mut Vec<(usize, Box<dyn Panel>)>,
-    splits: &mut Vec<PanelSplit>,
+    app: &mut App,
 ) {
-    split(active_panel_index, Direction::Vertical, panels, splits)
+    split(app, Direction::Vertical)
 }
 
 fn render_split(split: usize, app: &App, frame: &mut EditorFrame, chunk: Rect) {
@@ -460,16 +455,45 @@ fn first_available_id(panels: &Vec<(usize, Box<dyn Panel>)>) -> char {
     id
 }
 
-struct App<'a> {
-    chord_map: HashMap<KeyCode, KeyChord>,
-    current_chord: Option<&'a KeyChord>,
+struct App {
     panels: Vec<(usize, Box<dyn Panel>)>,
     splits: Vec<PanelSplit>,
     active_panel: usize,
 }
 
-impl App<'_> {
+impl App {
     fn new() -> Result<Self, io::Error> {
+        let splits: Vec<PanelSplit> = vec![PanelSplit::new(
+            Direction::Vertical,
+            vec![UserSplits::Panel(0), UserSplits::Panel(1)],
+        )];
+
+        let mut text_panel = TextEditPanel::new();
+        text_panel.set_id('a');
+
+        let mut prompt_panel = PromptPanel::new();
+        prompt_panel.set_id('$');
+
+        let panels: Vec<(usize, Box<dyn Panel>)> =
+            vec![(0, Box::new(prompt_panel)), (0, Box::new(text_panel))];
+
+        let active_panel = 1;
+
+        Ok(App {
+            panels,
+            splits,
+            active_panel,
+        })
+    }
+}
+
+struct Chords {
+    chord_map: HashMap<KeyCode, KeyChord>,
+    current_chord: Option<KeyChord>,
+}
+
+impl Chords {
+    fn global_chords() -> Self {
         // setup chord commands
         let mut chord_map = HashMap::new();
         chord_map.insert(
@@ -491,31 +515,10 @@ impl App<'_> {
             }),
         );
 
-        let current_chord: Option<&KeyChord> = None;
-
-        let splits: Vec<PanelSplit> = vec![PanelSplit::new(
-            Direction::Vertical,
-            vec![UserSplits::Panel(0), UserSplits::Panel(1)],
-        )];
-
-        let mut text_panel = TextEditPanel::new();
-        text_panel.set_id('a');
-
-        let mut prompt_panel = PromptPanel::new();
-        prompt_panel.set_id('$');
-
-        let panels: Vec<(usize, Box<dyn Panel>)> =
-            vec![(0, Box::new(prompt_panel)), (0, Box::new(text_panel))];
-
-        let active_panel = 1;
-
-        Ok(App {
+        Chords {
             chord_map,
-            current_chord,
-            panels,
-            splits,
-            active_panel,
-        })
+            current_chord: None
+        }
     }
 }
 
@@ -528,6 +531,7 @@ fn main() -> Result<(), io::Error> {
     let mut terminal = Terminal::new(backend)?;
 
     let mut app = App::new()?;
+    let mut global_chords = Chords::global_chords();
 
     loop {
         terminal.draw(|frame| render_split(0, &app, frame, frame.size()))?;
@@ -537,21 +541,21 @@ fn main() -> Result<(), io::Error> {
                 // check if we're in a chord right now
                 // if not, check if we're going to start a chord
                 // then finally defer to non-chord commands
-                match (&app.current_chord, event.code) {
+                let next_chord = match (&global_chords.current_chord, event.code) {
                     // soft error, just reset
                     // command should've been executed, before being set as current
-                    (Some(KeyChord::Command(_)), _) => app.current_chord = None,
+                    (Some(KeyChord::Command(_)), _) => None,
                     (Some(KeyChord::Node(_, children)), code) => {
                         match children.get(&code) {
-                            None => app.current_chord = None, // end chord
+                            None => None, // end chord
                             Some(KeyChord::Command(f)) => {
                                 // end of chord, execute function
-                                app.current_chord = None;
-                                f(app.active_panel, &mut app.panels, &mut app.splits)
+                                f(&mut app);
+                                None
                             }
                             Some(chord) => {
                                 // set this chord as current chord
-                                app.current_chord = Some(chord);
+                                Some(chord.clone())
                             }
                         }
                     }
@@ -561,12 +565,11 @@ fn main() -> Result<(), io::Error> {
                         if event.modifiers.contains(KeyModifiers::CONTROL) {
                             // CTRL means a global command including chords
                             // chords without CONTROL will be deferred to active panel
-                            match app.chord_map.get(&code) {
+                            match global_chords.chord_map.get(&code) {
                                 Some(chord) => {
-                                    app.current_chord = Some(chord);
-                                    continue; // revisit, might not always be last part of loop
+                                    Some(chord.clone())
                                 }
-                                None => (),
+                                None => None,
                             }
                         } else {
                             // defer to active panel
@@ -578,12 +581,16 @@ fn main() -> Result<(), io::Error> {
                                             _ => (),
                                         }
                                     }
+
+                                    None
                                 }
-                                None => (),
+                                None => None,
                             }
                         }
                     }
-                }
+                };
+
+                global_chords.current_chord = next_chord;
             }
             Event::Mouse(_event) => (), // println!("{:?}", event),
             Event::Resize(width, height) => execute!(
