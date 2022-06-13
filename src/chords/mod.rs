@@ -14,12 +14,12 @@ pub enum KeyChord {
     Command(ChordAction),
 }
 
-pub struct Chords {
+pub struct Chords<'a> {
     pub chord_map: HashMap<KeyCode, KeyChord>,
-    pub current_chord: Option<KeyChord>,
+    pub current_chord: Option<&'a KeyChord>,
 }
 
-impl Chords {
+impl Chords<'_> {
     pub fn global_chords() -> Self {
         // setup chord commands
         let mut chord_map = HashMap::new();

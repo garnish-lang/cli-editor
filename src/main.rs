@@ -142,7 +142,7 @@ fn main() -> Result<(), io::Error> {
                                 }
                                 Some(chord) => {
                                     // advance
-                                    Some(chord.clone())
+                                    Some(chord)
                                 }
                             },
                         }
@@ -165,7 +165,7 @@ fn main() -> Result<(), io::Error> {
                                         }
                                         _ => (), // action optional, nothing to do
                                     }
-                                    Some(chord.clone())
+                                    Some(chord)
                                 }
                                 None => None,
                             }
