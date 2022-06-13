@@ -12,12 +12,12 @@ use crossterm::terminal::{
 };
 use tui::backend::CrosstermBackend;
 use tui::layout::Direction;
+use tui::{Frame, Terminal};
 
 use crate::chords::{Chords, KeyChord};
 use crate::panels::{Panel, PromptPanel, TextEditPanel};
 use crate::render::render_split;
 use crate::splits::{PanelSplit, UserSplits};
-use tui::{Frame, Terminal};
 
 mod chords;
 mod panels;
@@ -30,6 +30,7 @@ pub struct AppState {
     panels: Vec<(usize, Box<dyn Panel>)>,
     splits: Vec<PanelSplit>,
     active_panel: usize,
+    selecting_panel: bool,
 }
 
 impl AppState {
@@ -54,7 +55,27 @@ impl AppState {
             panels,
             splits,
             active_panel,
+            selecting_panel: false,
         })
+    }
+
+    pub fn set_selecting_panel(&mut self, _code: KeyCode) {
+        self.selecting_panel = true;
+    }
+
+    pub fn select_panel(&mut self, code: KeyCode) {
+        self.selecting_panel = false;
+        match code {
+            KeyCode::Char(c) => {
+                for (index, (_, panel)) in self.panels.iter().enumerate() {
+                    if panel.get_id() == c {
+                        self.active_panel = index;
+                        break;
+                    }
+                }
+            }
+            _ => (), // soft error
+        }
     }
 
     pub fn first_available_id(&mut self) -> char {
@@ -102,27 +123,50 @@ fn main() -> Result<(), io::Error> {
                     // command should've been executed, before being set as current
                     (Some(KeyChord::Command(_)), _) => None,
                     (Some(KeyChord::Node(children, _action)), code) => {
-                        match children.get(&code) {
-                            None => None, // end chord
-                            Some(KeyChord::Command(f)) => {
-                                // end of chord, execute function
-                                f(&mut app_state);
-                                None
-                            }
-                            Some(chord) => {
-                                // set this chord as current chord
-                                Some(chord.clone())
-                            }
+                        match children.get(&KeyCode::Null) {
+                            // check if is command
+                            Some(wildcard) => match wildcard {
+                                KeyChord::Node(_, _) => None, // error, misconfiguration
+                                KeyChord::Command(action) => {
+                                    action(&mut app_state, code);
+                                    // end chord
+                                    None
+                                }
+                            },
+                            None => match children.get(&code) {
+                                None => None, // end chord
+                                Some(KeyChord::Command(action)) => {
+                                    // end of chord, execute function
+                                    action(&mut app_state, code);
+                                    None
+                                }
+                                Some(chord) => {
+                                    // advance
+                                    Some(chord.clone())
+                                }
+                            },
                         }
                     }
                     // not in chord, check other commands
                     (None, code) => {
                         // not in chord, but could start one
-                        if event.modifiers.contains(KeyModifiers::CONTROL) {
-                            // CTRL means a global command including chords
+                        if event
+                            .modifiers
+                            .contains(KeyModifiers::CONTROL | KeyModifiers::ALT)
+                        {
+                            // CTRL + ALT means a global command including chords
                             // chords without CONTROL will be deferred to active panel
                             match global_chords.chord_map.get(&code) {
-                                Some(chord) => Some(chord.clone()),
+                                Some(chord) => {
+                                    match chord {
+                                        KeyChord::Node(_, Some(action)) => {
+                                            // execute intermediary action
+                                            action(&mut app_state, code);
+                                        }
+                                        _ => (), // action optional, nothing to do
+                                    }
+                                    Some(chord.clone())
+                                }
                                 None => None,
                             }
                         } else {
@@ -145,6 +189,11 @@ fn main() -> Result<(), io::Error> {
                 };
 
                 global_chords.current_chord = next_chord;
+
+                if global_chords.current_chord.is_none() {
+                    // reset
+                    app_state.selecting_panel = false;
+                }
             }
             Event::Mouse(_event) => (), // println!("{:?}", event),
             Event::Resize(width, height) => execute!(

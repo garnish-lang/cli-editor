@@ -1,6 +1,6 @@
 use tui::layout::{Constraint, Direction, Layout, Rect};
-use tui::style::{Color, Style};
-use tui::text::Span;
+use tui::style::{Color, Modifier, Style};
+use tui::text::{Span, Spans};
 use tui::widgets::{Block, Borders};
 
 use crate::splits::UserSplits;
@@ -68,10 +68,29 @@ pub fn render_split(split: usize, app: &AppState, frame: &mut EditorFrame, chunk
                                 frame.set_cursor(x, y);
                             }
 
-                            let title = panel.get_title();
+                            // if selecting, display id on top right side
+                            let title = match app.selecting_panel {
+                                true => Spans::from(vec![
+                                    Span::styled(
+                                        format!(" {} ", panel.get_id()),
+                                        Style::default()
+                                            .fg(Color::Green)
+                                            .bg(Color::White)
+                                            .add_modifier(Modifier::BOLD),
+                                    ),
+                                    Span::styled(
+                                        panel.get_title(),
+                                        Style::default().fg(Color::White),
+                                    ),
+                                ]),
+                                false => Spans::from(vec![Span::styled(
+                                    panel.get_title(),
+                                    Style::default().fg(Color::White),
+                                )]),
+                            };
 
                             let block = Block::default()
-                                .title(Span::styled(title, Style::default().fg(Color::White)))
+                                .title(title)
                                 .borders(Borders::ALL)
                                 .border_style(Style::default().fg(match is_active {
                                     true => Color::Green,

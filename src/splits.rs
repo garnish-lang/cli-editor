@@ -1,3 +1,4 @@
+use crossterm::event::KeyCode;
 use tui::layout::Direction;
 
 use crate::panels::{Panel, TextEditPanel};
@@ -92,10 +93,10 @@ fn split(app: &mut AppState, direction: Direction) {
     }
 }
 
-pub fn split_horizontal(app: &mut AppState) {
+pub fn split_horizontal(app: &mut AppState, _code: KeyCode) {
     split(app, Direction::Horizontal)
 }
 
-pub fn split_vertical(app: &mut AppState) {
+pub fn split_vertical(app: &mut AppState, _code: KeyCode) {
     split(app, Direction::Vertical)
 }

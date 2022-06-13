@@ -6,7 +6,7 @@ use crate::AppState;
 
 use crate::splits::{split_horizontal, split_vertical};
 
-pub type ChordAction = fn(&mut AppState);
+pub type ChordAction = fn(&mut AppState, KeyCode);
 
 #[derive(Clone)]
 pub enum KeyChord {
@@ -37,9 +37,9 @@ impl Chords {
             KeyCode::Char('a'),
             KeyChord::Node({
                 let mut h = HashMap::new();
-                h.insert(KeyCode::Null, KeyChord::Command(split_horizontal));
+                h.insert(KeyCode::Null, KeyChord::Command(AppState::select_panel));
                 h
-            }, None),
+            }, Some(AppState::set_selecting_panel)),
         );
 
         Chords {
