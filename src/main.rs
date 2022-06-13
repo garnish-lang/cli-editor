@@ -152,7 +152,7 @@ fn main() -> Result<(), io::Error> {
                         // not in chord, but could start one
                         if event
                             .modifiers
-                            .contains(KeyModifiers::CONTROL | KeyModifiers::ALT)
+                            .contains(KeyModifiers::CONTROL)
                         {
                             // CTRL + ALT means a global command including chords
                             // chords without CONTROL will be deferred to active panel
