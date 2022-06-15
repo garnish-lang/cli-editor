@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter, Write};
+use std::hash::{Hash, Hasher};
 
 use crossterm::event::{KeyCode, KeyModifiers};
 
@@ -11,29 +12,67 @@ pub type ChordAction = fn(&mut AppState, KeyCode);
 #[derive(Clone)]
 pub enum KeyChord {
     Node(
-        HashMap<KeyCode, KeyChord>,
+        KeyCode,
         KeyModifiers,
+        HashMap<ChordHash, KeyChord>,
         Option<ChordAction>,
     ),
-    Command(ChordAction),
+    Command(KeyCode, KeyModifiers, ChordAction),
+}
+
+impl KeyChord {
+    fn get_hash(&self) -> ChordHash {
+        let (c, m) = match self {
+            KeyChord::Node(c, m, _, _) => (c, m),
+            KeyChord::Command(c, m, _) => (c, m),
+        };
+
+        ChordHash::new(*c, *m)
+    }
 }
 
 impl Debug for KeyChord {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.write_str(
             match self {
-                KeyChord::Node(children, mods, action) => {
+                KeyChord::Node(code, mods, children, action) => {
                     format!(
-                        "KeyChord Node: mods {:?} has action {} children {:?}",
+                        "KeyChord Node: code {:?} mods {:?} has action {} children {:?}",
+                        code,
                         mods,
                         action.is_some(),
                         children
                     )
                 }
-                KeyChord::Command(_) => format!("KeyChord Command"),
+                KeyChord::Command(code, mods, _) => {
+                    format!("KeyChord Command: code {:?} mods {:?}", code, mods)
+                }
             }
             .as_str(),
         )
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ChordHash {
+    code: KeyCode,
+    mods: KeyModifiers,
+}
+
+impl ChordHash {
+    pub fn new(code: KeyCode, mods: KeyModifiers) -> Self {
+        ChordHash { code, mods }
+    }
+
+    pub fn new_code(code: KeyCode) -> Self {
+        ChordHash { code, mods: KeyModifiers::empty() }
+    }
+}
+
+impl Hash for ChordHash {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.code.hash(state);
+        self.mods.hash(state);
     }
 }
 
@@ -46,7 +85,7 @@ pub struct Chords<'a> {
 impl Chords<'_> {
     pub fn new() -> Self {
         Chords {
-            root: KeyChord::Node(HashMap::new(), KeyModifiers::empty(), None),
+            root: KeyChord::Node(KeyCode::Null, KeyModifiers::empty(), HashMap::new(), None),
             chord_map: HashMap::new(),
             current_chord: None,
         }
@@ -63,17 +102,16 @@ impl Chords<'_> {
         // chain insert all but the last
         for node in builder.nodes.iter().take(builder.nodes.len() - 1) {
             match current_node {
-                KeyChord::Node(children, _, _) => {
-                    children.insert(
-                        node.code,
-                        KeyChord::Node(HashMap::new(), node.mods, node.action),
-                    );
-                    current_node = match children.get_mut(&node.code) {
+                KeyChord::Node(_, _, children, _) => {
+                    let n = KeyChord::Node(node.code, node.mods, HashMap::new(), node.action);
+                    let h = n.get_hash();
+                    children.insert(n.get_hash(), n);
+                    current_node = match children.get_mut(&h) {
                         Some(v) => v,
                         _ => unreachable!(),
                     };
                 }
-                KeyChord::Command(_) => unimplemented!(),
+                KeyChord::Command(_, _, _) => unimplemented!(),
             }
         }
 
@@ -81,11 +119,12 @@ impl Chords<'_> {
         // insert into current
         let last = &builder.nodes[builder.nodes.len() - 1];
         match current_node {
-            KeyChord::Node(children, _, _) => {
-                children.insert(last.code, KeyChord::Command(builder.action));
+            KeyChord::Node(_, _, children, _) => {
+                let n = KeyChord::Command(last.code, last.mods,builder.action);
+                children.insert(n.get_hash(), n);
             }
             // should've been validate in first loop
-            KeyChord::Command(_) => unreachable!()
+            KeyChord::Command(_, _, _) => unreachable!(),
         }
 
         Ok(())
@@ -94,40 +133,21 @@ impl Chords<'_> {
 
 impl Chords<'_> {
     pub fn global_chords() -> Self {
-        // setup chord commands
-        let mut chord_map = HashMap::new();
-        chord_map.insert(
-            KeyCode::Char('s'),
-            KeyChord::Node(
-                {
-                    let mut h = HashMap::new();
-                    h.insert(KeyCode::Char('h'), KeyChord::Command(split_horizontal));
-                    h.insert(KeyCode::Char('v'), KeyChord::Command(split_vertical));
-                    h
-                },
-                KeyModifiers::empty(),
-                None,
-            ),
-        );
+        let mut chords = Chords::new();
 
-        chord_map.insert(
-            KeyCode::Char('a'),
-            KeyChord::Node(
-                {
-                    let mut h = HashMap::new();
-                    h.insert(KeyCode::Null, KeyChord::Command(AppState::select_panel));
-                    h
-                },
-                KeyModifiers::empty(),
-                Some(AppState::set_selecting_panel),
-            ),
-        );
+        chords.insert(|b| {
+            b.node(key('s')).node(key('s')).action(split_horizontal)
+        }).unwrap();
 
-        Chords {
-            root: KeyChord::Node(HashMap::new(), KeyModifiers::empty(), None),
-            chord_map,
-            current_chord: None,
-        }
+        chords.insert(|b| {
+            b.node(key('s')).node(key('v')).action(split_vertical)
+        }).unwrap();
+
+        chords.insert(|b| {
+            b.node(key('a')).node(code(KeyCode::Null)).action(AppState::select_panel)
+        }).unwrap();
+
+        chords
     }
 }
 
@@ -203,7 +223,7 @@ impl KeyChordBuilder {
 mod tests {
     use crossterm::event::KeyCode;
 
-    use crate::chords::{code, default_action, key, KeyChordNode};
+    use crate::chords::{ChordHash, code, default_action, key, KeyChordNode};
     use crate::{AppState, Chords, KeyChord};
 
     fn no_op(state: &mut AppState, _: KeyCode) {
@@ -218,12 +238,12 @@ mod tests {
             .unwrap();
 
         match chords.root {
-            KeyChord::Node(children, _, _) => match children.get(&KeyCode::Char('a')).unwrap() {
-                KeyChord::Node(children, _, _) => {
-                    match children.get(&KeyCode::Char('b')).unwrap() {
-                        KeyChord::Node(children, _, _) => {
-                            match children.get(&KeyCode::Char('c')).unwrap() {
-                                KeyChord::Command(action) => {
+            KeyChord::Node(_, _, children, _) => match children.get(&ChordHash::new_code(KeyCode::Char('a'))).unwrap() {
+                KeyChord::Node(_, _, children, _) => {
+                    match children.get(&ChordHash::new_code(KeyCode::Char('b'))).unwrap() {
+                        KeyChord::Node(_, _, children, _) => {
+                            match children.get(&ChordHash::new_code(KeyCode::Char('c'))).unwrap() {
+                                KeyChord::Command(_, _, action) => {
                                     let mut state = AppState::new();
                                     action(&mut state, KeyCode::Null);
 

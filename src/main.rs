@@ -14,7 +14,7 @@ use tui::backend::CrosstermBackend;
 use tui::layout::Direction;
 use tui::{Frame, Terminal};
 
-use crate::chords::{Chords, KeyChord};
+use crate::chords::{ChordHash, Chords, KeyChord};
 use crate::panels::{Panel, PromptPanel, TextEditPanel};
 use crate::render::render_split;
 use crate::splits::{PanelSplit, UserSplits};
@@ -121,21 +121,21 @@ fn main() -> Result<(), io::Error> {
                 let next_chord = match (&global_chords.current_chord, event.code) {
                     // soft error, just reset
                     // command should've been executed, before being set as current
-                    (Some(KeyChord::Command(_)), _) => None,
-                    (Some(KeyChord::Node(children, _, _action)), code) => {
-                        match children.get(&KeyCode::Null) {
+                    (Some(KeyChord::Command(_, _, _)), _) => None,
+                    (Some(KeyChord::Node(_, _, children, _action)), code) => {
+                        match children.get(&ChordHash::new_code(KeyCode::Null)) {
                             // check if is command
                             Some(wildcard) => match wildcard {
-                                KeyChord::Node(_, _, _) => None, // error, misconfiguration
-                                KeyChord::Command(action) => {
+                                KeyChord::Node(_, _, _, _) => None, // error, misconfiguration
+                                KeyChord::Command(_, _, action) => {
                                     action(&mut app_state, code);
                                     // end chord
                                     None
                                 }
                             },
-                            None => match children.get(&code) {
+                            None => match children.get(&ChordHash::new_code(code)) {
                                 None => None, // end chord
-                                Some(KeyChord::Command(action)) => {
+                                Some(KeyChord::Command(_, _, action)) => {
                                     // end of chord, execute function
                                     action(&mut app_state, code);
                                     None
@@ -159,7 +159,7 @@ fn main() -> Result<(), io::Error> {
                             match global_chords.chord_map.get(&code) {
                                 Some(chord) => {
                                     match chord {
-                                        KeyChord::Node(_, _, Some(action)) => {
+                                        KeyChord::Node(_, _, _, Some(action)) => {
                                             // execute intermediary action
                                             action(&mut app_state, code);
                                         }
