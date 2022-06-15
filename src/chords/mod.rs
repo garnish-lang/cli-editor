@@ -53,7 +53,7 @@ impl Debug for KeyChord {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct ChordHash {
     code: KeyCode,
     mods: KeyModifiers,
@@ -66,13 +66,6 @@ impl ChordHash {
 
     pub fn new_code(code: KeyCode) -> Self {
         ChordHash { code, mods: KeyModifiers::empty() }
-    }
-}
-
-impl Hash for ChordHash {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.code.hash(state);
-        self.mods.hash(state);
     }
 }
 
