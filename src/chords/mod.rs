@@ -232,10 +232,9 @@ mod tests {
 
     fn assert_sequence(root: &KeyChord, sequence: &[char]) {
         let mut current = root;
-        let expected = ['a', 'b', 'c'];
-        for c in expected {
+        for c in sequence {
             match current {
-                KeyChord::Node(_, _, children, _) => match children.get(&ChordHash::new_code(KeyCode::Char(c))) {
+                KeyChord::Node(_, _, children, _) => match children.get(&ChordHash::new_code(KeyCode::Char(*c))) {
                     Some(n) => current = n,
                     None => panic!("{} not found in children", c)
                 }
