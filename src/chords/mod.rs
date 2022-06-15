@@ -68,14 +68,14 @@ impl CommandDetails {
         self.description.to_string()
     }
 
-    fn empty() -> Self {
+    pub fn empty() -> Self {
         CommandDetails {
             name: String::new(),
             description: String::new(),
         }
     }
 
-    fn split_horizontal() -> Self {
+    pub fn split_horizontal() -> Self {
         CommandDetails {
             name: "Split Horizontal".to_string(),
             description: "Split active panel into two panels that are horizontally aligned."
@@ -83,7 +83,7 @@ impl CommandDetails {
         }
     }
 
-    fn split_vertical() -> Self {
+    pub fn split_vertical() -> Self {
         CommandDetails {
             name: "Split Vertical".to_string(),
             description: "Split active panel into two panels that are vertically aligned."
@@ -91,7 +91,7 @@ impl CommandDetails {
         }
     }
 
-    fn select_panel() -> Self {
+    pub fn select_panel() -> Self {
         CommandDetails {
             name: "Activate Panel".to_string(),
             description: "Activate a panel by selecting its ID. The IDs will be displayed next to panel titles after first key.".to_string()
@@ -119,7 +119,6 @@ impl ChordHash {
 }
 
 pub struct Chords {
-    pub chord_map: HashMap<KeyCode, KeyChord>,
     root: KeyChord,
     path: Vec<ChordHash>,
 }
@@ -128,7 +127,6 @@ impl Chords {
     pub fn new() -> Self {
         Chords {
             root: KeyChord::Node(KeyCode::Null, KeyModifiers::empty(), HashMap::new(), None),
-            chord_map: HashMap::new(),
             path: vec![],
         }
     }
@@ -256,38 +254,6 @@ impl Chords {
             KeyChord::Node(_, _, _, _) => (false, None),
             KeyChord::Command(_, _, _, action) => (true, Some(*action)),
         }
-    }
-}
-
-impl Chords {
-    pub fn global_chords() -> Self {
-        let mut chords = Chords::new();
-
-        chords
-            .insert(|b| {
-                b.node(key('s'))
-                    .node(key('s'))
-                    .action(CommandDetails::split_horizontal(), split_horizontal)
-            })
-            .unwrap();
-
-        chords
-            .insert(|b| {
-                b.node(key('s'))
-                    .node(key('v'))
-                    .action(CommandDetails::split_vertical(), split_vertical)
-            })
-            .unwrap();
-
-        chords
-            .insert(|b| {
-                b.node(key('a'))
-                    .node(code(KeyCode::Null))
-                    .action(CommandDetails::select_panel(), AppState::select_panel)
-            })
-            .unwrap();
-
-        chords
     }
 }
 
@@ -509,7 +475,10 @@ mod tests {
             })
             .unwrap();
 
-        assert!(chords.chord_map.is_empty());
+        match chords.root {
+            KeyChord::Node(_, _, children, _) => assert!(children.is_empty()),
+            _ => panic!("Not a Node")
+        }
     }
 
     #[test]

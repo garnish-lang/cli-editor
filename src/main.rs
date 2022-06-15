@@ -3,7 +3,7 @@ use std::io;
 use std::io::Stdout;
 
 use crossterm::event::{
-    read, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers,
+    read, DisableMouseCapture, EnableMouseCapture, Event, KeyCode,
 };
 use crossterm::execute;
 use crossterm::style::Print;
@@ -14,10 +14,10 @@ use tui::backend::CrosstermBackend;
 use tui::layout::Direction;
 use tui::{Frame, Terminal};
 
-use crate::chords::{ChordHash, Chords, KeyChord};
+use crate::chords::{ChordHash, Chords, code, CommandDetails, key, KeyChord};
 use crate::panels::{Panel, PromptPanel, TextEditPanel};
 use crate::render::render_split;
-use crate::splits::{PanelSplit, UserSplits};
+use crate::splits::{PanelSplit, split_horizontal, split_vertical, UserSplits};
 
 mod chords;
 mod panels;
@@ -99,6 +99,36 @@ impl AppState {
     }
 }
 
+fn global_chords() -> Chords {
+    let mut chords = Chords::new();
+
+    chords
+        .insert(|b| {
+            b.node(key('s'))
+                .node(key('s'))
+                .action(CommandDetails::split_horizontal(), split_horizontal)
+        })
+        .unwrap();
+
+    chords
+        .insert(|b| {
+            b.node(key('s'))
+                .node(key('v'))
+                .action(CommandDetails::split_vertical(), split_vertical)
+        })
+        .unwrap();
+
+    chords
+        .insert(|b| {
+            b.node(key('a'))
+                .node(code(KeyCode::Null))
+                .action(CommandDetails::select_panel(), AppState::select_panel)
+        })
+        .unwrap();
+
+    chords
+}
+
 fn main() -> Result<(), io::Error> {
     enable_raw_mode()?;
 
@@ -108,89 +138,29 @@ fn main() -> Result<(), io::Error> {
     let mut terminal = Terminal::new(backend)?;
 
     let mut app_state = AppState::new();
-    let mut global_chords = Chords::global_chords();
+    let mut global_chords = global_chords();
 
     loop {
         terminal.draw(|frame| render_split(0, &app_state, frame, frame.size()))?;
 
         match read()? {
             Event::Key(event) => {
-                // check if we're in a chord right now
-                // if not, check if we're going to start a chord
-                // then finally defer to non-chord commands
-                // let next_chord = match (&global_chords.current_chord, event.code) {
-                //     // soft error, just reset
-                //     // command should've been executed, before being set as current
-                //     (Some(KeyChord::Command(_, _, _, _)), _) => None,
-                //     (Some(KeyChord::Node(_, _, children, _action)), code) => {
-                //         match children.get(&ChordHash::new_code(KeyCode::Null)) {
-                //             // check if is command
-                //             Some(wildcard) => match wildcard {
-                //                 KeyChord::Node(_, _, _, _) => None, // error, misconfiguration
-                //                 KeyChord::Command(_, _, _, action) => {
-                //                     action(&mut app_state, code);
-                //                     // end chord
-                //                     None
-                //                 }
-                //             },
-                //             None => match children.get(&ChordHash::new_code(code)) {
-                //                 None => None, // end chord
-                //                 Some(KeyChord::Command(_, _, _, action)) => {
-                //                     // end of chord, execute function
-                //                     action(&mut app_state, code);
-                //                     None
-                //                 }
-                //                 Some(chord) => {
-                //                     // advance
-                //                     Some(chord)
-                //                 }
-                //             },
-                //         }
-                //     }
-                //     // not in chord, check other commands
-                //     (None, code) => {
-                //         // not in chord, but could start one
-                //         if event.modifiers.contains(KeyModifiers::CONTROL) {
-                //             // CTRL + ALT means a global command including chords
-                //             // chords without CONTROL will be deferred to active panel
-                //             match global_chords.chord_map.get(&code) {
-                //                 Some(chord) => {
-                //                     match chord {
-                //                         KeyChord::Node(_, _, _, Some(action)) => {
-                //                             // execute intermediary action
-                //                             action(&mut app_state, code);
-                //                         }
-                //                         _ => (), // action optional, nothing to do
-                //                     }
-                //                     Some(chord)
-                //                 }
-                //                 None => None,
-                //             }
-                //         } else {
-                //             // defer to active panel
-                //             match app_state.panels.get_mut(app_state.active_panel) {
-                //                 Some((_, panel)) => {
-                //                     if !panel.receive_key(event) {
-                //                         match event.code {
-                //                             KeyCode::Esc => break,
-                //                             _ => (),
-                //                         }
-                //                     }
-                //
-                //                     None
-                //                 }
-                //                 None => None,
-                //             }
-                //         }
-                //     }
-                // };
-                //
-                // global_chords.current_chord = next_chord;
-                //
-                // if global_chords.current_chord.is_none() {
-                //     // reset
-                //     app_state.selecting_panel = false;
-                // }
+                // Loop breaking doesn't work with current implementation
+                if event.code == KeyCode::Esc {
+                    break;
+                }
+
+                let (end, action) = global_chords.advance(ChordHash::new(event.code, event.modifiers));
+
+                match action {
+                    Some(action) => action(&mut app_state, event.code),
+                    None => ()
+                };
+
+                if end {
+                    // reset
+                    app_state.selecting_panel = false;
+                }
             }
             Event::Mouse(_event) => (), // println!("{:?}", event),
             Event::Resize(width, height) => execute!(
