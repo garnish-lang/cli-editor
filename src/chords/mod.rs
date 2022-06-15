@@ -375,7 +375,7 @@ mod tests {
     }
 
     #[test]
-    fn insert_with_multiple_commands() {
+    fn insert_beyond_existing_command_extended() {
         let mut chords = Chords::new();
         chords
             .insert(|b| {
