@@ -149,7 +149,7 @@ impl Chords<'_> {
                     let n = KeyChord::Node(node.code, node.mods, HashMap::new(), node.action);
                     current_node = children.entry(h).or_insert(n)
                 }
-                KeyChord::Command(_, _, _, _) => unimplemented!(),
+                KeyChord::Command(_, _, _, _) => return Err("Existing command in sequence.".to_string()),
             }
         }
 
@@ -162,7 +162,7 @@ impl Chords<'_> {
                 children.insert(n.get_hash(), n);
             }
             // should've been validate in first loop
-            KeyChord::Command(_, _, _, _) => unreachable!(),
+            KeyChord::Command(_, _, _, _) => return Err("Existing command in sequence.".to_string()),
         }
 
         Ok(())
@@ -201,6 +201,7 @@ impl Chords<'_> {
     }
 }
 
+#[derive(Clone)]
 pub struct KeyChordNode {
     code: KeyCode,
     mods: KeyModifiers,
@@ -346,5 +347,56 @@ mod tests {
 
         assert_sequence(&chords.root, &['a', 'b', 'c']);
         assert_sequence(&chords.root, &['a', 'b', 'd']);
+    }
+
+    #[test]
+    fn insert_beyond_existing_command() {
+        let mut chords = Chords::new();
+        chords
+            .insert(|b| {
+                b.node(key('a'))
+                    .node(key('b'))
+                    .node(key('c'))
+                    .action(CommandDetails::split_horizontal(), no_op)
+            })
+            .unwrap();
+
+        let result = chords
+            .insert(|b| {
+                b.node(key('a'))
+                    .node(key('b'))
+                    .node(key('c'))
+                    .node(key('d'))
+                    .action(CommandDetails::split_horizontal(), no_op)
+            });
+
+        assert_sequence(&chords.root, &['a', 'b', 'c']);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn insert_with_multiple_commands() {
+        let mut chords = Chords::new();
+        chords
+            .insert(|b| {
+                b.node(key('a'))
+                    .node(key('b'))
+                    .node(key('c'))
+                    .action(CommandDetails::split_horizontal(), no_op)
+            })
+            .unwrap();
+
+        let result = chords
+            .insert(|b| {
+                b.node(key('a'))
+                    .node(key('b'))
+                    .node(key('c'))
+                    .node(key('d'))
+                    .node(key('e'))
+                    .node(key('f'))
+                    .action(CommandDetails::split_horizontal(), no_op)
+            });
+
+        assert!(result.is_err());
     }
 }
