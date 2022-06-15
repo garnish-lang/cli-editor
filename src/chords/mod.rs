@@ -230,6 +230,30 @@ mod tests {
         state.active_panel = 100;
     }
 
+    fn assert_sequence(root: &KeyChord, sequence: &[char]) {
+        let mut current = root;
+        let expected = ['a', 'b', 'c'];
+        for c in expected {
+            match current {
+                KeyChord::Node(_, _, children, _) => match children.get(&ChordHash::new_code(KeyCode::Char(c))) {
+                    Some(n) => current = n,
+                    None => panic!("{} not found in children", c)
+                }
+                k => panic!("{:?} node is not Node", k)
+            }
+        }
+
+        match current {
+            KeyChord::Command(_, _, action) => {
+                let mut state = AppState::new();
+                action(&mut state, KeyCode::Null);
+
+                assert_eq!(state.active_panel, 100, "State not changed");
+            }
+            k => panic!("{:?} is not a Command", k)
+        }
+    }
+
     #[test]
     fn insert_basic() {
         let mut chords = Chords::new();
@@ -237,27 +261,6 @@ mod tests {
             .insert(|b| b.node(key('a')).node(key('b')).node(key('c')).action(no_op))
             .unwrap();
 
-        match chords.root {
-            KeyChord::Node(_, _, children, _) => match children.get(&ChordHash::new_code(KeyCode::Char('a'))).unwrap() {
-                KeyChord::Node(_, _, children, _) => {
-                    match children.get(&ChordHash::new_code(KeyCode::Char('b'))).unwrap() {
-                        KeyChord::Node(_, _, children, _) => {
-                            match children.get(&ChordHash::new_code(KeyCode::Char('c'))).unwrap() {
-                                KeyChord::Command(_, _, action) => {
-                                    let mut state = AppState::new();
-                                    action(&mut state, KeyCode::Null);
-
-                                    assert_eq!(state.active_panel, 100, "State not changed");
-                                }
-                                _ => panic!("'c' node is not a command"),
-                            }
-                        }
-                        _ => panic!("'b' node is not a node"),
-                    }
-                }
-                _ => panic!("'a' node is not a node"),
-            },
-            _ => panic!("root not a node"),
-        }
+        assert_sequence(&chords.root, &['a', 'b', 'c'])
     }
 }
