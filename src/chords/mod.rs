@@ -145,13 +145,9 @@ impl Chords<'_> {
         for node in builder.nodes.iter().take(builder.nodes.len() - 1) {
             match current_node {
                 KeyChord::Node(_, _, children, _) => {
+                    let h = ChordHash::new(node.code, node.mods);
                     let n = KeyChord::Node(node.code, node.mods, HashMap::new(), node.action);
-                    let h = n.get_hash();
-                    children.insert(n.get_hash(), n);
-                    current_node = match children.get_mut(&h) {
-                        Some(v) => v,
-                        _ => unreachable!(),
-                    };
+                    current_node = children.entry(h).or_insert(n)
                 }
                 KeyChord::Command(_, _, _, _) => unimplemented!(),
             }
@@ -325,5 +321,30 @@ mod tests {
             .unwrap();
 
         assert_sequence(&chords.root, &['a', 'b', 'c'])
+    }
+
+    #[test]
+    fn insert_two_same_start() {
+        let mut chords = Chords::new();
+        chords
+            .insert(|b| {
+                b.node(key('a'))
+                    .node(key('b'))
+                    .node(key('c'))
+                    .action(CommandDetails::split_horizontal(), no_op)
+            })
+            .unwrap();
+
+        chords
+            .insert(|b| {
+                b.node(key('a'))
+                    .node(key('b'))
+                    .node(key('d'))
+                    .action(CommandDetails::split_horizontal(), no_op)
+            })
+            .unwrap();
+
+        assert_sequence(&chords.root, &['a', 'b', 'c']);
+        assert_sequence(&chords.root, &['a', 'b', 'd']);
     }
 }
