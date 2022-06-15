@@ -149,7 +149,9 @@ impl Chords<'_> {
                     let n = KeyChord::Node(node.code, node.mods, HashMap::new(), node.action);
                     current_node = children.entry(h).or_insert(n)
                 }
-                KeyChord::Command(_, _, _, _) => return Err("Existing command in sequence.".to_string()),
+                KeyChord::Command(_, _, _, _) => {
+                    return Err("Existing command in sequence.".to_string())
+                }
             }
         }
 
@@ -162,7 +164,66 @@ impl Chords<'_> {
                 children.insert(n.get_hash(), n);
             }
             // should've been validate in first loop
-            KeyChord::Command(_, _, _, _) => return Err("Existing command in sequence.".to_string()),
+            KeyChord::Command(_, _, _, _) => {
+                return Err("Existing command in sequence.".to_string())
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn remove(&mut self, build: fn(KeyChordBuilder) -> KeyChordBuilder) -> Result<(), String> {
+        let builder = build(KeyChordBuilder::new());
+        // manual count of nesting
+        // drill down and keep track of the lowest node with only 1 child
+        let mut index = 0;
+        let mut lowest = 0;
+
+        let mut current_node = &self.root;
+        for node in &builder.nodes {
+            match current_node {
+                KeyChord::Node(_, _, children, _) => {
+                    let h = ChordHash::new(node.code, node.mods);
+                    match children.get(&h) {
+                        // no child with given sequence, effectively means its already removed
+                        // just return
+                        None => return Ok(()),
+                        Some(c) => current_node = c,
+                    };
+
+                    // 1 or fewer children means this entire branch will be removed
+                    if children.len() > 1 {
+                        lowest = index + 1;
+                    }
+                    index += 1;
+                }
+                // end of branch
+                KeyChord::Command(_, _, _, _) => (),
+            }
+        }
+
+        // drill down lowest number of times and remove that node from its parent
+        let mut current_node = &mut self.root;
+        index = 0;
+
+        for node in &builder.nodes {
+            match current_node {
+                KeyChord::Node(_, _, children, _) => {
+                    let h = ChordHash::new(node.code, node.mods);
+                    // 1 or fewer children means this entire branch will be removed
+                    if index == lowest {
+                        children.remove(&h);
+                        break;
+                    }
+                    match children.get_mut(&h) {
+                        None => unreachable!(),
+                        Some(c) => current_node = c
+                    }
+                    index += 1;
+                }
+                // end of branch
+                KeyChord::Command(_, _, _, _) => (),
+            }
         }
 
         Ok(())
@@ -361,14 +422,13 @@ mod tests {
             })
             .unwrap();
 
-        let result = chords
-            .insert(|b| {
-                b.node(key('a'))
-                    .node(key('b'))
-                    .node(key('c'))
-                    .node(key('d'))
-                    .action(CommandDetails::split_horizontal(), no_op)
-            });
+        let result = chords.insert(|b| {
+            b.node(key('a'))
+                .node(key('b'))
+                .node(key('c'))
+                .node(key('d'))
+                .action(CommandDetails::split_horizontal(), no_op)
+        });
 
         assert_sequence(&chords.root, &['a', 'b', 'c']);
         assert!(result.is_err());
@@ -386,17 +446,72 @@ mod tests {
             })
             .unwrap();
 
-        let result = chords
+        let result = chords.insert(|b| {
+            b.node(key('a'))
+                .node(key('b'))
+                .node(key('c'))
+                .node(key('d'))
+                .node(key('e'))
+                .node(key('f'))
+                .action(CommandDetails::split_horizontal(), no_op)
+        });
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn remove() {
+        let mut chords = Chords::new();
+        chords
+            .insert(|b| {
+                b.node(key('a'))
+                    .node(key('b'))
+                    .node(key('c'))
+                    .action(CommandDetails::split_horizontal(), no_op)
+            })
+            .unwrap();
+
+        chords.remove(|b| {
+            b.node(key('a'))
+                .node(key('b'))
+                .node(key('c'))
+                .action(CommandDetails::split_horizontal(), no_op)
+        }).unwrap();
+
+        assert!(chords.chord_map.is_empty());
+    }
+
+    #[test]
+    fn remove_leaves_sibling_branch() {
+        let mut chords = Chords::new();
+        chords
             .insert(|b| {
                 b.node(key('a'))
                     .node(key('b'))
                     .node(key('c'))
                     .node(key('d'))
+                    .action(CommandDetails::split_horizontal(), no_op)
+            })
+            .unwrap();
+
+        chords
+            .insert(|b| {
+                b.node(key('a'))
+                    .node(key('b'))
                     .node(key('e'))
                     .node(key('f'))
                     .action(CommandDetails::split_horizontal(), no_op)
-            });
+            })
+            .unwrap();
 
-        assert!(result.is_err());
+        chords.remove(|b| {
+            b.node(key('a'))
+                .node(key('b'))
+                .node(key('c'))
+                .node(key('d'))
+                .action(CommandDetails::split_horizontal(), no_op)
+        }).unwrap();
+
+        assert_sequence(&chords.root, &['a', 'b', 'e', 'f']);
     }
 }
