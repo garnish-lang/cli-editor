@@ -516,4 +516,26 @@ mod tests {
 
         assert_sequence(&chords.root, &['a', 'b', 'e', 'f']);
     }
+
+    #[test]
+    fn remove_absent_sequence() {
+        let mut chords = Chords::new();
+        chords
+            .insert(|b| {
+                b.node(key('a'))
+                    .node(key('b'))
+                    .node(key('c'))
+                    .action(CommandDetails::split_horizontal(), no_op)
+            })
+            .unwrap();
+
+        chords.remove(|b| {
+            b.node(key('a'))
+                .node(key('b'))
+                .node(key('d'))
+                .action(CommandDetails::split_horizontal(), no_op)
+        }).unwrap();
+
+        assert_sequence(&chords.root, &['a', 'b', 'c']);
+    }
 }
