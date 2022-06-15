@@ -216,7 +216,9 @@ impl Chords<'_> {
                         break;
                     }
                     match children.get_mut(&h) {
-                        None => unreachable!(),
+                        // no child with given sequence, effectively means its already removed
+                        // just return
+                        None => return Ok(()),
                         Some(c) => current_node = c
                     }
                     index += 1;
