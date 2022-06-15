@@ -34,7 +34,7 @@ pub struct AppState {
 }
 
 impl AppState {
-    fn new() -> Result<Self, io::Error> {
+    fn new() -> Self {
         let splits: Vec<PanelSplit> = vec![PanelSplit::new(
             Direction::Vertical,
             vec![UserSplits::Panel(0), UserSplits::Panel(1)],
@@ -51,12 +51,12 @@ impl AppState {
 
         let active_panel = 1;
 
-        Ok(AppState {
+        AppState {
             panels,
             splits,
             active_panel,
             selecting_panel: false,
-        })
+        }
     }
 
     pub fn set_selecting_panel(&mut self, _code: KeyCode) {
@@ -107,7 +107,7 @@ fn main() -> Result<(), io::Error> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let mut app_state = AppState::new()?;
+    let mut app_state = AppState::new();
     let mut global_chords = Chords::global_chords();
 
     loop {
@@ -122,11 +122,11 @@ fn main() -> Result<(), io::Error> {
                     // soft error, just reset
                     // command should've been executed, before being set as current
                     (Some(KeyChord::Command(_)), _) => None,
-                    (Some(KeyChord::Node(children, _action)), code) => {
+                    (Some(KeyChord::Node(children, _, _action)), code) => {
                         match children.get(&KeyCode::Null) {
                             // check if is command
                             Some(wildcard) => match wildcard {
-                                KeyChord::Node(_, _) => None, // error, misconfiguration
+                                KeyChord::Node(_, _, _) => None, // error, misconfiguration
                                 KeyChord::Command(action) => {
                                     action(&mut app_state, code);
                                     // end chord
@@ -159,7 +159,7 @@ fn main() -> Result<(), io::Error> {
                             match global_chords.chord_map.get(&code) {
                                 Some(chord) => {
                                     match chord {
-                                        KeyChord::Node(_, Some(action)) => {
+                                        KeyChord::Node(_, _, Some(action)) => {
                                             // execute intermediary action
                                             action(&mut app_state, code);
                                         }
