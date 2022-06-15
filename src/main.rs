@@ -121,13 +121,13 @@ fn main() -> Result<(), io::Error> {
                 let next_chord = match (&global_chords.current_chord, event.code) {
                     // soft error, just reset
                     // command should've been executed, before being set as current
-                    (Some(KeyChord::Command(_, _, _)), _) => None,
+                    (Some(KeyChord::Command(_, _, _, _)), _) => None,
                     (Some(KeyChord::Node(_, _, children, _action)), code) => {
                         match children.get(&ChordHash::new_code(KeyCode::Null)) {
                             // check if is command
                             Some(wildcard) => match wildcard {
                                 KeyChord::Node(_, _, _, _) => None, // error, misconfiguration
-                                KeyChord::Command(_, _, action) => {
+                                KeyChord::Command(_, _, _, action) => {
                                     action(&mut app_state, code);
                                     // end chord
                                     None
@@ -135,7 +135,7 @@ fn main() -> Result<(), io::Error> {
                             },
                             None => match children.get(&ChordHash::new_code(code)) {
                                 None => None, // end chord
-                                Some(KeyChord::Command(_, _, action)) => {
+                                Some(KeyChord::Command(_, _, _, action)) => {
                                     // end of chord, execute function
                                     action(&mut app_state, code);
                                     None
@@ -150,10 +150,7 @@ fn main() -> Result<(), io::Error> {
                     // not in chord, check other commands
                     (None, code) => {
                         // not in chord, but could start one
-                        if event
-                            .modifiers
-                            .contains(KeyModifiers::CONTROL)
-                        {
+                        if event.modifiers.contains(KeyModifiers::CONTROL) {
                             // CTRL + ALT means a global command including chords
                             // chords without CONTROL will be deferred to active panel
                             match global_chords.chord_map.get(&code) {

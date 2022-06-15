@@ -17,14 +17,14 @@ pub enum KeyChord {
         HashMap<ChordHash, KeyChord>,
         Option<ChordAction>,
     ),
-    Command(KeyCode, KeyModifiers, ChordAction),
+    Command(KeyCode, KeyModifiers, CommandDetails, ChordAction),
 }
 
 impl KeyChord {
     fn get_hash(&self) -> ChordHash {
         let (c, m) = match self {
             KeyChord::Node(c, m, _, _) => (c, m),
-            KeyChord::Command(c, m, _) => (c, m),
+            KeyChord::Command(c, m, _, _) => (c, m),
         };
 
         ChordHash::new(*c, *m)
@@ -44,12 +44,58 @@ impl Debug for KeyChord {
                         children
                     )
                 }
-                KeyChord::Command(code, mods, _) => {
+                KeyChord::Command(code, mods, _, _) => {
                     format!("KeyChord Command: code {:?} mods {:?}", code, mods)
                 }
             }
             .as_str(),
         )
+    }
+}
+
+#[derive(Clone)]
+pub struct CommandDetails {
+    name: String,
+    description: String,
+}
+
+impl CommandDetails {
+    pub fn name(&self) -> String {
+        self.name.to_string()
+    }
+
+    pub fn description(&self) -> String {
+        self.description.to_string()
+    }
+
+    fn empty() -> Self {
+        CommandDetails {
+            name: String::new(),
+            description: String::new(),
+        }
+    }
+
+    fn split_horizontal() -> Self {
+        CommandDetails {
+            name: "Split Horizontal".to_string(),
+            description: "Split active panel into two panels that are horizontally aligned."
+                .to_string(),
+        }
+    }
+
+    fn split_vertical() -> Self {
+        CommandDetails {
+            name: "Split Vertical".to_string(),
+            description: "Split active panel into two panels that are vertically aligned."
+                .to_string(),
+        }
+    }
+
+    fn select_panel() -> Self {
+        CommandDetails {
+            name: "Activate Panel".to_string(),
+            description: "Activate a panel by selecting its ID. The IDs will be displayed next to panel titles after first key.".to_string()
+        }
     }
 }
 
@@ -65,7 +111,10 @@ impl ChordHash {
     }
 
     pub fn new_code(code: KeyCode) -> Self {
-        ChordHash { code, mods: KeyModifiers::empty() }
+        ChordHash {
+            code,
+            mods: KeyModifiers::empty(),
+        }
     }
 }
 
@@ -104,7 +153,7 @@ impl Chords<'_> {
                         _ => unreachable!(),
                     };
                 }
-                KeyChord::Command(_, _, _) => unimplemented!(),
+                KeyChord::Command(_, _, _, _) => unimplemented!(),
             }
         }
 
@@ -113,11 +162,11 @@ impl Chords<'_> {
         let last = &builder.nodes[builder.nodes.len() - 1];
         match current_node {
             KeyChord::Node(_, _, children, _) => {
-                let n = KeyChord::Command(last.code, last.mods,builder.action);
+                let n = KeyChord::Command(last.code, last.mods, builder.details, builder.action);
                 children.insert(n.get_hash(), n);
             }
             // should've been validate in first loop
-            KeyChord::Command(_, _, _) => unreachable!(),
+            KeyChord::Command(_, _, _, _) => unreachable!(),
         }
 
         Ok(())
@@ -128,17 +177,29 @@ impl Chords<'_> {
     pub fn global_chords() -> Self {
         let mut chords = Chords::new();
 
-        chords.insert(|b| {
-            b.node(key('s')).node(key('s')).action(split_horizontal)
-        }).unwrap();
+        chords
+            .insert(|b| {
+                b.node(key('s'))
+                    .node(key('s'))
+                    .action(CommandDetails::split_horizontal(), split_horizontal)
+            })
+            .unwrap();
 
-        chords.insert(|b| {
-            b.node(key('s')).node(key('v')).action(split_vertical)
-        }).unwrap();
+        chords
+            .insert(|b| {
+                b.node(key('s'))
+                    .node(key('v'))
+                    .action(CommandDetails::split_vertical(), split_vertical)
+            })
+            .unwrap();
 
-        chords.insert(|b| {
-            b.node(key('a')).node(code(KeyCode::Null)).action(AppState::select_panel)
-        }).unwrap();
+        chords
+            .insert(|b| {
+                b.node(key('a'))
+                    .node(code(KeyCode::Null))
+                    .action(CommandDetails::select_panel(), AppState::select_panel)
+            })
+            .unwrap();
 
         chords
     }
@@ -182,6 +243,7 @@ fn default_action(_: &mut AppState, _: KeyCode) {}
 
 pub struct KeyChordBuilder {
     nodes: Vec<KeyChordNode>,
+    details: CommandDetails,
     action: ChordAction,
 }
 
@@ -189,6 +251,7 @@ impl KeyChordBuilder {
     fn new() -> Self {
         KeyChordBuilder {
             nodes: vec![],
+            details: CommandDetails::empty(),
             action: default_action,
         }
     }
@@ -206,7 +269,8 @@ impl KeyChordBuilder {
         self
     }
 
-    pub fn action(mut self, action: ChordAction) -> Self {
+    pub fn action(mut self, details: CommandDetails, action: ChordAction) -> Self {
+        self.details = details;
         self.action = action;
         self
     }
@@ -216,7 +280,7 @@ impl KeyChordBuilder {
 mod tests {
     use crossterm::event::KeyCode;
 
-    use crate::chords::{ChordHash, code, default_action, key, KeyChordNode};
+    use crate::chords::{code, default_action, key, ChordHash, CommandDetails, KeyChordNode};
     use crate::{AppState, Chords, KeyChord};
 
     fn no_op(state: &mut AppState, _: KeyCode) {
@@ -227,22 +291,24 @@ mod tests {
         let mut current = root;
         for c in sequence {
             match current {
-                KeyChord::Node(_, _, children, _) => match children.get(&ChordHash::new_code(KeyCode::Char(*c))) {
-                    Some(n) => current = n,
-                    None => panic!("{} not found in children", c)
+                KeyChord::Node(_, _, children, _) => {
+                    match children.get(&ChordHash::new_code(KeyCode::Char(*c))) {
+                        Some(n) => current = n,
+                        None => panic!("{} not found in children", c),
+                    }
                 }
-                k => panic!("{:?} node is not Node", k)
+                k => panic!("{:?} node is not Node", k),
             }
         }
 
         match current {
-            KeyChord::Command(_, _, action) => {
+            KeyChord::Command(_, _, _, action) => {
                 let mut state = AppState::new();
                 action(&mut state, KeyCode::Null);
 
                 assert_eq!(state.active_panel, 100, "State not changed");
             }
-            k => panic!("{:?} is not a Command", k)
+            k => panic!("{:?} is not a Command", k),
         }
     }
 
@@ -250,7 +316,12 @@ mod tests {
     fn insert_basic() {
         let mut chords = Chords::new();
         chords
-            .insert(|b| b.node(key('a')).node(key('b')).node(key('c')).action(no_op))
+            .insert(|b| {
+                b.node(key('a'))
+                    .node(key('b'))
+                    .node(key('c'))
+                    .action(CommandDetails::split_horizontal(), no_op)
+            })
             .unwrap();
 
         assert_sequence(&chords.root, &['a', 'b', 'c'])
