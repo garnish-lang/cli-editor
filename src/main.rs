@@ -118,79 +118,79 @@ fn main() -> Result<(), io::Error> {
                 // check if we're in a chord right now
                 // if not, check if we're going to start a chord
                 // then finally defer to non-chord commands
-                let next_chord = match (&global_chords.current_chord, event.code) {
-                    // soft error, just reset
-                    // command should've been executed, before being set as current
-                    (Some(KeyChord::Command(_, _, _, _)), _) => None,
-                    (Some(KeyChord::Node(_, _, children, _action)), code) => {
-                        match children.get(&ChordHash::new_code(KeyCode::Null)) {
-                            // check if is command
-                            Some(wildcard) => match wildcard {
-                                KeyChord::Node(_, _, _, _) => None, // error, misconfiguration
-                                KeyChord::Command(_, _, _, action) => {
-                                    action(&mut app_state, code);
-                                    // end chord
-                                    None
-                                }
-                            },
-                            None => match children.get(&ChordHash::new_code(code)) {
-                                None => None, // end chord
-                                Some(KeyChord::Command(_, _, _, action)) => {
-                                    // end of chord, execute function
-                                    action(&mut app_state, code);
-                                    None
-                                }
-                                Some(chord) => {
-                                    // advance
-                                    Some(chord)
-                                }
-                            },
-                        }
-                    }
-                    // not in chord, check other commands
-                    (None, code) => {
-                        // not in chord, but could start one
-                        if event.modifiers.contains(KeyModifiers::CONTROL) {
-                            // CTRL + ALT means a global command including chords
-                            // chords without CONTROL will be deferred to active panel
-                            match global_chords.chord_map.get(&code) {
-                                Some(chord) => {
-                                    match chord {
-                                        KeyChord::Node(_, _, _, Some(action)) => {
-                                            // execute intermediary action
-                                            action(&mut app_state, code);
-                                        }
-                                        _ => (), // action optional, nothing to do
-                                    }
-                                    Some(chord)
-                                }
-                                None => None,
-                            }
-                        } else {
-                            // defer to active panel
-                            match app_state.panels.get_mut(app_state.active_panel) {
-                                Some((_, panel)) => {
-                                    if !panel.receive_key(event) {
-                                        match event.code {
-                                            KeyCode::Esc => break,
-                                            _ => (),
-                                        }
-                                    }
-
-                                    None
-                                }
-                                None => None,
-                            }
-                        }
-                    }
-                };
-
-                global_chords.current_chord = next_chord;
-
-                if global_chords.current_chord.is_none() {
-                    // reset
-                    app_state.selecting_panel = false;
-                }
+                // let next_chord = match (&global_chords.current_chord, event.code) {
+                //     // soft error, just reset
+                //     // command should've been executed, before being set as current
+                //     (Some(KeyChord::Command(_, _, _, _)), _) => None,
+                //     (Some(KeyChord::Node(_, _, children, _action)), code) => {
+                //         match children.get(&ChordHash::new_code(KeyCode::Null)) {
+                //             // check if is command
+                //             Some(wildcard) => match wildcard {
+                //                 KeyChord::Node(_, _, _, _) => None, // error, misconfiguration
+                //                 KeyChord::Command(_, _, _, action) => {
+                //                     action(&mut app_state, code);
+                //                     // end chord
+                //                     None
+                //                 }
+                //             },
+                //             None => match children.get(&ChordHash::new_code(code)) {
+                //                 None => None, // end chord
+                //                 Some(KeyChord::Command(_, _, _, action)) => {
+                //                     // end of chord, execute function
+                //                     action(&mut app_state, code);
+                //                     None
+                //                 }
+                //                 Some(chord) => {
+                //                     // advance
+                //                     Some(chord)
+                //                 }
+                //             },
+                //         }
+                //     }
+                //     // not in chord, check other commands
+                //     (None, code) => {
+                //         // not in chord, but could start one
+                //         if event.modifiers.contains(KeyModifiers::CONTROL) {
+                //             // CTRL + ALT means a global command including chords
+                //             // chords without CONTROL will be deferred to active panel
+                //             match global_chords.chord_map.get(&code) {
+                //                 Some(chord) => {
+                //                     match chord {
+                //                         KeyChord::Node(_, _, _, Some(action)) => {
+                //                             // execute intermediary action
+                //                             action(&mut app_state, code);
+                //                         }
+                //                         _ => (), // action optional, nothing to do
+                //                     }
+                //                     Some(chord)
+                //                 }
+                //                 None => None,
+                //             }
+                //         } else {
+                //             // defer to active panel
+                //             match app_state.panels.get_mut(app_state.active_panel) {
+                //                 Some((_, panel)) => {
+                //                     if !panel.receive_key(event) {
+                //                         match event.code {
+                //                             KeyCode::Esc => break,
+                //                             _ => (),
+                //                         }
+                //                     }
+                //
+                //                     None
+                //                 }
+                //                 None => None,
+                //             }
+                //         }
+                //     }
+                // };
+                //
+                // global_chords.current_chord = next_chord;
+                //
+                // if global_chords.current_chord.is_none() {
+                //     // reset
+                //     app_state.selecting_panel = false;
+                // }
             }
             Event::Mouse(_event) => (), // println!("{:?}", event),
             Event::Resize(width, height) => execute!(

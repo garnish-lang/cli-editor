@@ -118,18 +118,18 @@ impl ChordHash {
     }
 }
 
-pub struct Chords<'a> {
+pub struct Chords {
     pub chord_map: HashMap<KeyCode, KeyChord>,
     root: KeyChord,
-    pub current_chord: Option<&'a KeyChord>,
+    path: Vec<ChordHash>,
 }
 
-impl Chords<'_> {
+impl Chords {
     pub fn new() -> Self {
         Chords {
             root: KeyChord::Node(KeyCode::Null, KeyModifiers::empty(), HashMap::new(), None),
             chord_map: HashMap::new(),
-            current_chord: None,
+            path: vec![],
         }
     }
 
@@ -219,7 +219,7 @@ impl Chords<'_> {
                         // no child with given sequence, effectively means its already removed
                         // just return
                         None => return Ok(()),
-                        Some(c) => current_node = c
+                        Some(c) => current_node = c,
                     }
                     index += 1;
                 }
@@ -230,9 +230,36 @@ impl Chords<'_> {
 
         Ok(())
     }
+
+    pub fn advance(&mut self, key: ChordHash) -> (bool, Option<ChordAction>) {
+        self.path.push(key);
+
+        let mut current = &self.root;
+        for c in &self.path {
+            match current {
+                KeyChord::Node(_, _, children, _) => match children.get(c) {
+                    Some(next) => current = next,
+                    // current path leads nowhere
+                    // return early with end and no action
+                    None => return (true, None),
+                },
+                KeyChord::Command(_, _, _, a) => {
+                    // current path goes beyond command
+                    // return early with end result
+                    return (true, Some(*a));
+                }
+            }
+        }
+
+        match current {
+            KeyChord::Node(.., Some(action)) => (false, Some(*action)),
+            KeyChord::Node(_, _, _, _) => (false, None),
+            KeyChord::Command(_, _, _, action) => (true, Some(*action)),
+        }
+    }
 }
 
-impl Chords<'_> {
+impl Chords {
     pub fn global_chords() -> Self {
         let mut chords = Chords::new();
 
@@ -338,7 +365,7 @@ impl KeyChordBuilder {
 
 #[cfg(test)]
 mod tests {
-    use crossterm::event::KeyCode;
+    use crossterm::event::{KeyCode, KeyModifiers};
 
     use crate::chords::{code, default_action, key, ChordHash, CommandDetails, KeyChordNode};
     use crate::{AppState, Chords, KeyChord};
@@ -473,12 +500,14 @@ mod tests {
             })
             .unwrap();
 
-        chords.remove(|b| {
-            b.node(key('a'))
-                .node(key('b'))
-                .node(key('c'))
-                .action(CommandDetails::split_horizontal(), no_op)
-        }).unwrap();
+        chords
+            .remove(|b| {
+                b.node(key('a'))
+                    .node(key('b'))
+                    .node(key('c'))
+                    .action(CommandDetails::split_horizontal(), no_op)
+            })
+            .unwrap();
 
         assert!(chords.chord_map.is_empty());
     }
@@ -506,13 +535,15 @@ mod tests {
             })
             .unwrap();
 
-        chords.remove(|b| {
-            b.node(key('a'))
-                .node(key('b'))
-                .node(key('c'))
-                .node(key('d'))
-                .action(CommandDetails::split_horizontal(), no_op)
-        }).unwrap();
+        chords
+            .remove(|b| {
+                b.node(key('a'))
+                    .node(key('b'))
+                    .node(key('c'))
+                    .node(key('d'))
+                    .action(CommandDetails::split_horizontal(), no_op)
+            })
+            .unwrap();
 
         assert_sequence(&chords.root, &['a', 'b', 'e', 'f']);
     }
@@ -529,13 +560,240 @@ mod tests {
             })
             .unwrap();
 
-        chords.remove(|b| {
-            b.node(key('a'))
-                .node(key('b'))
-                .node(key('d'))
-                .action(CommandDetails::split_horizontal(), no_op)
-        }).unwrap();
+        chords
+            .remove(|b| {
+                b.node(key('a'))
+                    .node(key('b'))
+                    .node(key('d'))
+                    .action(CommandDetails::split_horizontal(), no_op)
+            })
+            .unwrap();
 
         assert_sequence(&chords.root, &['a', 'b', 'c']);
+    }
+
+    fn details(name: String) -> CommandDetails {
+        CommandDetails {
+            name,
+            description: String::new(),
+        }
+    }
+
+    #[test]
+    fn advance() {
+        let mut chords = Chords::new();
+        chords
+            .insert(|b| {
+                b.node(key('a'))
+                    .node(key('b'))
+                    .node(key('c'))
+                    .action(details("abc".to_string()), no_op)
+            })
+            .unwrap();
+
+        chords
+            .insert(|b| {
+                b.node(key('a'))
+                    .node(key('b'))
+                    .node(key('d'))
+                    .action(details("abd".to_string()), no_op)
+            })
+            .unwrap();
+
+        chords
+            .insert(|b| {
+                b.node(key('a'))
+                    .node(key('e'))
+                    .node(key('f'))
+                    .action(details("aef".to_string()), no_op)
+            })
+            .unwrap();
+
+        let (end, action) =
+            chords.advance(ChordHash::new(KeyCode::Char('a'), KeyModifiers::empty()));
+
+        assert!(!end);
+        assert!(action.is_none());
+
+        let (end, action) =
+            chords.advance(ChordHash::new(KeyCode::Char('b'), KeyModifiers::empty()));
+
+        assert!(!end);
+        assert!(action.is_none());
+
+        let (end, action) =
+            chords.advance(ChordHash::new(KeyCode::Char('d'), KeyModifiers::empty()));
+
+        assert!(end);
+
+        let mut state = AppState::new();
+        action.unwrap()(&mut state, KeyCode::Null);
+        assert_eq!(state.active_panel, 100, "State not changed");
+    }
+
+    #[test]
+    fn advance_beyond() {
+        let mut chords = Chords::new();
+        chords
+            .insert(|b| {
+                b.node(key('a'))
+                    .node(key('b'))
+                    .node(key('c'))
+                    .action(details("abc".to_string()), no_op)
+            })
+            .unwrap();
+
+        chords
+            .insert(|b| {
+                b.node(key('a'))
+                    .node(key('b'))
+                    .node(key('d'))
+                    .action(details("abd".to_string()), no_op)
+            })
+            .unwrap();
+
+        chords
+            .insert(|b| {
+                b.node(key('a'))
+                    .node(key('e'))
+                    .node(key('f'))
+                    .action(details("aef".to_string()), no_op)
+            })
+            .unwrap();
+
+        let (end, action) =
+            chords.advance(ChordHash::new(KeyCode::Char('a'), KeyModifiers::empty()));
+
+        assert!(!end);
+        assert!(action.is_none());
+
+        let (end, action) =
+            chords.advance(ChordHash::new(KeyCode::Char('b'), KeyModifiers::empty()));
+
+        assert!(!end);
+        assert!(action.is_none());
+
+        let (end, action) =
+            chords.advance(ChordHash::new(KeyCode::Char('d'), KeyModifiers::empty()));
+
+        assert!(end);
+
+        let mut state = AppState::new();
+        action.unwrap()(&mut state, KeyCode::Null);
+        assert_eq!(state.active_panel, 100, "State not changed");
+
+        // beyond sequence
+        let (end, action) =
+            chords.advance(ChordHash::new(KeyCode::Char('e'), KeyModifiers::empty()));
+
+        assert!(end);
+
+        let mut state = AppState::new();
+        action.unwrap()(&mut state, KeyCode::Null);
+        assert_eq!(state.active_panel, 100, "State not changed");
+    }
+
+    #[test]
+    fn advance_to_absent_key() {
+        let mut chords = Chords::new();
+        chords
+            .insert(|b| {
+                b.node(key('a'))
+                    .node(key('b'))
+                    .node(key('c'))
+                    .action(details("abc".to_string()), no_op)
+            })
+            .unwrap();
+
+        chords
+            .insert(|b| {
+                b.node(key('a'))
+                    .node(key('b'))
+                    .node(key('d'))
+                    .action(details("abd".to_string()), no_op)
+            })
+            .unwrap();
+
+        chords
+            .insert(|b| {
+                b.node(key('a'))
+                    .node(key('e'))
+                    .node(key('f'))
+                    .action(details("aef".to_string()), no_op)
+            })
+            .unwrap();
+
+        let (end, action) =
+            chords.advance(ChordHash::new(KeyCode::Char('a'), KeyModifiers::empty()));
+
+        assert!(!end);
+        assert!(action.is_none());
+
+        let (end, action) =
+            chords.advance(ChordHash::new(KeyCode::Char('b'), KeyModifiers::empty()));
+
+        assert!(!end);
+        assert!(action.is_none());
+
+        let (end, action) =
+            chords.advance(ChordHash::new(KeyCode::Char('z'), KeyModifiers::empty()));
+
+        assert!(end);
+        assert!(action.is_none());
+    }
+
+    #[test]
+    fn advance_through_intermediate_action() {
+        let mut chords = Chords::new();
+        chords
+            .insert(|b| {
+                b.node(key('a'))
+                    .node(key('b').action(no_op))
+                    .node(key('c'))
+                    .action(details("abc".to_string()), no_op)
+            })
+            .unwrap();
+
+        chords
+            .insert(|b| {
+                b.node(key('a'))
+                    .node(key('b'))
+                    .node(key('d'))
+                    .action(details("abd".to_string()), no_op)
+            })
+            .unwrap();
+
+        chords
+            .insert(|b| {
+                b.node(key('a'))
+                    .node(key('e'))
+                    .node(key('f'))
+                    .action(details("aef".to_string()), no_op)
+            })
+            .unwrap();
+
+        let (end, action) =
+            chords.advance(ChordHash::new(KeyCode::Char('a'), KeyModifiers::empty()));
+
+        assert!(!end);
+        assert!(action.is_none());
+
+        let (end, action) =
+            chords.advance(ChordHash::new(KeyCode::Char('b'), KeyModifiers::empty()));
+
+        assert!(!end);
+
+        let mut state = AppState::new();
+        action.unwrap()(&mut state, KeyCode::Null);
+        assert_eq!(state.active_panel, 100, "State not changed");
+
+        let (end, action) =
+            chords.advance(ChordHash::new(KeyCode::Char('d'), KeyModifiers::empty()));
+
+        assert!(end);
+
+        let mut state = AppState::new();
+        action.unwrap()(&mut state, KeyCode::Null);
+        assert_eq!(state.active_panel, 100, "State not changed");
     }
 }
