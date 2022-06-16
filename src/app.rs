@@ -151,7 +151,7 @@ pub fn global_commands() -> Commands<GlobalAction> {
 
     commands
         .insert(|b| {
-            b.node(ctrl_key('s')).node(key('h')).action(
+            b.node(ctrl_key('p')).node(key('h')).action(
                 CommandDetails::split_horizontal(),
                 AppState::split_current_panel_horizontal,
             )
@@ -160,7 +160,7 @@ pub fn global_commands() -> Commands<GlobalAction> {
 
     commands
         .insert(|b| {
-            b.node(ctrl_key('s')).node(key('v')).action(
+            b.node(ctrl_key('p')).node(key('v')).action(
                 CommandDetails::split_vertical(),
                 AppState::split_current_panel_vertical,
             )
