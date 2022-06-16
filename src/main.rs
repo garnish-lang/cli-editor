@@ -12,10 +12,10 @@ use tui::backend::CrosstermBackend;
 use tui::layout::Direction;
 use tui::{Frame, Terminal};
 
-use crate::chords::{code, key, ChordHash, Chords, CommandDetails, ctrl_key};
+use crate::chords::{code, ctrl_key, key, ChordHash, Chords, CommandDetails};
 use crate::panels::{Panel, PromptPanel, TextEditPanel};
 use crate::render::render_split;
-use crate::splits::{PanelSplit, UserSplits, split};
+use crate::splits::{split, PanelSplit, UserSplits};
 
 mod chords;
 mod panels;
@@ -76,7 +76,6 @@ impl AppState {
         }
     }
 
-
     pub fn split_current_panel_horizontal(&mut self, _code: KeyCode) {
         split(self, Direction::Horizontal)
     }
@@ -111,17 +110,19 @@ fn global_chords() -> Chords {
 
     chords
         .insert(|b| {
-            b.node(ctrl_key('s'))
-                .node(key('h'))
-                .action(CommandDetails::split_horizontal(), AppState::split_current_panel_horizontal)
+            b.node(ctrl_key('s')).node(key('h')).action(
+                CommandDetails::split_horizontal(),
+                AppState::split_current_panel_horizontal,
+            )
         })
         .unwrap();
 
     chords
         .insert(|b| {
-            b.node(ctrl_key('s'))
-                .node(key('v'))
-                .action(CommandDetails::split_vertical(), AppState::split_current_panel_vertical)
+            b.node(ctrl_key('s')).node(key('v')).action(
+                CommandDetails::split_vertical(),
+                AppState::split_current_panel_vertical,
+            )
         })
         .unwrap();
 
