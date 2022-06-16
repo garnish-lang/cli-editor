@@ -100,6 +100,26 @@ impl AppState {
         self.selecting_panel = selecting;
     }
 
+    pub fn first_available_id(&mut self) -> char {
+        let mut current = HashSet::new();
+
+        for (_, panel) in self.panels.iter() {
+            current.insert(panel.get_id());
+        }
+
+        let options = ('a'..'z').chain('A'..'Z');
+
+        let mut id = '\0';
+        for c in options {
+            if !current.contains(&c) {
+                id = c;
+                break;
+            }
+        }
+
+        id
+    }
+
     //
     // Command Actions
     //
@@ -131,24 +151,36 @@ impl AppState {
         split(self, Direction::Vertical)
     }
 
-    pub fn first_available_id(&mut self) -> char {
-        let mut current = HashSet::new();
+    pub fn delete_active_panel(&mut self, _code: KeyCode) {
+        let (active_split, active_panel_id) = match self.get_active_panel() {
+            None => {
+                panic!("active panel not found")
+            }
+            Some((split_i, active_panel)) => (*split_i, active_panel.get_id()),
+        };
 
-        for (_, panel) in self.panels.iter() {
-            current.insert(panel.get_id());
+        if self.static_panels().contains(&active_panel_id) {
+            return;
         }
 
-        let options = ('a'..'z').chain('A'..'Z');
+        // find active's index in split
+        let active_panel_index = self.active_panel();
+        self.panels.remove(active_panel_index);
 
-        let mut id = '\0';
-        for c in options {
-            if !current.contains(&c) {
-                id = c;
-                break;
+        match self.splits.get_mut(active_split) {
+            None => unimplemented!(),
+            Some(split) => {
+                let index = match split.panels.iter().enumerate().find(|(_, s)| match s {
+                    UserSplits::Panel(index) => *index == active_panel_index,
+                    UserSplits::Split(..) => false,
+                }) {
+                    Some(i) => i.0,
+                    None => return, //error
+                };
+
+                split.panels.remove(index);
             }
         }
-
-        id
     }
 }
 
@@ -204,6 +236,31 @@ mod tests {
 
         app.set_active_panel(0);
         app.split_current_panel_horizontal(KeyCode::Null);
+
+        assert_eq!(app.panels.len(), 2);
+        assert_eq!(app.splits.len(), 1);
+    }
+
+    #[test]
+    fn delete_active_panel() {
+        let mut app = AppState::new();
+        let next_panel_index = app.panels_len();
+
+        app.split_current_panel_horizontal(KeyCode::Null);
+        app.set_active_panel(next_panel_index);
+
+        app.delete_active_panel(KeyCode::Null);
+
+        assert_eq!(app.panels.len(), 2);
+        assert_eq!(app.splits.len(), 2);
+    }
+
+    #[test]
+    fn delete_active_panel_replaces_if_only_one_left() {
+        let mut app = AppState::new();
+        app.set_active_panel(0);
+
+        app.delete_active_panel(KeyCode::Null);
 
         assert_eq!(app.panels.len(), 2);
         assert_eq!(app.splits.len(), 1);
