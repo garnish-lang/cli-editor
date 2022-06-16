@@ -12,7 +12,7 @@ use tui::backend::CrosstermBackend;
 use tui::layout::Direction;
 use tui::{Frame, Terminal};
 
-use crate::commands::{code, ctrl_key, key, CommandId, Commands, CommandDetails};
+use crate::commands::{code, ctrl_key, key, CommandKeyId, Commands, CommandDetails};
 use crate::panels::{Panel, PromptPanel, TextEditPanel};
 use crate::render::render_split;
 use crate::splits::{split, PanelSplit, UserSplits};
@@ -166,7 +166,7 @@ fn main() -> Result<(), io::Error> {
                 // then check global
 
                 let (end, action) = if global_commands.has_progress() {
-                    global_commands.advance(CommandId::new(event.code, event.modifiers))
+                    global_commands.advance(CommandKeyId::new(event.code, event.modifiers))
                 } else {
                     let handled = match app_state.panels.get_mut(app_state.active_panel) {
                         Some((_, panel)) => panel.receive_key(event),
@@ -174,7 +174,7 @@ fn main() -> Result<(), io::Error> {
                     };
 
                     if handled {
-                        global_commands.advance(CommandId::new(event.code, event.modifiers))
+                        global_commands.advance(CommandKeyId::new(event.code, event.modifiers))
                     } else {
                         (false, None)
                     }

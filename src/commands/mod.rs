@@ -13,20 +13,20 @@ pub enum CommandKey<T> {
     Node(
         KeyCode,
         KeyModifiers,
-        HashMap<CommandId, CommandKey<T>>,
+        HashMap<CommandKeyId, CommandKey<T>>,
         Option<T>,
     ),
     Leaf(KeyCode, KeyModifiers, CommandDetails, T),
 }
 
 impl<T> CommandKey<T> {
-    fn get_hash(&self) -> CommandId {
+    fn get_hash(&self) -> CommandKeyId {
         let (c, m) = match self {
             CommandKey::Node(c, m, _, _) => (c, m),
             CommandKey::Leaf(c, m, _, _) => (c, m),
         };
 
-        CommandId::new(*c, *m)
+        CommandKeyId::new(*c, *m)
     }
 }
 
@@ -100,19 +100,19 @@ impl CommandDetails {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct CommandId {
+pub struct CommandKeyId {
     code: KeyCode,
     mods: KeyModifiers,
 }
 
 #[allow(dead_code)]
-impl CommandId {
+impl CommandKeyId {
     pub fn new(code: KeyCode, mods: KeyModifiers) -> Self {
-        CommandId { code, mods }
+        CommandKeyId { code, mods }
     }
 
     pub fn new_code(code: KeyCode) -> Self {
-        CommandId {
+        CommandKeyId {
             code,
             mods: KeyModifiers::empty(),
         }
@@ -121,7 +121,7 @@ impl CommandId {
 
 pub struct Commands<T> {
     root: CommandKey<T>,
-    path: Vec<CommandId>,
+    path: Vec<CommandKeyId>,
 }
 
 #[allow(dead_code)]
@@ -145,7 +145,7 @@ impl<T> Commands<T> where T: Copy {
         for node in builder.nodes.iter().take(builder.nodes.len() - 1) {
             match current_node {
                 CommandKey::Node(_, _, children, _) => {
-                    let h = CommandId::new(node.code, node.mods);
+                    let h = CommandKeyId::new(node.code, node.mods);
                     let n = CommandKey::Node(node.code, node.mods, HashMap::new(), node.action);
                     current_node = children.entry(h).or_insert(n)
                 }
@@ -189,7 +189,7 @@ impl<T> Commands<T> where T: Copy {
         for node in &builder.nodes {
             match current_node {
                 CommandKey::Node(_, _, children, _) => {
-                    let h = CommandId::new(node.code, node.mods);
+                    let h = CommandKeyId::new(node.code, node.mods);
                     match children.get(&h) {
                         // no child with given sequence, effectively means its already removed
                         // just return
@@ -215,7 +215,7 @@ impl<T> Commands<T> where T: Copy {
         for node in &builder.nodes {
             match current_node {
                 CommandKey::Node(_, _, children, _) => {
-                    let h = CommandId::new(node.code, node.mods);
+                    let h = CommandKeyId::new(node.code, node.mods);
                     // 1 or fewer children means this entire branch will be removed
                     if index == lowest {
                         children.remove(&h);
@@ -237,7 +237,7 @@ impl<T> Commands<T> where T: Copy {
         Ok(())
     }
 
-    pub fn advance(&mut self, key: CommandId) -> (bool, Option<T>) {
+    pub fn advance(&mut self, key: CommandKeyId) -> (bool, Option<T>) {
         self.path.push(key);
 
         let mut current = &self.root;
@@ -247,7 +247,7 @@ impl<T> Commands<T> where T: Copy {
                     Some(next) => current = next,
                     // no direct match
                     // check for catch all Null code, cloning given modifiers
-                    None => match children.get(&CommandId::new(KeyCode::Null, c.mods)) {
+                    None => match children.get(&CommandKeyId::new(KeyCode::Null, c.mods)) {
                         Some(next) => current = next,
                         // current path leads nowhere
                         // return early with end and no action
@@ -362,7 +362,7 @@ impl<T> CommandSequenceBuilder<T> {
 mod tests {
     use crossterm::event::{KeyCode, KeyModifiers};
 
-    use crate::commands::{code, key, CommandId, CommandDetails, CommandKey, CommandAction};
+    use crate::commands::{code, key, CommandKeyId, CommandDetails, CommandKey, CommandAction};
     use crate::{AppState, Commands};
 
     fn no_op(state: &mut AppState, _: KeyCode) {
@@ -374,7 +374,7 @@ mod tests {
         for c in sequence {
             match current {
                 CommandKey::Node(_, _, children, _) => {
-                    match children.get(&CommandId::new_code(KeyCode::Char(*c))) {
+                    match children.get(&CommandKeyId::new_code(KeyCode::Char(*c))) {
                         Some(n) => current = n,
                         None => panic!("{} not found in children", c),
                     }
@@ -630,19 +630,19 @@ mod tests {
             .unwrap();
 
         let (end, action) =
-            commands.advance(CommandId::new(KeyCode::Char('a'), KeyModifiers::empty()));
+            commands.advance(CommandKeyId::new(KeyCode::Char('a'), KeyModifiers::empty()));
 
         assert!(!end);
         assert!(action.is_none());
 
         let (end, action) =
-            commands.advance(CommandId::new(KeyCode::Char('b'), KeyModifiers::empty()));
+            commands.advance(CommandKeyId::new(KeyCode::Char('b'), KeyModifiers::empty()));
 
         assert!(!end);
         assert!(action.is_none());
 
         let (end, action) =
-            commands.advance(CommandId::new(KeyCode::Char('d'), KeyModifiers::empty()));
+            commands.advance(CommandKeyId::new(KeyCode::Char('d'), KeyModifiers::empty()));
 
         assert!(end);
 
@@ -665,19 +665,19 @@ mod tests {
             .unwrap();
 
         let (end, action) =
-            commands.advance(CommandId::new(KeyCode::Char('a'), KeyModifiers::empty()));
+            commands.advance(CommandKeyId::new(KeyCode::Char('a'), KeyModifiers::empty()));
 
         assert!(!end);
         assert!(action.is_none());
 
         let (end, action) =
-            commands.advance(CommandId::new(KeyCode::Char('b'), KeyModifiers::empty()));
+            commands.advance(CommandKeyId::new(KeyCode::Char('b'), KeyModifiers::empty()));
 
         assert!(!end);
         assert!(action.is_none());
 
         let (end, action) =
-            commands.advance(CommandId::new(KeyCode::Char('c'), KeyModifiers::empty()));
+            commands.advance(CommandKeyId::new(KeyCode::Char('c'), KeyModifiers::empty()));
 
         assert!(end);
 
@@ -718,19 +718,19 @@ mod tests {
             .unwrap();
 
         let (end, action) =
-            commands.advance(CommandId::new(KeyCode::Char('a'), KeyModifiers::empty()));
+            commands.advance(CommandKeyId::new(KeyCode::Char('a'), KeyModifiers::empty()));
 
         assert!(!end);
         assert!(action.is_none());
 
         let (end, action) =
-            commands.advance(CommandId::new(KeyCode::Char('b'), KeyModifiers::empty()));
+            commands.advance(CommandKeyId::new(KeyCode::Char('b'), KeyModifiers::empty()));
 
         assert!(!end);
         assert!(action.is_none());
 
         let (end, action) =
-            commands.advance(CommandId::new(KeyCode::Char('d'), KeyModifiers::empty()));
+            commands.advance(CommandKeyId::new(KeyCode::Char('d'), KeyModifiers::empty()));
 
         assert!(end);
 
@@ -740,7 +740,7 @@ mod tests {
 
         // beyond sequence
         let (end, action) =
-            commands.advance(CommandId::new(KeyCode::Char('e'), KeyModifiers::empty()));
+            commands.advance(CommandKeyId::new(KeyCode::Char('e'), KeyModifiers::empty()));
 
         assert!(end);
 
@@ -781,19 +781,19 @@ mod tests {
             .unwrap();
 
         let (end, action) =
-            commands.advance(CommandId::new(KeyCode::Char('a'), KeyModifiers::empty()));
+            commands.advance(CommandKeyId::new(KeyCode::Char('a'), KeyModifiers::empty()));
 
         assert!(!end);
         assert!(action.is_none());
 
         let (end, action) =
-            commands.advance(CommandId::new(KeyCode::Char('b'), KeyModifiers::empty()));
+            commands.advance(CommandKeyId::new(KeyCode::Char('b'), KeyModifiers::empty()));
 
         assert!(!end);
         assert!(action.is_none());
 
         let (end, action) =
-            commands.advance(CommandId::new(KeyCode::Char('z'), KeyModifiers::empty()));
+            commands.advance(CommandKeyId::new(KeyCode::Char('z'), KeyModifiers::empty()));
 
         assert!(end);
         assert!(action.is_none());
@@ -831,13 +831,13 @@ mod tests {
             .unwrap();
 
         let (end, action) =
-            commands.advance(CommandId::new(KeyCode::Char('a'), KeyModifiers::empty()));
+            commands.advance(CommandKeyId::new(KeyCode::Char('a'), KeyModifiers::empty()));
 
         assert!(!end);
         assert!(action.is_none());
 
         let (end, action) =
-            commands.advance(CommandId::new(KeyCode::Char('b'), KeyModifiers::empty()));
+            commands.advance(CommandKeyId::new(KeyCode::Char('b'), KeyModifiers::empty()));
 
         assert!(!end);
 
@@ -846,7 +846,7 @@ mod tests {
         assert_eq!(state.active_panel, 100, "State not changed");
 
         let (end, action) =
-            commands.advance(CommandId::new(KeyCode::Char('d'), KeyModifiers::empty()));
+            commands.advance(CommandKeyId::new(KeyCode::Char('d'), KeyModifiers::empty()));
 
         assert!(end);
 
@@ -886,9 +886,9 @@ mod tests {
             })
             .unwrap();
 
-        commands.advance(CommandId::new(KeyCode::Char('a'), KeyModifiers::empty()));
-        commands.advance(CommandId::new(KeyCode::Char('b'), KeyModifiers::empty()));
-        commands.advance(CommandId::new(KeyCode::Char('d'), KeyModifiers::empty()));
+        commands.advance(CommandKeyId::new(KeyCode::Char('a'), KeyModifiers::empty()));
+        commands.advance(CommandKeyId::new(KeyCode::Char('b'), KeyModifiers::empty()));
+        commands.advance(CommandKeyId::new(KeyCode::Char('d'), KeyModifiers::empty()));
 
         commands.reset();
 
@@ -928,8 +928,8 @@ mod tests {
 
         assert!(!commands.has_progress());
 
-        commands.advance(CommandId::new(KeyCode::Char('a'), KeyModifiers::empty()));
-        commands.advance(CommandId::new(KeyCode::Char('b'), KeyModifiers::empty()));
+        commands.advance(CommandKeyId::new(KeyCode::Char('a'), KeyModifiers::empty()));
+        commands.advance(CommandKeyId::new(KeyCode::Char('b'), KeyModifiers::empty()));
 
         assert!(commands.has_progress());
 
