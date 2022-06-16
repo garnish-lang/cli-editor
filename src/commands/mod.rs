@@ -9,17 +9,17 @@ use crate::AppState;
 pub type CommandAction = fn(&mut AppState, KeyCode);
 
 #[derive(Clone)]
-pub enum CommandKey {
+pub enum CommandKey<T> {
     Node(
         KeyCode,
         KeyModifiers,
-        HashMap<CommandId, CommandKey>,
-        Option<CommandAction>,
+        HashMap<CommandId, CommandKey<T>>,
+        Option<T>,
     ),
-    Leaf(KeyCode, KeyModifiers, CommandDetails, CommandAction),
+    Leaf(KeyCode, KeyModifiers, CommandDetails, T),
 }
 
-impl CommandKey {
+impl<T> CommandKey<T> {
     fn get_hash(&self) -> CommandId {
         let (c, m) = match self {
             CommandKey::Node(c, m, _, _) => (c, m),
@@ -30,7 +30,7 @@ impl CommandKey {
     }
 }
 
-impl Debug for CommandKey {
+impl<T> Debug for CommandKey<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.write_str(
             match self {
@@ -119,13 +119,13 @@ impl CommandId {
     }
 }
 
-pub struct Commands {
-    root: CommandKey,
+pub struct Commands<T> {
+    root: CommandKey<T>,
     path: Vec<CommandId>,
 }
 
 #[allow(dead_code)]
-impl Commands {
+impl<T> Commands<T> where T: Copy {
     pub fn new() -> Self {
         Commands {
             root: CommandKey::Node(KeyCode::Null, KeyModifiers::empty(), HashMap::new(), None),
@@ -133,11 +133,11 @@ impl Commands {
         }
     }
 
-    pub fn builder() -> CommandSequenceBuilder {
+    pub fn builder() -> CommandSequenceBuilder<T> {
         CommandSequenceBuilder::new()
     }
 
-    pub fn insert(&mut self, build: fn(CommandSequenceBuilder) -> CommandSequenceBuilder) -> Result<(), String> {
+    pub fn insert(&mut self, build: fn(CommandSequenceBuilder<T>) -> CommandSequenceBuilder<T>) -> Result<(), String> {
         let builder = build(CommandSequenceBuilder::new());
         let mut current_node = &mut self.root;
 
@@ -160,8 +160,14 @@ impl Commands {
         let last = &builder.nodes[builder.nodes.len() - 1];
         match current_node {
             CommandKey::Node(_, _, children, _) => {
-                let n = CommandKey::Leaf(last.code, last.mods, builder.details, builder.action);
-                children.insert(n.get_hash(), n);
+                // make sure we were given a action
+                match builder.action {
+                    Some(action) => {
+                        let n = CommandKey::Leaf(last.code, last.mods, builder.details, action);
+                        children.insert(n.get_hash(), n);
+                    }
+                    None => return Err("Missing command action.".to_string())
+                }
             }
             // should've been validate in first loop
             CommandKey::Leaf(_, _, _, _) => {
@@ -172,7 +178,7 @@ impl Commands {
         Ok(())
     }
 
-    pub fn remove(&mut self, build: fn(CommandSequenceBuilder) -> CommandSequenceBuilder) -> Result<(), String> {
+    pub fn remove(&mut self, build: fn(CommandSequenceBuilder<T>) -> CommandSequenceBuilder<T>) -> Result<(), String> {
         let builder = build(CommandSequenceBuilder::new());
         // manual count of nesting
         // drill down and keep track of the lowest node with only 1 child
@@ -231,7 +237,7 @@ impl Commands {
         Ok(())
     }
 
-    pub fn advance(&mut self, key: CommandId) -> (bool, Option<CommandAction>) {
+    pub fn advance(&mut self, key: CommandId) -> (bool, Option<T>) {
         self.path.push(key);
 
         let mut current = &self.root;
@@ -273,26 +279,26 @@ impl Commands {
 }
 
 #[derive(Clone)]
-pub struct CommandKeyBuilder {
+pub struct CommandKeyBuilder<T> {
     code: KeyCode,
     mods: KeyModifiers,
-    action: Option<CommandAction>,
+    action: Option<T>,
 }
 
 #[allow(dead_code)]
-impl CommandKeyBuilder {
+impl<T> CommandKeyBuilder<T> {
     pub fn mods(mut self, mods: KeyModifiers) -> Self {
         self.mods = mods;
         self
     }
 
-    pub fn action(mut self, action: CommandAction) -> Self {
+    pub fn action(mut self, action: T) -> Self {
         self.action = Some(action);
         self
     }
 }
 
-pub fn ctrl_key(key: char) -> CommandKeyBuilder {
+pub fn ctrl_key<T>(key: char) -> CommandKeyBuilder<T> {
     CommandKeyBuilder {
         code: KeyCode::Char(key),
         mods: KeyModifiers::CONTROL,
@@ -300,7 +306,7 @@ pub fn ctrl_key(key: char) -> CommandKeyBuilder {
     }
 }
 
-pub fn key(key: char) -> CommandKeyBuilder {
+pub fn key<T>(key: char) -> CommandKeyBuilder<T> {
     CommandKeyBuilder {
         code: KeyCode::Char(key),
         mods: KeyModifiers::empty(),
@@ -308,7 +314,7 @@ pub fn key(key: char) -> CommandKeyBuilder {
     }
 }
 
-pub fn code(code: KeyCode) -> CommandKeyBuilder {
+pub fn code<T>(code: KeyCode) -> CommandKeyBuilder<T> {
     CommandKeyBuilder {
         code,
         mods: KeyModifiers::empty(),
@@ -316,21 +322,19 @@ pub fn code(code: KeyCode) -> CommandKeyBuilder {
     }
 }
 
-fn default_action(_: &mut AppState, _: KeyCode) {}
-
-pub struct CommandSequenceBuilder {
-    nodes: Vec<CommandKeyBuilder>,
+pub struct CommandSequenceBuilder<T> {
+    nodes: Vec<CommandKeyBuilder<T>>,
     details: CommandDetails,
-    action: CommandAction,
+    action: Option<T>,
 }
 
 #[allow(dead_code)]
-impl CommandSequenceBuilder {
+impl<T> CommandSequenceBuilder<T> {
     fn new() -> Self {
         CommandSequenceBuilder {
             nodes: vec![],
             details: CommandDetails::empty(),
-            action: default_action,
+            action: None,
         }
     }
 
@@ -342,14 +346,14 @@ impl CommandSequenceBuilder {
         self
     }
 
-    pub fn node(mut self, c: CommandKeyBuilder) -> Self {
+    pub fn node(mut self, c: CommandKeyBuilder<T>) -> Self {
         self.nodes.push(c.into());
         self
     }
 
-    pub fn action(mut self, details: CommandDetails, action: CommandAction) -> Self {
+    pub fn action(mut self, details: CommandDetails, action: T) -> Self {
         self.details = details;
-        self.action = action;
+        self.action = Some(action);
         self
     }
 }
@@ -358,14 +362,14 @@ impl CommandSequenceBuilder {
 mod tests {
     use crossterm::event::{KeyCode, KeyModifiers};
 
-    use crate::commands::{code, key, CommandId, CommandDetails, CommandKey};
+    use crate::commands::{code, key, CommandId, CommandDetails, CommandKey, CommandAction};
     use crate::{AppState, Commands};
 
     fn no_op(state: &mut AppState, _: KeyCode) {
         state.active_panel = 100;
     }
 
-    fn assert_sequence(root: &CommandKey, sequence: &[char]) {
+    fn assert_sequence(root: &CommandKey<fn(&mut AppState, KeyCode)>, sequence: &[char]) {
         let mut current = root;
         for c in sequence {
             match current {
@@ -392,7 +396,8 @@ mod tests {
 
     #[test]
     fn insert_basic() {
-        let mut commands = Commands::new();
+        let mut commands = Commands::<CommandAction>::new();
+
         commands
             .insert(|b| {
                 b.node(key('a'))
@@ -406,8 +411,23 @@ mod tests {
     }
 
     #[test]
+    fn insert_without_action_is_err() {
+        let mut commands = Commands::<CommandAction>::new();
+
+        let result = commands
+            .insert(|b| {
+                b.node(key('a'))
+                    .node(key('b'))
+                    .node(key('c'))
+            });
+
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn insert_two_same_start() {
-        let mut commands = Commands::new();
+        let mut commands = Commands::<CommandAction>::new();
+
         commands
             .insert(|b| {
                 b.node(key('a'))
@@ -432,7 +452,8 @@ mod tests {
 
     #[test]
     fn insert_beyond_existing_command() {
-        let mut commands = Commands::new();
+        let mut commands = Commands::<CommandAction>::new();
+
         commands
             .insert(|b| {
                 b.node(key('a'))
@@ -456,7 +477,8 @@ mod tests {
 
     #[test]
     fn insert_beyond_existing_command_extended() {
-        let mut commands = Commands::new();
+        let mut commands = Commands::<CommandAction>::new();
+
         commands
             .insert(|b| {
                 b.node(key('a'))
@@ -481,7 +503,8 @@ mod tests {
 
     #[test]
     fn remove() {
-        let mut commands = Commands::new();
+        let mut commands = Commands::<CommandAction>::new();
+
         commands
             .insert(|b| {
                 b.node(key('a'))
@@ -508,7 +531,8 @@ mod tests {
 
     #[test]
     fn remove_leaves_sibling_branch() {
-        let mut commands = Commands::new();
+        let mut commands = Commands::<CommandAction>::new();
+
         commands
             .insert(|b| {
                 b.node(key('a'))
@@ -544,7 +568,8 @@ mod tests {
 
     #[test]
     fn remove_absent_sequence() {
-        let mut commands = Commands::new();
+        let mut commands = Commands::<CommandAction>::new();
+
         commands
             .insert(|b| {
                 b.node(key('a'))
@@ -575,7 +600,8 @@ mod tests {
 
     #[test]
     fn advance() {
-        let mut commands = Commands::new();
+        let mut commands = Commands::<CommandAction>::new();
+
         commands
             .insert(|b| {
                 b.node(key('a'))
@@ -627,7 +653,8 @@ mod tests {
 
     #[test]
     fn advance_through_catch_all() {
-        let mut commands = Commands::new();
+        let mut commands = Commands::<CommandAction>::new();
+
         commands
             .insert(|b| {
                 b.node(key('a'))
@@ -661,7 +688,8 @@ mod tests {
 
     #[test]
     fn advance_beyond() {
-        let mut commands = Commands::new();
+        let mut commands = Commands::<CommandAction>::new();
+
         commands
             .insert(|b| {
                 b.node(key('a'))
@@ -723,7 +751,8 @@ mod tests {
 
     #[test]
     fn advance_to_absent_key() {
-        let mut commands = Commands::new();
+        let mut commands = Commands::<CommandAction>::new();
+
         commands
             .insert(|b| {
                 b.node(key('a'))
@@ -772,7 +801,8 @@ mod tests {
 
     #[test]
     fn advance_through_intermediate_action() {
-        let mut commands = Commands::new();
+        let mut commands = Commands::<CommandAction>::new();
+
         commands
             .insert(|b| {
                 b.node(key('a'))
@@ -827,7 +857,8 @@ mod tests {
 
     #[test]
     fn reset() {
-        let mut commands = Commands::new();
+        let mut commands = Commands::<CommandAction>::new();
+
         commands
             .insert(|b| {
                 b.node(key('a'))
@@ -866,7 +897,8 @@ mod tests {
 
     #[test]
     fn has_progress() {
-        let mut commands = Commands::new();
+        let mut commands = Commands::<CommandAction>::new();
+
         commands
             .insert(|b| {
                 b.node(key('a'))

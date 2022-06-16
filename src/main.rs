@@ -105,8 +105,10 @@ impl AppState {
     }
 }
 
-fn global_chords() -> Commands {
-    let mut chords = Commands::new();
+type GlobalAction = fn(&mut AppState, KeyCode);
+
+fn global_chords() -> Commands<GlobalAction> {
+    let mut chords = Commands::<GlobalAction>::new();
 
     chords
         .insert(|b| {
