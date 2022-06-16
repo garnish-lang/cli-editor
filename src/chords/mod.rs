@@ -262,6 +262,10 @@ impl Chords {
             KeyChord::Command(_, _, _, action) => (true, Some(*action)),
         }
     }
+
+    pub fn reset(&mut self) {
+        self.path.clear();
+    }
 }
 
 #[derive(Clone)]
@@ -807,5 +811,44 @@ mod tests {
         let mut state = AppState::new();
         action.unwrap()(&mut state, KeyCode::Null);
         assert_eq!(state.active_panel, 100, "State not changed");
+    }
+
+    #[test]
+    fn reset() {
+        let mut chords = Chords::new();
+        chords
+            .insert(|b| {
+                b.node(key('a'))
+                    .node(key('b'))
+                    .node(key('c'))
+                    .action(details("abc".to_string()), no_op)
+            })
+            .unwrap();
+
+        chords
+            .insert(|b| {
+                b.node(key('a'))
+                    .node(key('b'))
+                    .node(key('d'))
+                    .action(details("abd".to_string()), no_op)
+            })
+            .unwrap();
+
+        chords
+            .insert(|b| {
+                b.node(key('a'))
+                    .node(key('e'))
+                    .node(key('f'))
+                    .action(details("aef".to_string()), no_op)
+            })
+            .unwrap();
+
+        chords.advance(ChordHash::new(KeyCode::Char('a'), KeyModifiers::empty()));
+        chords.advance(ChordHash::new(KeyCode::Char('b'), KeyModifiers::empty()));
+        chords.advance(ChordHash::new(KeyCode::Char('d'), KeyModifiers::empty()));
+
+        chords.reset();
+
+        assert!(chords.path.is_empty());
     }
 }
