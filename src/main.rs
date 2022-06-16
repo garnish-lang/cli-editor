@@ -77,11 +77,11 @@ impl AppState {
     }
 
 
-    pub fn split_horizontal(&mut self, _code: KeyCode) {
+    pub fn split_current_panel_horizontal(&mut self, _code: KeyCode) {
         split(self, Direction::Horizontal)
     }
 
-    pub fn split_vertical(&mut self, _code: KeyCode) {
+    pub fn split_current_panel_vertical(&mut self, _code: KeyCode) {
         split(self, Direction::Vertical)
     }
 
@@ -113,7 +113,7 @@ fn global_chords() -> Chords {
         .insert(|b| {
             b.node(ctrl_key('s'))
                 .node(key('h'))
-                .action(CommandDetails::split_horizontal(), AppState::split_horizontal)
+                .action(CommandDetails::split_horizontal(), AppState::split_current_panel_horizontal)
         })
         .unwrap();
 
@@ -121,7 +121,7 @@ fn global_chords() -> Chords {
         .insert(|b| {
             b.node(ctrl_key('s'))
                 .node(key('v'))
-                .action(CommandDetails::split_vertical(), AppState::split_vertical)
+                .action(CommandDetails::split_vertical(), AppState::split_current_panel_vertical)
         })
         .unwrap();
 
