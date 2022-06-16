@@ -8,7 +8,10 @@ pub struct AppState {
     splits: Vec<PanelSplit>,
     active_panel: usize,
     selecting_panel: bool,
+    static_panels: Vec<char>
 }
+
+const PROMPT_PANEL_ID: char = '$';
 
 impl AppState {
     pub fn new() -> Self {
@@ -21,7 +24,7 @@ impl AppState {
         text_panel.set_id('a');
 
         let mut prompt_panel = PromptPanel::new();
-        prompt_panel.set_id('$');
+        prompt_panel.set_id(PROMPT_PANEL_ID);
 
         let panels: Vec<(usize, Box<dyn Panel>)> =
             vec![(0, Box::new(prompt_panel)), (0, Box::new(text_panel))];
@@ -33,7 +36,12 @@ impl AppState {
             splits,
             active_panel,
             selecting_panel: false,
+            static_panels: vec![PROMPT_PANEL_ID]
         }
+    }
+
+    pub fn static_panels(&self) -> &Vec<char> {
+        &self.static_panels
     }
 
     pub fn active_panel(&self) -> usize {
@@ -188,5 +196,16 @@ mod tests {
 
         assert_eq!(app.panels.len(), 3);
         assert_eq!(app.splits.len(), 2);
+    }
+
+    #[test]
+    fn prompt_panel_doesnt_split() {
+        let mut app = AppState::new();
+
+        app.set_active_panel(0);
+        app.split_current_panel_horizontal(KeyCode::Null);
+
+        assert_eq!(app.panels.len(), 2);
+        assert_eq!(app.splits.len(), 1);
     }
 }

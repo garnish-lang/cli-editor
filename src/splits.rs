@@ -20,12 +20,16 @@ pub enum UserSplits {
 }
 
 pub fn split(app: &mut AppState, direction: Direction) {
-    let active_split = match app.get_active_panel() {
+    let (active_split, active_panel_id) = match app.get_active_panel() {
         None => {
             panic!("active panel not found")
         }
-        Some((split_i, _active_panel)) => *split_i,
+        Some((split_i, active_panel)) => (*split_i, active_panel.get_id()),
     };
+
+    if app.static_panels().contains(&active_panel_id) {
+        return;
+    }
 
     let new_split_index = app.splits_len();
     let new_id = app.first_available_id();
