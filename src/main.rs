@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::io;
 use std::io::Stdout;
 
-use crossterm::event::{read, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers};
+use crossterm::event::{read, DisableMouseCapture, EnableMouseCapture, Event, KeyCode};
 use crossterm::execute;
 use crossterm::style::Print;
 use crossterm::terminal::{
@@ -15,7 +15,7 @@ use tui::{Frame, Terminal};
 use crate::chords::{code, key, ChordHash, Chords, CommandDetails, ctrl_key};
 use crate::panels::{Panel, PromptPanel, TextEditPanel};
 use crate::render::render_split;
-use crate::splits::{split_horizontal, split_vertical, PanelSplit, UserSplits};
+use crate::splits::{PanelSplit, UserSplits, split};
 
 mod chords;
 mod panels;
@@ -76,6 +76,15 @@ impl AppState {
         }
     }
 
+
+    pub fn split_horizontal(&mut self, _code: KeyCode) {
+        split(self, Direction::Horizontal)
+    }
+
+    pub fn split_vertical(&mut self, _code: KeyCode) {
+        split(self, Direction::Vertical)
+    }
+
     pub fn first_available_id(&mut self) -> char {
         let mut current = HashSet::new();
 
@@ -104,7 +113,7 @@ fn global_chords() -> Chords {
         .insert(|b| {
             b.node(ctrl_key('s'))
                 .node(key('h'))
-                .action(CommandDetails::split_horizontal(), split_horizontal)
+                .action(CommandDetails::split_horizontal(), AppState::split_horizontal)
         })
         .unwrap();
 
@@ -112,7 +121,7 @@ fn global_chords() -> Chords {
         .insert(|b| {
             b.node(ctrl_key('s'))
                 .node(key('v'))
-                .action(CommandDetails::split_vertical(), split_vertical)
+                .action(CommandDetails::split_vertical(), AppState::split_vertical)
         })
         .unwrap();
 

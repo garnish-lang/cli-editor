@@ -1,4 +1,3 @@
-use crossterm::event::KeyCode;
 use tui::layout::Direction;
 
 use crate::panels::{Panel, TextEditPanel};
@@ -20,7 +19,7 @@ pub enum UserSplits {
     Panel(usize),
 }
 
-fn split(app: &mut AppState, direction: Direction) {
+pub fn split(app: &mut AppState, direction: Direction) {
     match app.panels.get(app.active_panel) {
         None => {
             panic!("active panel not found")
@@ -91,12 +90,4 @@ fn split(app: &mut AppState, direction: Direction) {
             app.splits.push(new_split);
         }
     }
-}
-
-pub fn split_horizontal(app: &mut AppState, _code: KeyCode) {
-    split(app, Direction::Horizontal)
-}
-
-pub fn split_vertical(app: &mut AppState, _code: KeyCode) {
-    split(app, Direction::Vertical)
 }
