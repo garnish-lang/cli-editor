@@ -6,35 +6,35 @@ use crossterm::event::{KeyCode, KeyModifiers};
 
 use crate::AppState;
 
-pub type ChordAction = fn(&mut AppState, KeyCode);
+pub type CommandAction = fn(&mut AppState, KeyCode);
 
 #[derive(Clone)]
-pub enum KeyChord {
+pub enum CommandKey {
     Node(
         KeyCode,
         KeyModifiers,
-        HashMap<ChordHash, KeyChord>,
-        Option<ChordAction>,
+        HashMap<CommandId, CommandKey>,
+        Option<CommandAction>,
     ),
-    Command(KeyCode, KeyModifiers, CommandDetails, ChordAction),
+    Leaf(KeyCode, KeyModifiers, CommandDetails, CommandAction),
 }
 
-impl KeyChord {
-    fn get_hash(&self) -> ChordHash {
+impl CommandKey {
+    fn get_hash(&self) -> CommandId {
         let (c, m) = match self {
-            KeyChord::Node(c, m, _, _) => (c, m),
-            KeyChord::Command(c, m, _, _) => (c, m),
+            CommandKey::Node(c, m, _, _) => (c, m),
+            CommandKey::Leaf(c, m, _, _) => (c, m),
         };
 
-        ChordHash::new(*c, *m)
+        CommandId::new(*c, *m)
     }
 }
 
-impl Debug for KeyChord {
+impl Debug for CommandKey {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.write_str(
             match self {
-                KeyChord::Node(code, mods, children, action) => {
+                CommandKey::Node(code, mods, children, action) => {
                     format!(
                         "KeyChord Node: code {:?} mods {:?} has action {} children {:?}",
                         code,
@@ -43,7 +43,7 @@ impl Debug for KeyChord {
                         children
                     )
                 }
-                KeyChord::Command(code, mods, _, _) => {
+                CommandKey::Leaf(code, mods, _, _) => {
                     format!("KeyChord Command: code {:?} mods {:?}", code, mods)
                 }
             }
@@ -100,56 +100,56 @@ impl CommandDetails {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct ChordHash {
+pub struct CommandId {
     code: KeyCode,
     mods: KeyModifiers,
 }
 
 #[allow(dead_code)]
-impl ChordHash {
+impl CommandId {
     pub fn new(code: KeyCode, mods: KeyModifiers) -> Self {
-        ChordHash { code, mods }
+        CommandId { code, mods }
     }
 
     pub fn new_code(code: KeyCode) -> Self {
-        ChordHash {
+        CommandId {
             code,
             mods: KeyModifiers::empty(),
         }
     }
 }
 
-pub struct Chords {
-    root: KeyChord,
-    path: Vec<ChordHash>,
+pub struct Commands {
+    root: CommandKey,
+    path: Vec<CommandId>,
 }
 
 #[allow(dead_code)]
-impl Chords {
+impl Commands {
     pub fn new() -> Self {
-        Chords {
-            root: KeyChord::Node(KeyCode::Null, KeyModifiers::empty(), HashMap::new(), None),
+        Commands {
+            root: CommandKey::Node(KeyCode::Null, KeyModifiers::empty(), HashMap::new(), None),
             path: vec![],
         }
     }
 
-    pub fn builder() -> KeyChordBuilder {
-        KeyChordBuilder::new()
+    pub fn builder() -> CommandSequenceBuilder {
+        CommandSequenceBuilder::new()
     }
 
-    pub fn insert(&mut self, build: fn(KeyChordBuilder) -> KeyChordBuilder) -> Result<(), String> {
-        let builder = build(KeyChordBuilder::new());
+    pub fn insert(&mut self, build: fn(CommandSequenceBuilder) -> CommandSequenceBuilder) -> Result<(), String> {
+        let builder = build(CommandSequenceBuilder::new());
         let mut current_node = &mut self.root;
 
         // chain insert all but the last
         for node in builder.nodes.iter().take(builder.nodes.len() - 1) {
             match current_node {
-                KeyChord::Node(_, _, children, _) => {
-                    let h = ChordHash::new(node.code, node.mods);
-                    let n = KeyChord::Node(node.code, node.mods, HashMap::new(), node.action);
+                CommandKey::Node(_, _, children, _) => {
+                    let h = CommandId::new(node.code, node.mods);
+                    let n = CommandKey::Node(node.code, node.mods, HashMap::new(), node.action);
                     current_node = children.entry(h).or_insert(n)
                 }
-                KeyChord::Command(_, _, _, _) => {
+                CommandKey::Leaf(_, _, _, _) => {
                     return Err("Existing command in sequence.".to_string())
                 }
             }
@@ -159,12 +159,12 @@ impl Chords {
         // insert into current
         let last = &builder.nodes[builder.nodes.len() - 1];
         match current_node {
-            KeyChord::Node(_, _, children, _) => {
-                let n = KeyChord::Command(last.code, last.mods, builder.details, builder.action);
+            CommandKey::Node(_, _, children, _) => {
+                let n = CommandKey::Leaf(last.code, last.mods, builder.details, builder.action);
                 children.insert(n.get_hash(), n);
             }
             // should've been validate in first loop
-            KeyChord::Command(_, _, _, _) => {
+            CommandKey::Leaf(_, _, _, _) => {
                 return Err("Existing command in sequence.".to_string())
             }
         }
@@ -172,8 +172,8 @@ impl Chords {
         Ok(())
     }
 
-    pub fn remove(&mut self, build: fn(KeyChordBuilder) -> KeyChordBuilder) -> Result<(), String> {
-        let builder = build(KeyChordBuilder::new());
+    pub fn remove(&mut self, build: fn(CommandSequenceBuilder) -> CommandSequenceBuilder) -> Result<(), String> {
+        let builder = build(CommandSequenceBuilder::new());
         // manual count of nesting
         // drill down and keep track of the lowest node with only 1 child
         let mut index = 0;
@@ -182,8 +182,8 @@ impl Chords {
         let mut current_node = &self.root;
         for node in &builder.nodes {
             match current_node {
-                KeyChord::Node(_, _, children, _) => {
-                    let h = ChordHash::new(node.code, node.mods);
+                CommandKey::Node(_, _, children, _) => {
+                    let h = CommandId::new(node.code, node.mods);
                     match children.get(&h) {
                         // no child with given sequence, effectively means its already removed
                         // just return
@@ -198,7 +198,7 @@ impl Chords {
                     index += 1;
                 }
                 // end of branch
-                KeyChord::Command(_, _, _, _) => (),
+                CommandKey::Leaf(_, _, _, _) => (),
             }
         }
 
@@ -208,8 +208,8 @@ impl Chords {
 
         for node in &builder.nodes {
             match current_node {
-                KeyChord::Node(_, _, children, _) => {
-                    let h = ChordHash::new(node.code, node.mods);
+                CommandKey::Node(_, _, children, _) => {
+                    let h = CommandId::new(node.code, node.mods);
                     // 1 or fewer children means this entire branch will be removed
                     if index == lowest {
                         children.remove(&h);
@@ -224,31 +224,31 @@ impl Chords {
                     index += 1;
                 }
                 // end of branch
-                KeyChord::Command(_, _, _, _) => (),
+                CommandKey::Leaf(_, _, _, _) => (),
             }
         }
 
         Ok(())
     }
 
-    pub fn advance(&mut self, key: ChordHash) -> (bool, Option<ChordAction>) {
+    pub fn advance(&mut self, key: CommandId) -> (bool, Option<CommandAction>) {
         self.path.push(key);
 
         let mut current = &self.root;
         for c in &self.path {
             match current {
-                KeyChord::Node(_, _, children, _) => match children.get(c) {
+                CommandKey::Node(_, _, children, _) => match children.get(c) {
                     Some(next) => current = next,
                     // no direct match
                     // check for catch all Null code, cloning given modifiers
-                    None => match children.get(&ChordHash::new(KeyCode::Null, c.mods)) {
+                    None => match children.get(&CommandId::new(KeyCode::Null, c.mods)) {
                         Some(next) => current = next,
                         // current path leads nowhere
                         // return early with end and no action
                         None => return (true, None),
                     },
                 },
-                KeyChord::Command(_, _, _, a) => {
+                CommandKey::Leaf(_, _, _, a) => {
                     // current path goes beyond command
                     // return early with end result
                     return (true, Some(*a));
@@ -257,9 +257,9 @@ impl Chords {
         }
 
         match current {
-            KeyChord::Node(.., Some(action)) => (false, Some(*action)),
-            KeyChord::Node(_, _, _, _) => (false, None),
-            KeyChord::Command(_, _, _, action) => (true, Some(*action)),
+            CommandKey::Node(.., Some(action)) => (false, Some(*action)),
+            CommandKey::Node(_, _, _, _) => (false, None),
+            CommandKey::Leaf(_, _, _, action) => (true, Some(*action)),
         }
     }
 
@@ -273,43 +273,43 @@ impl Chords {
 }
 
 #[derive(Clone)]
-pub struct KeyChordNode {
+pub struct CommandKeyBuilder {
     code: KeyCode,
     mods: KeyModifiers,
-    action: Option<ChordAction>,
+    action: Option<CommandAction>,
 }
 
 #[allow(dead_code)]
-impl KeyChordNode {
+impl CommandKeyBuilder {
     pub fn mods(mut self, mods: KeyModifiers) -> Self {
         self.mods = mods;
         self
     }
 
-    pub fn action(mut self, action: ChordAction) -> Self {
+    pub fn action(mut self, action: CommandAction) -> Self {
         self.action = Some(action);
         self
     }
 }
 
-pub fn ctrl_key(key: char) -> KeyChordNode {
-    KeyChordNode {
+pub fn ctrl_key(key: char) -> CommandKeyBuilder {
+    CommandKeyBuilder {
         code: KeyCode::Char(key),
         mods: KeyModifiers::CONTROL,
         action: None
     }
 }
 
-pub fn key(key: char) -> KeyChordNode {
-    KeyChordNode {
+pub fn key(key: char) -> CommandKeyBuilder {
+    CommandKeyBuilder {
         code: KeyCode::Char(key),
         mods: KeyModifiers::empty(),
         action: None,
     }
 }
 
-pub fn code(code: KeyCode) -> KeyChordNode {
-    KeyChordNode {
+pub fn code(code: KeyCode) -> CommandKeyBuilder {
+    CommandKeyBuilder {
         code,
         mods: KeyModifiers::empty(),
         action: None,
@@ -318,16 +318,16 @@ pub fn code(code: KeyCode) -> KeyChordNode {
 
 fn default_action(_: &mut AppState, _: KeyCode) {}
 
-pub struct KeyChordBuilder {
-    nodes: Vec<KeyChordNode>,
+pub struct CommandSequenceBuilder {
+    nodes: Vec<CommandKeyBuilder>,
     details: CommandDetails,
-    action: ChordAction,
+    action: CommandAction,
 }
 
 #[allow(dead_code)]
-impl KeyChordBuilder {
+impl CommandSequenceBuilder {
     fn new() -> Self {
-        KeyChordBuilder {
+        CommandSequenceBuilder {
             nodes: vec![],
             details: CommandDetails::empty(),
             action: default_action,
@@ -342,12 +342,12 @@ impl KeyChordBuilder {
         self
     }
 
-    pub fn node(mut self, c: KeyChordNode) -> Self {
+    pub fn node(mut self, c: CommandKeyBuilder) -> Self {
         self.nodes.push(c.into());
         self
     }
 
-    pub fn action(mut self, details: CommandDetails, action: ChordAction) -> Self {
+    pub fn action(mut self, details: CommandDetails, action: CommandAction) -> Self {
         self.details = details;
         self.action = action;
         self
@@ -358,19 +358,19 @@ impl KeyChordBuilder {
 mod tests {
     use crossterm::event::{KeyCode, KeyModifiers};
 
-    use crate::chords::{code, key, ChordHash, CommandDetails, KeyChord};
-    use crate::{AppState, Chords};
+    use crate::commands::{code, key, CommandId, CommandDetails, CommandKey};
+    use crate::{AppState, Commands};
 
     fn no_op(state: &mut AppState, _: KeyCode) {
         state.active_panel = 100;
     }
 
-    fn assert_sequence(root: &KeyChord, sequence: &[char]) {
+    fn assert_sequence(root: &CommandKey, sequence: &[char]) {
         let mut current = root;
         for c in sequence {
             match current {
-                KeyChord::Node(_, _, children, _) => {
-                    match children.get(&ChordHash::new_code(KeyCode::Char(*c))) {
+                CommandKey::Node(_, _, children, _) => {
+                    match children.get(&CommandId::new_code(KeyCode::Char(*c))) {
                         Some(n) => current = n,
                         None => panic!("{} not found in children", c),
                     }
@@ -380,7 +380,7 @@ mod tests {
         }
 
         match current {
-            KeyChord::Command(_, _, _, action) => {
+            CommandKey::Leaf(_, _, _, action) => {
                 let mut state = AppState::new();
                 action(&mut state, KeyCode::Null);
 
@@ -392,8 +392,8 @@ mod tests {
 
     #[test]
     fn insert_basic() {
-        let mut chords = Chords::new();
-        chords
+        let mut commands = Commands::new();
+        commands
             .insert(|b| {
                 b.node(key('a'))
                     .node(key('b'))
@@ -402,13 +402,13 @@ mod tests {
             })
             .unwrap();
 
-        assert_sequence(&chords.root, &['a', 'b', 'c'])
+        assert_sequence(&commands.root, &['a', 'b', 'c'])
     }
 
     #[test]
     fn insert_two_same_start() {
-        let mut chords = Chords::new();
-        chords
+        let mut commands = Commands::new();
+        commands
             .insert(|b| {
                 b.node(key('a'))
                     .node(key('b'))
@@ -417,7 +417,7 @@ mod tests {
             })
             .unwrap();
 
-        chords
+        commands
             .insert(|b| {
                 b.node(key('a'))
                     .node(key('b'))
@@ -426,14 +426,14 @@ mod tests {
             })
             .unwrap();
 
-        assert_sequence(&chords.root, &['a', 'b', 'c']);
-        assert_sequence(&chords.root, &['a', 'b', 'd']);
+        assert_sequence(&commands.root, &['a', 'b', 'c']);
+        assert_sequence(&commands.root, &['a', 'b', 'd']);
     }
 
     #[test]
     fn insert_beyond_existing_command() {
-        let mut chords = Chords::new();
-        chords
+        let mut commands = Commands::new();
+        commands
             .insert(|b| {
                 b.node(key('a'))
                     .node(key('b'))
@@ -442,7 +442,7 @@ mod tests {
             })
             .unwrap();
 
-        let result = chords.insert(|b| {
+        let result = commands.insert(|b| {
             b.node(key('a'))
                 .node(key('b'))
                 .node(key('c'))
@@ -450,14 +450,14 @@ mod tests {
                 .action(CommandDetails::split_horizontal(), no_op)
         });
 
-        assert_sequence(&chords.root, &['a', 'b', 'c']);
+        assert_sequence(&commands.root, &['a', 'b', 'c']);
         assert!(result.is_err());
     }
 
     #[test]
     fn insert_beyond_existing_command_extended() {
-        let mut chords = Chords::new();
-        chords
+        let mut commands = Commands::new();
+        commands
             .insert(|b| {
                 b.node(key('a'))
                     .node(key('b'))
@@ -466,7 +466,7 @@ mod tests {
             })
             .unwrap();
 
-        let result = chords.insert(|b| {
+        let result = commands.insert(|b| {
             b.node(key('a'))
                 .node(key('b'))
                 .node(key('c'))
@@ -481,8 +481,8 @@ mod tests {
 
     #[test]
     fn remove() {
-        let mut chords = Chords::new();
-        chords
+        let mut commands = Commands::new();
+        commands
             .insert(|b| {
                 b.node(key('a'))
                     .node(key('b'))
@@ -491,7 +491,7 @@ mod tests {
             })
             .unwrap();
 
-        chords
+        commands
             .remove(|b| {
                 b.node(key('a'))
                     .node(key('b'))
@@ -500,16 +500,16 @@ mod tests {
             })
             .unwrap();
 
-        match chords.root {
-            KeyChord::Node(_, _, children, _) => assert!(children.is_empty()),
+        match commands.root {
+            CommandKey::Node(_, _, children, _) => assert!(children.is_empty()),
             _ => panic!("Not a Node"),
         }
     }
 
     #[test]
     fn remove_leaves_sibling_branch() {
-        let mut chords = Chords::new();
-        chords
+        let mut commands = Commands::new();
+        commands
             .insert(|b| {
                 b.node(key('a'))
                     .node(key('b'))
@@ -519,7 +519,7 @@ mod tests {
             })
             .unwrap();
 
-        chords
+        commands
             .insert(|b| {
                 b.node(key('a'))
                     .node(key('b'))
@@ -529,7 +529,7 @@ mod tests {
             })
             .unwrap();
 
-        chords
+        commands
             .remove(|b| {
                 b.node(key('a'))
                     .node(key('b'))
@@ -539,13 +539,13 @@ mod tests {
             })
             .unwrap();
 
-        assert_sequence(&chords.root, &['a', 'b', 'e', 'f']);
+        assert_sequence(&commands.root, &['a', 'b', 'e', 'f']);
     }
 
     #[test]
     fn remove_absent_sequence() {
-        let mut chords = Chords::new();
-        chords
+        let mut commands = Commands::new();
+        commands
             .insert(|b| {
                 b.node(key('a'))
                     .node(key('b'))
@@ -554,7 +554,7 @@ mod tests {
             })
             .unwrap();
 
-        chords
+        commands
             .remove(|b| {
                 b.node(key('a'))
                     .node(key('b'))
@@ -563,7 +563,7 @@ mod tests {
             })
             .unwrap();
 
-        assert_sequence(&chords.root, &['a', 'b', 'c']);
+        assert_sequence(&commands.root, &['a', 'b', 'c']);
     }
 
     fn details(name: String) -> CommandDetails {
@@ -575,8 +575,8 @@ mod tests {
 
     #[test]
     fn advance() {
-        let mut chords = Chords::new();
-        chords
+        let mut commands = Commands::new();
+        commands
             .insert(|b| {
                 b.node(key('a'))
                     .node(key('b'))
@@ -585,7 +585,7 @@ mod tests {
             })
             .unwrap();
 
-        chords
+        commands
             .insert(|b| {
                 b.node(key('a'))
                     .node(key('b'))
@@ -594,7 +594,7 @@ mod tests {
             })
             .unwrap();
 
-        chords
+        commands
             .insert(|b| {
                 b.node(key('a'))
                     .node(key('e'))
@@ -604,19 +604,19 @@ mod tests {
             .unwrap();
 
         let (end, action) =
-            chords.advance(ChordHash::new(KeyCode::Char('a'), KeyModifiers::empty()));
+            commands.advance(CommandId::new(KeyCode::Char('a'), KeyModifiers::empty()));
 
         assert!(!end);
         assert!(action.is_none());
 
         let (end, action) =
-            chords.advance(ChordHash::new(KeyCode::Char('b'), KeyModifiers::empty()));
+            commands.advance(CommandId::new(KeyCode::Char('b'), KeyModifiers::empty()));
 
         assert!(!end);
         assert!(action.is_none());
 
         let (end, action) =
-            chords.advance(ChordHash::new(KeyCode::Char('d'), KeyModifiers::empty()));
+            commands.advance(CommandId::new(KeyCode::Char('d'), KeyModifiers::empty()));
 
         assert!(end);
 
@@ -627,8 +627,8 @@ mod tests {
 
     #[test]
     fn advance_through_catch_all() {
-        let mut chords = Chords::new();
-        chords
+        let mut commands = Commands::new();
+        commands
             .insert(|b| {
                 b.node(key('a'))
                     .node(code(KeyCode::Null))
@@ -638,19 +638,19 @@ mod tests {
             .unwrap();
 
         let (end, action) =
-            chords.advance(ChordHash::new(KeyCode::Char('a'), KeyModifiers::empty()));
+            commands.advance(CommandId::new(KeyCode::Char('a'), KeyModifiers::empty()));
 
         assert!(!end);
         assert!(action.is_none());
 
         let (end, action) =
-            chords.advance(ChordHash::new(KeyCode::Char('b'), KeyModifiers::empty()));
+            commands.advance(CommandId::new(KeyCode::Char('b'), KeyModifiers::empty()));
 
         assert!(!end);
         assert!(action.is_none());
 
         let (end, action) =
-            chords.advance(ChordHash::new(KeyCode::Char('c'), KeyModifiers::empty()));
+            commands.advance(CommandId::new(KeyCode::Char('c'), KeyModifiers::empty()));
 
         assert!(end);
 
@@ -661,8 +661,8 @@ mod tests {
 
     #[test]
     fn advance_beyond() {
-        let mut chords = Chords::new();
-        chords
+        let mut commands = Commands::new();
+        commands
             .insert(|b| {
                 b.node(key('a'))
                     .node(key('b'))
@@ -671,7 +671,7 @@ mod tests {
             })
             .unwrap();
 
-        chords
+        commands
             .insert(|b| {
                 b.node(key('a'))
                     .node(key('b'))
@@ -680,7 +680,7 @@ mod tests {
             })
             .unwrap();
 
-        chords
+        commands
             .insert(|b| {
                 b.node(key('a'))
                     .node(key('e'))
@@ -690,19 +690,19 @@ mod tests {
             .unwrap();
 
         let (end, action) =
-            chords.advance(ChordHash::new(KeyCode::Char('a'), KeyModifiers::empty()));
+            commands.advance(CommandId::new(KeyCode::Char('a'), KeyModifiers::empty()));
 
         assert!(!end);
         assert!(action.is_none());
 
         let (end, action) =
-            chords.advance(ChordHash::new(KeyCode::Char('b'), KeyModifiers::empty()));
+            commands.advance(CommandId::new(KeyCode::Char('b'), KeyModifiers::empty()));
 
         assert!(!end);
         assert!(action.is_none());
 
         let (end, action) =
-            chords.advance(ChordHash::new(KeyCode::Char('d'), KeyModifiers::empty()));
+            commands.advance(CommandId::new(KeyCode::Char('d'), KeyModifiers::empty()));
 
         assert!(end);
 
@@ -712,7 +712,7 @@ mod tests {
 
         // beyond sequence
         let (end, action) =
-            chords.advance(ChordHash::new(KeyCode::Char('e'), KeyModifiers::empty()));
+            commands.advance(CommandId::new(KeyCode::Char('e'), KeyModifiers::empty()));
 
         assert!(end);
 
@@ -723,8 +723,8 @@ mod tests {
 
     #[test]
     fn advance_to_absent_key() {
-        let mut chords = Chords::new();
-        chords
+        let mut commands = Commands::new();
+        commands
             .insert(|b| {
                 b.node(key('a'))
                     .node(key('b'))
@@ -733,7 +733,7 @@ mod tests {
             })
             .unwrap();
 
-        chords
+        commands
             .insert(|b| {
                 b.node(key('a'))
                     .node(key('b'))
@@ -742,7 +742,7 @@ mod tests {
             })
             .unwrap();
 
-        chords
+        commands
             .insert(|b| {
                 b.node(key('a'))
                     .node(key('e'))
@@ -752,19 +752,19 @@ mod tests {
             .unwrap();
 
         let (end, action) =
-            chords.advance(ChordHash::new(KeyCode::Char('a'), KeyModifiers::empty()));
+            commands.advance(CommandId::new(KeyCode::Char('a'), KeyModifiers::empty()));
 
         assert!(!end);
         assert!(action.is_none());
 
         let (end, action) =
-            chords.advance(ChordHash::new(KeyCode::Char('b'), KeyModifiers::empty()));
+            commands.advance(CommandId::new(KeyCode::Char('b'), KeyModifiers::empty()));
 
         assert!(!end);
         assert!(action.is_none());
 
         let (end, action) =
-            chords.advance(ChordHash::new(KeyCode::Char('z'), KeyModifiers::empty()));
+            commands.advance(CommandId::new(KeyCode::Char('z'), KeyModifiers::empty()));
 
         assert!(end);
         assert!(action.is_none());
@@ -772,8 +772,8 @@ mod tests {
 
     #[test]
     fn advance_through_intermediate_action() {
-        let mut chords = Chords::new();
-        chords
+        let mut commands = Commands::new();
+        commands
             .insert(|b| {
                 b.node(key('a'))
                     .node(key('b').action(no_op))
@@ -782,7 +782,7 @@ mod tests {
             })
             .unwrap();
 
-        chords
+        commands
             .insert(|b| {
                 b.node(key('a'))
                     .node(key('b'))
@@ -791,7 +791,7 @@ mod tests {
             })
             .unwrap();
 
-        chords
+        commands
             .insert(|b| {
                 b.node(key('a'))
                     .node(key('e'))
@@ -801,13 +801,13 @@ mod tests {
             .unwrap();
 
         let (end, action) =
-            chords.advance(ChordHash::new(KeyCode::Char('a'), KeyModifiers::empty()));
+            commands.advance(CommandId::new(KeyCode::Char('a'), KeyModifiers::empty()));
 
         assert!(!end);
         assert!(action.is_none());
 
         let (end, action) =
-            chords.advance(ChordHash::new(KeyCode::Char('b'), KeyModifiers::empty()));
+            commands.advance(CommandId::new(KeyCode::Char('b'), KeyModifiers::empty()));
 
         assert!(!end);
 
@@ -816,7 +816,7 @@ mod tests {
         assert_eq!(state.active_panel, 100, "State not changed");
 
         let (end, action) =
-            chords.advance(ChordHash::new(KeyCode::Char('d'), KeyModifiers::empty()));
+            commands.advance(CommandId::new(KeyCode::Char('d'), KeyModifiers::empty()));
 
         assert!(end);
 
@@ -827,8 +827,8 @@ mod tests {
 
     #[test]
     fn reset() {
-        let mut chords = Chords::new();
-        chords
+        let mut commands = Commands::new();
+        commands
             .insert(|b| {
                 b.node(key('a'))
                     .node(key('b'))
@@ -837,7 +837,7 @@ mod tests {
             })
             .unwrap();
 
-        chords
+        commands
             .insert(|b| {
                 b.node(key('a'))
                     .node(key('b'))
@@ -846,7 +846,7 @@ mod tests {
             })
             .unwrap();
 
-        chords
+        commands
             .insert(|b| {
                 b.node(key('a'))
                     .node(key('e'))
@@ -855,19 +855,19 @@ mod tests {
             })
             .unwrap();
 
-        chords.advance(ChordHash::new(KeyCode::Char('a'), KeyModifiers::empty()));
-        chords.advance(ChordHash::new(KeyCode::Char('b'), KeyModifiers::empty()));
-        chords.advance(ChordHash::new(KeyCode::Char('d'), KeyModifiers::empty()));
+        commands.advance(CommandId::new(KeyCode::Char('a'), KeyModifiers::empty()));
+        commands.advance(CommandId::new(KeyCode::Char('b'), KeyModifiers::empty()));
+        commands.advance(CommandId::new(KeyCode::Char('d'), KeyModifiers::empty()));
 
-        chords.reset();
+        commands.reset();
 
-        assert!(chords.path.is_empty());
+        assert!(commands.path.is_empty());
     }
 
     #[test]
     fn has_progress() {
-        let mut chords = Chords::new();
-        chords
+        let mut commands = Commands::new();
+        commands
             .insert(|b| {
                 b.node(key('a'))
                     .node(key('b'))
@@ -876,7 +876,7 @@ mod tests {
             })
             .unwrap();
 
-        chords
+        commands
             .insert(|b| {
                 b.node(key('a'))
                     .node(key('b'))
@@ -885,7 +885,7 @@ mod tests {
             })
             .unwrap();
 
-        chords
+        commands
             .insert(|b| {
                 b.node(key('a'))
                     .node(key('e'))
@@ -894,15 +894,15 @@ mod tests {
             })
             .unwrap();
 
-        assert!(!chords.has_progress());
+        assert!(!commands.has_progress());
 
-        chords.advance(ChordHash::new(KeyCode::Char('a'), KeyModifiers::empty()));
-        chords.advance(ChordHash::new(KeyCode::Char('b'), KeyModifiers::empty()));
+        commands.advance(CommandId::new(KeyCode::Char('a'), KeyModifiers::empty()));
+        commands.advance(CommandId::new(KeyCode::Char('b'), KeyModifiers::empty()));
 
-        assert!(chords.has_progress());
+        assert!(commands.has_progress());
 
-        chords.reset();
+        commands.reset();
 
-        assert!(!chords.has_progress());
+        assert!(!commands.has_progress());
     }
 }

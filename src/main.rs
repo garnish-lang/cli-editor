@@ -12,12 +12,12 @@ use tui::backend::CrosstermBackend;
 use tui::layout::Direction;
 use tui::{Frame, Terminal};
 
-use crate::chords::{code, ctrl_key, key, ChordHash, Chords, CommandDetails};
+use crate::commands::{code, ctrl_key, key, CommandId, Commands, CommandDetails};
 use crate::panels::{Panel, PromptPanel, TextEditPanel};
 use crate::render::render_split;
 use crate::splits::{split, PanelSplit, UserSplits};
 
-mod chords;
+mod commands;
 mod panels;
 mod render;
 mod splits;
@@ -105,8 +105,8 @@ impl AppState {
     }
 }
 
-fn global_chords() -> Chords {
-    let mut chords = Chords::new();
+fn global_chords() -> Commands {
+    let mut chords = Commands::new();
 
     chords
         .insert(|b| {
@@ -146,7 +146,7 @@ fn main() -> Result<(), io::Error> {
     let mut terminal = Terminal::new(backend)?;
 
     let mut app_state = AppState::new();
-    let mut global_chords = global_chords();
+    let mut global_commands = global_chords();
 
     loop {
         terminal.draw(|frame| render_split(0, &app_state, frame, frame.size()))?;
@@ -163,8 +163,8 @@ fn main() -> Result<(), io::Error> {
                 // if active panel doesn't handle event
                 // then check global
 
-                let (end, action) = if global_chords.has_progress() {
-                    global_chords.advance(ChordHash::new(event.code, event.modifiers))
+                let (end, action) = if global_commands.has_progress() {
+                    global_commands.advance(CommandId::new(event.code, event.modifiers))
                 } else {
                     let handled = match app_state.panels.get_mut(app_state.active_panel) {
                         Some((_, panel)) => panel.receive_key(event),
@@ -172,7 +172,7 @@ fn main() -> Result<(), io::Error> {
                     };
 
                     if handled {
-                        global_chords.advance(ChordHash::new(event.code, event.modifiers))
+                        global_commands.advance(CommandId::new(event.code, event.modifiers))
                     } else {
                         (false, None)
                     }
@@ -185,7 +185,7 @@ fn main() -> Result<(), io::Error> {
 
                 if end {
                     // reset
-                    global_chords.reset();
+                    global_commands.reset();
                     app_state.selecting_panel = false;
                 }
             }
