@@ -167,7 +167,7 @@ impl AppState {
         let active_panel_index = self.active_panel();
         self.panels.remove(active_panel_index);
 
-        match self.splits.get_mut(active_split) {
+        let remove_split = match self.splits.get_mut(active_split) {
             None => unimplemented!(),
             Some(split) => {
                 let index = match split.panels.iter().enumerate().find(|(_, s)| match s {
@@ -179,6 +179,34 @@ impl AppState {
                 };
 
                 split.panels.remove(index);
+
+                split.panels.is_empty()
+            }
+        };
+
+        if remove_split {
+            self.splits.remove(active_split);
+
+            let mut parent_index = 0;
+            let mut child_index = 0;
+            'outer: for (i, s)in self.splits.iter().enumerate() {
+                for (j, p) in s.panels.iter().enumerate() {
+                    match p {
+                        UserSplits::Panel(_) => (),
+                        UserSplits::Split(index) => if *index == active_split {
+                            parent_index = i;
+                            child_index = j;
+                            break 'outer;
+                        }
+                    }
+                }
+            }
+
+            match self.get_split_mut(parent_index) {
+                Some(p) => {
+                    p.panels.remove(child_index);
+                },
+                None => (), // error
             }
         }
     }
@@ -264,5 +292,27 @@ mod tests {
 
         assert_eq!(app.panels.len(), 2);
         assert_eq!(app.splits.len(), 1);
+    }
+
+    #[test]
+    fn delete_active_panel_deletes_empty_split() {
+        let mut app = AppState::new();
+
+        let second = app.panels_len();
+        app.split_current_panel_horizontal(KeyCode::Null);
+        app.set_active_panel(second);
+
+        let third = app.panels_len();
+        app.split_current_panel_horizontal(KeyCode::Null);
+        app.set_active_panel(third);
+
+        app.delete_active_panel(KeyCode::Null);
+
+        app.set_active_panel(second);
+
+        app.delete_active_panel(KeyCode::Null);
+
+        assert_eq!(app.panels.len(), 2);
+        assert_eq!(app.splits.len(), 2);
     }
 }
