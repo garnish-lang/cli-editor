@@ -2,9 +2,7 @@ use std::collections::HashSet;
 use std::io;
 use std::io::Stdout;
 
-use crossterm::event::{
-    read, DisableMouseCapture, EnableMouseCapture, Event, KeyCode,
-};
+use crossterm::event::{read, DisableMouseCapture, EnableMouseCapture, Event, KeyCode};
 use crossterm::execute;
 use crossterm::style::Print;
 use crossterm::terminal::{
@@ -14,10 +12,10 @@ use tui::backend::CrosstermBackend;
 use tui::layout::Direction;
 use tui::{Frame, Terminal};
 
-use crate::chords::{ChordHash, Chords, code, CommandDetails, key, KeyChord};
+use crate::chords::{code, key, ChordHash, Chords, CommandDetails};
 use crate::panels::{Panel, PromptPanel, TextEditPanel};
 use crate::render::render_split;
-use crate::splits::{PanelSplit, split_horizontal, split_vertical, UserSplits};
+use crate::splits::{split_horizontal, split_vertical, PanelSplit, UserSplits};
 
 mod chords;
 mod panels;
@@ -150,11 +148,12 @@ fn main() -> Result<(), io::Error> {
                     break;
                 }
 
-                let (end, action) = global_chords.advance(ChordHash::new(event.code, event.modifiers));
+                let (end, action) =
+                    global_chords.advance(ChordHash::new(event.code, event.modifiers));
 
                 match action {
                     Some(action) => action(&mut app_state, event.code),
-                    None => ()
+                    None => (),
                 };
 
                 if end {

@@ -1,10 +1,9 @@
 use std::collections::HashMap;
-use std::fmt::{Debug, Formatter, Write};
-use std::hash::{Hash, Hasher};
+use std::fmt::{Debug, Formatter};
+use std::hash::Hash;
 
 use crossterm::event::{KeyCode, KeyModifiers};
 
-use crate::splits::{split_horizontal, split_vertical};
 use crate::AppState;
 
 pub type ChordAction = fn(&mut AppState, KeyCode);
@@ -59,6 +58,7 @@ pub struct CommandDetails {
     description: String,
 }
 
+#[allow(dead_code)]
 impl CommandDetails {
     pub fn name(&self) -> String {
         self.name.to_string()
@@ -105,6 +105,7 @@ pub struct ChordHash {
     mods: KeyModifiers,
 }
 
+#[allow(dead_code)]
 impl ChordHash {
     pub fn new(code: KeyCode, mods: KeyModifiers) -> Self {
         ChordHash { code, mods }
@@ -123,6 +124,7 @@ pub struct Chords {
     path: Vec<ChordHash>,
 }
 
+#[allow(dead_code)]
 impl Chords {
     pub fn new() -> Self {
         Chords {
@@ -243,7 +245,7 @@ impl Chords {
                         Some(next) => current = next,
                         // current path leads nowhere
                         // return early with end and no action
-                        None => return (true, None)
+                        None => return (true, None),
                     },
                 },
                 KeyChord::Command(_, _, _, a) => {
@@ -269,6 +271,7 @@ pub struct KeyChordNode {
     action: Option<ChordAction>,
 }
 
+#[allow(dead_code)]
 impl KeyChordNode {
     pub fn mods(mut self, mods: KeyModifiers) -> Self {
         self.mods = mods;
@@ -305,6 +308,7 @@ pub struct KeyChordBuilder {
     action: ChordAction,
 }
 
+#[allow(dead_code)]
 impl KeyChordBuilder {
     fn new() -> Self {
         KeyChordBuilder {
@@ -338,8 +342,8 @@ impl KeyChordBuilder {
 mod tests {
     use crossterm::event::{KeyCode, KeyModifiers};
 
-    use crate::chords::{code, default_action, key, ChordHash, CommandDetails, KeyChordNode};
-    use crate::{AppState, Chords, KeyChord};
+    use crate::chords::{code, key, ChordHash, CommandDetails, KeyChord};
+    use crate::{AppState, Chords};
 
     fn no_op(state: &mut AppState, _: KeyCode) {
         state.active_panel = 100;
@@ -482,7 +486,7 @@ mod tests {
 
         match chords.root {
             KeyChord::Node(_, _, children, _) => assert!(children.is_empty()),
-            _ => panic!("Not a Node")
+            _ => panic!("Not a Node"),
         }
     }
 
