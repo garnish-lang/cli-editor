@@ -12,7 +12,7 @@ use tui::backend::CrosstermBackend;
 use tui::layout::Direction;
 use tui::{Frame, Terminal};
 
-use crate::commands::{code, ctrl_key, key, CommandKeyId, Commands, CommandDetails};
+use crate::commands::{code, ctrl_key, key, CommandKeyId, Commands, CommandDetails, catch_all};
 use crate::panels::{Panel, PromptPanel, TextEditPanel};
 use crate::render::render_split;
 use crate::splits::{split, PanelSplit, UserSplits};
@@ -131,7 +131,7 @@ fn global_chords() -> Commands<GlobalAction> {
     chords
         .insert(|b| {
             b.node(ctrl_key('a').action(AppState::set_selecting_panel))
-                .node(code(KeyCode::Null))
+                .node(catch_all())
                 .action(CommandDetails::select_panel(), AppState::select_panel)
         })
         .unwrap();

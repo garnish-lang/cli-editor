@@ -322,6 +322,14 @@ pub fn code<T>(code: KeyCode) -> CommandKeyBuilder<T> {
     }
 }
 
+pub fn catch_all<T>() -> CommandKeyBuilder<T> {
+    CommandKeyBuilder {
+        code: KeyCode::Null,
+        mods: KeyModifiers::empty(),
+        action: None
+    }
+}
+
 pub struct CommandSequenceBuilder<T> {
     nodes: Vec<CommandKeyBuilder<T>>,
     details: CommandDetails,
