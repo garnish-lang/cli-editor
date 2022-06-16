@@ -237,9 +237,14 @@ impl Chords {
             match current {
                 KeyChord::Node(_, _, children, _) => match children.get(c) {
                     Some(next) => current = next,
-                    // current path leads nowhere
-                    // return early with end and no action
-                    None => return (true, None),
+                    // no direct match
+                    // check for catch all Null code, cloning given modifiers
+                    None => match children.get(&ChordHash::new(KeyCode::Null, c.mods)) {
+                        Some(next) => current = next,
+                        // current path leads nowhere
+                        // return early with end and no action
+                        None => return (true, None)
+                    },
                 },
                 KeyChord::Command(_, _, _, a) => {
                     // current path goes beyond command
@@ -592,6 +597,40 @@ mod tests {
 
         let (end, action) =
             chords.advance(ChordHash::new(KeyCode::Char('d'), KeyModifiers::empty()));
+
+        assert!(end);
+
+        let mut state = AppState::new();
+        action.unwrap()(&mut state, KeyCode::Null);
+        assert_eq!(state.active_panel, 100, "State not changed");
+    }
+
+    #[test]
+    fn advance_through_catch_all() {
+        let mut chords = Chords::new();
+        chords
+            .insert(|b| {
+                b.node(key('a'))
+                    .node(code(KeyCode::Null))
+                    .node(key('c'))
+                    .action(details("abc".to_string()), no_op)
+            })
+            .unwrap();
+
+        let (end, action) =
+            chords.advance(ChordHash::new(KeyCode::Char('a'), KeyModifiers::empty()));
+
+        assert!(!end);
+        assert!(action.is_none());
+
+        let (end, action) =
+            chords.advance(ChordHash::new(KeyCode::Char('b'), KeyModifiers::empty()));
+
+        assert!(!end);
+        assert!(action.is_none());
+
+        let (end, action) =
+            chords.advance(ChordHash::new(KeyCode::Char('c'), KeyModifiers::empty()));
 
         assert!(end);
 
