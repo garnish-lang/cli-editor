@@ -288,6 +288,14 @@ impl KeyChordNode {
     }
 }
 
+pub fn ctrl_key(key: char) -> KeyChordNode {
+    KeyChordNode {
+        code: KeyCode::Char(key),
+        mods: KeyModifiers::CONTROL,
+        action: None
+    }
+}
+
 pub fn key(key: char) -> KeyChordNode {
     KeyChordNode {
         code: KeyCode::Char(key),

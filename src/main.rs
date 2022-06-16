@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::io;
 use std::io::Stdout;
 
-use crossterm::event::{read, DisableMouseCapture, EnableMouseCapture, Event, KeyCode};
+use crossterm::event::{read, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers};
 use crossterm::execute;
 use crossterm::style::Print;
 use crossterm::terminal::{
@@ -12,7 +12,7 @@ use tui::backend::CrosstermBackend;
 use tui::layout::Direction;
 use tui::{Frame, Terminal};
 
-use crate::chords::{code, key, ChordHash, Chords, CommandDetails};
+use crate::chords::{code, key, ChordHash, Chords, CommandDetails, ctrl_key};
 use crate::panels::{Panel, PromptPanel, TextEditPanel};
 use crate::render::render_split;
 use crate::splits::{split_horizontal, split_vertical, PanelSplit, UserSplits};
@@ -102,15 +102,15 @@ fn global_chords() -> Chords {
 
     chords
         .insert(|b| {
-            b.node(key('s'))
-                .node(key('s'))
+            b.node(ctrl_key('s'))
+                .node(key('h'))
                 .action(CommandDetails::split_horizontal(), split_horizontal)
         })
         .unwrap();
 
     chords
         .insert(|b| {
-            b.node(key('s'))
+            b.node(ctrl_key('s'))
                 .node(key('v'))
                 .action(CommandDetails::split_vertical(), split_vertical)
         })
@@ -118,7 +118,7 @@ fn global_chords() -> Chords {
 
     chords
         .insert(|b| {
-            b.node(key('a'))
+            b.node(ctrl_key('a').action(AppState::set_selecting_panel))
                 .node(code(KeyCode::Null))
                 .action(CommandDetails::select_panel(), AppState::select_panel)
         })
@@ -158,6 +158,7 @@ fn main() -> Result<(), io::Error> {
 
                 if end {
                     // reset
+                    global_chords.reset();
                     app_state.selecting_panel = false;
                 }
             }
