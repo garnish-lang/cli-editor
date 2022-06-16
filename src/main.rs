@@ -23,21 +23,23 @@ mod panels;
 mod render;
 mod splits;
 
-fn main() -> Result<(), io::Error> {
-    enable_raw_mode()?;
+pub type EditorFrame<'a> = Frame<'a, CrosstermBackend<Stdout>>;
+
+fn main() -> Result<(), String> {
+    enable_raw_mode().or_else(|err| Err(err.to_string()))?;
 
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture).or_else(|err| Err(err.to_string()))?;
     let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
+    let mut terminal = Terminal::new(backend).or_else(|err| Err(err.to_string()))?;
 
     let mut app_state = AppState::new();
-    let mut global_commands = global_commands();
+    let mut global_commands = global_commands()?;
 
     loop {
-        terminal.draw(|frame| render_split(0, &app_state, frame, frame.size()))?;
+        terminal.draw(|frame| render_split(0, &app_state, frame, frame.size())).or_else(|err| Err(err.to_string()))?;
 
-        match read()? {
+        match read().or_else(|err| Err(err.to_string()))? {
             Event::Key(event) => {
                 // Loop breaking doesn't work with current implementation
                 if event.code == KeyCode::Esc {
@@ -79,17 +81,17 @@ fn main() -> Result<(), io::Error> {
             Event::Resize(width, height) => execute!(
                 terminal.backend_mut(),
                 Print(format!("New size {}x{}", width, height))
-            )?,
+            ).or_else(|err| Err(err.to_string()))?,
         }
     }
 
-    disable_raw_mode()?;
+    disable_raw_mode().or_else(|err| Err(err.to_string()))?;
     execute!(
         terminal.backend_mut(),
         LeaveAlternateScreen,
         DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
+    ).or_else(|err| Err(err.to_string()))?;
+    terminal.show_cursor().or_else(|err| Err(err.to_string()))?;
 
     Ok(())
 }

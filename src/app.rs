@@ -146,7 +146,7 @@ impl AppState {
 
 type GlobalAction = fn(&mut AppState, KeyCode);
 
-pub fn global_commands() -> Commands<GlobalAction> {
+pub fn global_commands() -> Result<Commands<GlobalAction>, String> {
     let mut commands = Commands::<GlobalAction>::new();
 
     commands
@@ -155,8 +155,7 @@ pub fn global_commands() -> Commands<GlobalAction> {
                 CommandDetails::split_horizontal(),
                 AppState::split_current_panel_horizontal,
             )
-        })
-        .unwrap();
+        })?;
 
     commands
         .insert(|b| {
@@ -164,16 +163,14 @@ pub fn global_commands() -> Commands<GlobalAction> {
                 CommandDetails::split_vertical(),
                 AppState::split_current_panel_vertical,
             )
-        })
-        .unwrap();
+        })?;
 
     commands
         .insert(|b| {
             b.node(ctrl_key('a').action(AppState::start_selecting_panel))
                 .node(catch_all())
                 .action(CommandDetails::select_panel(), AppState::select_panel)
-        })
-        .unwrap();
+        })?;
 
-    commands
+    Ok(commands)
 }
