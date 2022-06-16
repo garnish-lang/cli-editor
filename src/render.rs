@@ -7,7 +7,7 @@ use crate::splits::UserSplits;
 use crate::{AppState, EditorFrame};
 
 pub fn render_split(split: usize, app: &AppState, frame: &mut EditorFrame, chunk: Rect) {
-    match app.splits.get(split) {
+    match app.get_split(split) {
         None => (), // error
         Some(split) => {
             // calculate child width
@@ -26,7 +26,7 @@ pub fn render_split(split: usize, app: &AppState, frame: &mut EditorFrame, chunk
                     .take(split.panels.len() - 1)
                     .map(|s| {
                         let l = match s {
-                            UserSplits::Panel(index) => match app.panels.get(*index) {
+                            UserSplits::Panel(index) => match app.get_panel(*index) {
                                 Some((_, panel)) => {
                                     if panel.get_length() == 0 {
                                         part_size
@@ -59,17 +59,17 @@ pub fn render_split(split: usize, app: &AppState, frame: &mut EditorFrame, chunk
             // loop through children and render
             for (child, chunk) in split.panels.iter().zip(chunks) {
                 match child {
-                    UserSplits::Panel(panel_i) => match app.panels.get(*panel_i) {
+                    UserSplits::Panel(panel_i) => match app.get_panel(*panel_i) {
                         None => (), // error
                         Some((_, panel)) => {
-                            let is_active = *panel_i == app.active_panel;
+                            let is_active = *panel_i == app.active_panel();
                             if is_active {
                                 let (x, y) = panel.get_cursor(&chunk);
                                 frame.set_cursor(x, y);
                             }
 
                             // if selecting, display id on top right side
-                            let title = match app.selecting_panel {
+                            let title = match app.selecting_panel() {
                                 true => Spans::from(vec![
                                     Span::styled(
                                         format!(" {} ", panel.get_id()),
@@ -101,7 +101,7 @@ pub fn render_split(split: usize, app: &AppState, frame: &mut EditorFrame, chunk
                         }
                     },
                     UserSplits::Split(split_index) => {
-                        match app.splits.get(*split_index) {
+                        match app.get_split(*split_index) {
                             None => (), // error
                             Some(_) => render_split(*split_index, app, frame, chunk),
                         }

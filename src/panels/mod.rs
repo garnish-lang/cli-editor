@@ -71,6 +71,11 @@ impl Panel for TextEditPanel {
     }
 
     fn receive_key(&mut self, event: KeyEvent) -> bool {
+        // temp ignore all modifiers
+        if !event.modifiers.is_empty() {
+            return false;
+        }
+
         match event.code {
             KeyCode::Backspace => {
                 match self.text.pop() {

@@ -4,10 +4,6 @@ use std::hash::Hash;
 
 use crossterm::event::{KeyCode, KeyModifiers};
 
-use crate::AppState;
-
-pub type CommandAction = fn(&mut AppState, KeyCode);
-
 #[derive(Clone)]
 pub enum CommandKey<T> {
     Node(
@@ -125,7 +121,10 @@ pub struct Commands<T> {
 }
 
 #[allow(dead_code)]
-impl<T> Commands<T> where T: Copy {
+impl<T> Commands<T>
+where
+    T: Copy,
+{
     pub fn new() -> Self {
         Commands {
             root: CommandKey::Node(KeyCode::Null, KeyModifiers::empty(), HashMap::new(), None),
@@ -137,7 +136,10 @@ impl<T> Commands<T> where T: Copy {
         CommandSequenceBuilder::new()
     }
 
-    pub fn insert(&mut self, build: fn(CommandSequenceBuilder<T>) -> CommandSequenceBuilder<T>) -> Result<(), String> {
+    pub fn insert(
+        &mut self,
+        build: fn(CommandSequenceBuilder<T>) -> CommandSequenceBuilder<T>,
+    ) -> Result<(), String> {
         let builder = build(CommandSequenceBuilder::new());
         let mut current_node = &mut self.root;
 
@@ -166,19 +168,20 @@ impl<T> Commands<T> where T: Copy {
                         let n = CommandKey::Leaf(last.code, last.mods, builder.details, action);
                         children.insert(n.get_hash(), n);
                     }
-                    None => return Err("Missing command action.".to_string())
+                    None => return Err("Missing command action.".to_string()),
                 }
             }
             // should've been validate in first loop
-            CommandKey::Leaf(_, _, _, _) => {
-                return Err("Existing command in sequence.".to_string())
-            }
+            CommandKey::Leaf(_, _, _, _) => return Err("Existing command in sequence.".to_string()),
         }
 
         Ok(())
     }
 
-    pub fn remove(&mut self, build: fn(CommandSequenceBuilder<T>) -> CommandSequenceBuilder<T>) -> Result<(), String> {
+    pub fn remove(
+        &mut self,
+        build: fn(CommandSequenceBuilder<T>) -> CommandSequenceBuilder<T>,
+    ) -> Result<(), String> {
         let builder = build(CommandSequenceBuilder::new());
         // manual count of nesting
         // drill down and keep track of the lowest node with only 1 child
@@ -302,7 +305,7 @@ pub fn ctrl_key<T>(key: char) -> CommandKeyBuilder<T> {
     CommandKeyBuilder {
         code: KeyCode::Char(key),
         mods: KeyModifiers::CONTROL,
-        action: None
+        action: None,
     }
 }
 
@@ -314,6 +317,7 @@ pub fn key<T>(key: char) -> CommandKeyBuilder<T> {
     }
 }
 
+#[allow(dead_code)]
 pub fn code<T>(code: KeyCode) -> CommandKeyBuilder<T> {
     CommandKeyBuilder {
         code,
@@ -326,7 +330,7 @@ pub fn catch_all<T>() -> CommandKeyBuilder<T> {
     CommandKeyBuilder {
         code: KeyCode::Null,
         mods: KeyModifiers::empty(),
-        action: None
+        action: None,
     }
 }
 
@@ -370,11 +374,11 @@ impl<T> CommandSequenceBuilder<T> {
 mod tests {
     use crossterm::event::{KeyCode, KeyModifiers};
 
-    use crate::commands::{code, key, CommandKeyId, CommandDetails, CommandKey, CommandAction};
+    use crate::commands::{code, key, CommandAction, CommandDetails, CommandKey, CommandKeyId};
     use crate::{AppState, Commands};
 
     fn no_op(state: &mut AppState, _: KeyCode) {
-        state.active_panel = 100;
+        state.set_active_panel(100)
     }
 
     fn assert_sequence(root: &CommandKey<fn(&mut AppState, KeyCode)>, sequence: &[char]) {
@@ -396,7 +400,7 @@ mod tests {
                 let mut state = AppState::new();
                 action(&mut state, KeyCode::Null);
 
-                assert_eq!(state.active_panel, 100, "State not changed");
+                assert_eq!(state.active_panel(), 100, "State not changed");
             }
             k => panic!("{:?} is not a Command", k),
         }
@@ -422,12 +426,7 @@ mod tests {
     fn insert_without_action_is_err() {
         let mut commands = Commands::<CommandAction>::new();
 
-        let result = commands
-            .insert(|b| {
-                b.node(key('a'))
-                    .node(key('b'))
-                    .node(key('c'))
-            });
+        let result = commands.insert(|b| b.node(key('a')).node(key('b')).node(key('c')));
 
         assert!(result.is_err());
     }
@@ -656,7 +655,7 @@ mod tests {
 
         let mut state = AppState::new();
         action.unwrap()(&mut state, KeyCode::Null);
-        assert_eq!(state.active_panel, 100, "State not changed");
+        assert_eq!(state.active_panel(), 100, "State not changed");
     }
 
     #[test]
@@ -691,7 +690,7 @@ mod tests {
 
         let mut state = AppState::new();
         action.unwrap()(&mut state, KeyCode::Null);
-        assert_eq!(state.active_panel, 100, "State not changed");
+        assert_eq!(state.active_panel(), 100, "State not changed");
     }
 
     #[test]
@@ -744,7 +743,7 @@ mod tests {
 
         let mut state = AppState::new();
         action.unwrap()(&mut state, KeyCode::Null);
-        assert_eq!(state.active_panel, 100, "State not changed");
+        assert_eq!(state.active_panel(), 100, "State not changed");
 
         // beyond sequence
         let (end, action) =
@@ -754,7 +753,7 @@ mod tests {
 
         let mut state = AppState::new();
         action.unwrap()(&mut state, KeyCode::Null);
-        assert_eq!(state.active_panel, 100, "State not changed");
+        assert_eq!(state.active_panel(), 100, "State not changed");
     }
 
     #[test]
@@ -851,7 +850,7 @@ mod tests {
 
         let mut state = AppState::new();
         action.unwrap()(&mut state, KeyCode::Null);
-        assert_eq!(state.active_panel, 100, "State not changed");
+        assert_eq!(state.active_panel(), 100, "State not changed");
 
         let (end, action) =
             commands.advance(CommandKeyId::new(KeyCode::Char('d'), KeyModifiers::empty()));
@@ -860,7 +859,7 @@ mod tests {
 
         let mut state = AppState::new();
         action.unwrap()(&mut state, KeyCode::Null);
-        assert_eq!(state.active_panel, 100, "State not changed");
+        assert_eq!(state.active_panel(), 100, "State not changed");
     }
 
     #[test]
