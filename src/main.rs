@@ -158,8 +158,25 @@ fn main() -> Result<(), io::Error> {
                     break;
                 }
 
-                let (end, action) =
-                    global_chords.advance(ChordHash::new(event.code, event.modifiers));
+                // allow active panel to receive first
+                // unless global is in progress
+                // if active panel doesn't handle event
+                // then check global
+
+                let (end, action) = if global_chords.has_progress() {
+                    global_chords.advance(ChordHash::new(event.code, event.modifiers))
+                } else {
+                    let handled = match app_state.panels.get_mut(app_state.active_panel) {
+                        Some((_, panel)) => panel.receive_key(event),
+                        None => false, // error?
+                    };
+
+                    if handled {
+                        global_chords.advance(ChordHash::new(event.code, event.modifiers))
+                    } else {
+                        (false, None)
+                    }
+                };
 
                 match action {
                     Some(action) => action(&mut app_state, event.code),
