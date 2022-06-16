@@ -374,12 +374,14 @@ impl<T> CommandSequenceBuilder<T> {
 mod tests {
     use crossterm::event::{KeyCode, KeyModifiers};
 
-    use crate::commands::{code, key, CommandAction, CommandDetails, CommandKey, CommandKeyId};
+    use crate::commands::{code, key, CommandDetails, CommandKey, CommandKeyId};
     use crate::{AppState, Commands};
 
     fn no_op(state: &mut AppState, _: KeyCode) {
         state.set_active_panel(100)
     }
+
+    type CommandAction = fn(&mut AppState, KeyCode);
 
     fn assert_sequence(root: &CommandKey<fn(&mut AppState, KeyCode)>, sequence: &[char]) {
         let mut current = root;

@@ -174,3 +174,19 @@ pub fn global_commands() -> Result<Commands<GlobalAction>, String> {
 
     Ok(commands)
 }
+
+#[cfg(test)]
+mod tests {
+    use crossterm::event::KeyCode;
+    use crate::AppState;
+
+    #[test]
+    fn split_panel() {
+        let mut app = AppState::new();
+
+        app.split_current_panel_horizontal(KeyCode::Null);
+
+        assert_eq!(app.panels.len(), 3);
+        assert_eq!(app.splits.len(), 2);
+    }
+}
