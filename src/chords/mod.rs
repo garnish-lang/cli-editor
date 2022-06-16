@@ -266,6 +266,10 @@ impl Chords {
     pub fn reset(&mut self) {
         self.path.clear();
     }
+
+    pub fn has_progress(&self) -> bool {
+        self.path.len() > 0
+    }
 }
 
 #[derive(Clone)]
@@ -858,5 +862,47 @@ mod tests {
         chords.reset();
 
         assert!(chords.path.is_empty());
+    }
+
+    #[test]
+    fn has_progress() {
+        let mut chords = Chords::new();
+        chords
+            .insert(|b| {
+                b.node(key('a'))
+                    .node(key('b'))
+                    .node(key('c'))
+                    .action(details("abc".to_string()), no_op)
+            })
+            .unwrap();
+
+        chords
+            .insert(|b| {
+                b.node(key('a'))
+                    .node(key('b'))
+                    .node(key('d'))
+                    .action(details("abd".to_string()), no_op)
+            })
+            .unwrap();
+
+        chords
+            .insert(|b| {
+                b.node(key('a'))
+                    .node(key('e'))
+                    .node(key('f'))
+                    .action(details("aef".to_string()), no_op)
+            })
+            .unwrap();
+
+        assert!(!chords.has_progress());
+
+        chords.advance(ChordHash::new(KeyCode::Char('a'), KeyModifiers::empty()));
+        chords.advance(ChordHash::new(KeyCode::Char('b'), KeyModifiers::empty()));
+
+        assert!(chords.has_progress());
+
+        chords.reset();
+
+        assert!(!chords.has_progress());
     }
 }
