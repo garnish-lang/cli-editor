@@ -206,7 +206,7 @@ impl AppState {
                 Some(p) => {
                     p.panels.remove(child_index);
                 },
-                None => (), // error
+                None => unimplemented!(), // error
             }
         }
     }
