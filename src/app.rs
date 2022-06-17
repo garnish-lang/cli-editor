@@ -165,7 +165,6 @@ impl AppState {
 
         // find active's index in split
         let active_panel_index = self.active_panel();
-        self.panels.remove(active_panel_index);
 
         let remove_split = match self.splits.get_mut(active_split) {
             None => unimplemented!(),
@@ -215,6 +214,29 @@ impl AppState {
                 },
                 None => unimplemented!(), // error
             }
+        }
+
+        // if this is last panel besides prompt panel
+        // we will replace it
+        if self.panels.len() <= self.static_panels.len() + 1 {
+            // get id before removal so its different
+            // done in order to detect change
+            let new_id = self.first_available_id();
+            self.panels.remove(active_panel_index);
+            let index = self.panels_len();
+            let mut text_panel = TextEditPanel::new();
+            text_panel.set_id(new_id);
+
+            // use last split that we have for new panel's split
+            let last = self.splits_len() - 1;
+            match self.get_split_mut(last) {
+                Some(s) => s.panels.push(UserSplits::Panel(index)),
+                None => unimplemented!("No split when replacing removed panel: {}", last)
+            }
+
+            self.panels.push((last, Box::new(text_panel)));
+        } else {
+            self.panels.remove(active_panel_index);
         }
     }
 }
@@ -277,6 +299,17 @@ mod tests {
     }
 
     #[test]
+    fn prompt_panel_doesnt_delete() {
+        let mut app = AppState::new();
+
+        app.set_active_panel(0);
+        app.delete_active_panel(KeyCode::Null);
+
+        assert_eq!(app.panels.len(), 2);
+        assert_eq!(app.splits.len(), 1);
+    }
+
+    #[test]
     fn delete_active_panel() {
         let mut app = AppState::new();
         let next_panel_index = app.panels_len();
@@ -293,9 +326,13 @@ mod tests {
     #[test]
     fn delete_active_panel_replaces_if_only_one_left() {
         let mut app = AppState::new();
-        app.set_active_panel(0);
 
         app.delete_active_panel(KeyCode::Null);
+
+        match app.get_active_panel() {
+            Some((_, panel)) => assert_eq!(panel.get_id(), 'b'),
+            None => panic!("No active panel")
+        }
 
         assert_eq!(app.panels.len(), 2);
         assert_eq!(app.splits.len(), 1);
