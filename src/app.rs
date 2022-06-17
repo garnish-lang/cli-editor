@@ -187,6 +187,9 @@ impl AppState {
         if remove_split {
             self.splits.remove(active_split);
 
+            // should always get set
+            // if they remain zero, it would remove static prompt panel
+            // error below
             let mut parent_index = 0;
             let mut child_index = 0;
             'outer: for (i, s)in self.splits.iter().enumerate() {
@@ -200,6 +203,10 @@ impl AppState {
                         }
                     }
                 }
+            }
+
+            if parent_index == 0 && child_index == 0 {
+                unimplemented!()
             }
 
             match self.get_split_mut(parent_index) {
