@@ -3,6 +3,7 @@ use tui::layout::Direction;
 use crate::panels::{Panel, TextEditPanel};
 use crate::AppState;
 
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PanelSplit {
     pub direction: Direction,
     pub panels: Vec<UserSplits>,
@@ -14,6 +15,7 @@ impl PanelSplit {
     }
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub enum UserSplits {
     Split(usize),
     Panel(usize),

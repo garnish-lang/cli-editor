@@ -369,7 +369,7 @@ mod tests {
     use crossterm::event::KeyCode;
 
     use crate::app::{Message, MessageChannel};
-    use crate::{AppState, Panel, TextEditPanel};
+    use crate::{AppState, Panel, TextEditPanel, UserSplits};
 
     fn assert_is_default(app: &AppState) {
         assert_eq!(app.panels.len(), 2);
@@ -400,6 +400,14 @@ mod tests {
 
         assert_eq!(app.panels.len(), 3);
         assert_eq!(app.splits.len(), 2);
+
+        assert_eq!(app.splits[1].panels, vec![
+            UserSplits::Panel(1),
+            UserSplits::Panel(2)
+        ]);
+
+        assert_eq!(app.panels[1].0, 1);
+        assert_eq!(app.panels[2].0, 1);
     }
 
     #[test]
