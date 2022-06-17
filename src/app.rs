@@ -15,7 +15,21 @@ const PROMPT_PANEL_ID: char = '$';
 
 impl AppState {
     pub fn new() -> Self {
-        let splits: Vec<PanelSplit> = vec![PanelSplit::new(
+        let mut app = AppState {
+            panels: vec![],
+            splits: vec![],
+            active_panel: 0,
+            selecting_panel: false,
+            static_panels: vec![]
+        };
+
+        app.reset();
+
+        app
+    }
+
+    fn reset(&mut self) {
+        self.splits = vec![PanelSplit::new(
             Direction::Vertical,
             vec![UserSplits::Panel(0), UserSplits::Panel(1)],
         )];
@@ -26,18 +40,9 @@ impl AppState {
         let mut prompt_panel = PromptPanel::new();
         prompt_panel.set_id(PROMPT_PANEL_ID);
 
-        let panels: Vec<(usize, Box<dyn Panel>)> =
-            vec![(0, Box::new(prompt_panel)), (0, Box::new(text_panel))];
-
-        let active_panel = 1;
-
-        AppState {
-            panels,
-            splits,
-            active_panel,
-            selecting_panel: false,
-            static_panels: vec![PROMPT_PANEL_ID]
-        }
+        self.panels = vec![(0, Box::new(prompt_panel)), (0, Box::new(text_panel))];
+        self.active_panel = 1;
+        self.selecting_panel = false;
     }
 
     pub fn static_panels(&self) -> &Vec<char> {
@@ -275,6 +280,22 @@ pub fn global_commands() -> Result<Commands<GlobalAction>, String> {
 mod tests {
     use crossterm::event::KeyCode;
     use crate::{AppState, Panel, TextEditPanel};
+
+    #[test]
+    fn set_default() {
+        let mut app = AppState::new();
+        app.split_current_panel_horizontal(KeyCode::Null);
+        app.split_current_panel_horizontal(KeyCode::Null);
+        app.split_current_panel_horizontal(KeyCode::Null);
+        app.set_selecting_panel(true);
+
+        app.reset();
+
+        assert_eq!(app.panels.len(), 2);
+        assert_eq!(app.splits.len(), 1);
+        assert_eq!(app.active_panel, 1);
+        assert_eq!(app.selecting_panel, false);
+    }
 
     #[test]
     fn split_panel() {
