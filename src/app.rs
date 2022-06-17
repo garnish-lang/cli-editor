@@ -65,7 +65,15 @@ impl AppState {
         app
     }
 
-    fn reset(&mut self) {
+    pub fn add_error<T: ToString>(&mut self, message: T) {
+        self.messages.push(Message::error(message));
+    }
+
+    pub fn add_info<T: ToString>(&mut self, message: T) {
+        self.messages.push(Message::info(message));
+    }
+
+    pub fn reset(&mut self) {
         self.splits = vec![PanelSplit::new(
             Direction::Vertical,
             vec![UserSplits::Panel(0), UserSplits::Panel(1)],
@@ -395,6 +403,34 @@ mod tests {
     }
 
     #[test]
+    fn split_no_active_panel_logs_message() {
+        let mut app = AppState::new();
+        app.set_active_panel(100);
+
+        app.split_current_panel_horizontal(KeyCode::Null);
+
+        assert_eq!(app.active_panel, 1);
+        assert!(app.messages.contains(&Message {
+            channel: MessageChannel::ERROR,
+            text: "No active panel. Setting to be last panel.".to_string()
+        }))
+    }
+
+    #[test]
+    fn split_active_panel_split_non_existent_logs_message() {
+        let mut app = AppState::new();
+        app.panels.push((10, Box::new(TextEditPanel::new())));
+        app.active_panel = 2;
+
+        app.split_current_panel_horizontal(KeyCode::Null);
+
+        assert_is_default(&app);
+        assert!(app.messages.contains(&Message::error(
+            "Active panel's split not found. Resetting state."
+        )));
+    }
+
+    #[test]
     fn prompt_panel_doesnt_split() {
         let mut app = AppState::new();
 
@@ -403,6 +439,9 @@ mod tests {
 
         assert_eq!(app.panels.len(), 2);
         assert_eq!(app.splits.len(), 1);
+        assert!(app.messages.contains(&Message::info(
+            "Cannot split static panel"
+        )));
     }
 
     #[test]
@@ -538,6 +577,6 @@ mod tests {
         assert_is_default(&app);
         assert!(app.messages.contains(&Message::error(
             "Split not found in parent when removing due to being empty. Resetting state."
-        )))
+        )));
     }
 }

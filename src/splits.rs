@@ -20,31 +20,32 @@ pub enum UserSplits {
 }
 
 pub fn split(app: &mut AppState, direction: Direction) {
-    let (active_split, active_panel_id) = match app.get_active_panel() {
-        None => {
-            panic!("active panel not found")
-        }
-        Some((split_i, active_panel)) => (*split_i, active_panel.get_id()),
-    };
-
-    if app.static_panels().contains(&active_panel_id) {
-        return;
-    }
-
     let new_split_index = app.splits_len();
     let new_id = app.first_available_id();
     let new_panel_index = app.panels_len();
+
+    let (active_split, active_panel_id) = match app.get_active_panel_mut() {
+        None => {
+            app.add_error("No active panel. Setting to be last panel.");
+            app.reset();
+            return;
+        }
+        Some((split_i, active_panel)) => {
+            let r = (*split_i, active_panel.get_id());
+            *split_i = new_split_index;
+            r
+        },
+    };
+
+    if app.static_panels().contains(&active_panel_id) {
+        app.add_info("Cannot split static panel");
+        return;
+    }
 
     // create panel
     let mut p = TextEditPanel::new();
     p.set_id(new_id);
     app.push_panel((new_split_index, Box::new(p)));
-
-    // set active panel's split to new split index
-    match app.get_active_panel_mut() {
-        None => unimplemented!(),
-        Some((split, _)) => *split = new_split_index,
-    }
 
     let new_panel_split = PanelSplit::new(
         direction,
@@ -58,7 +59,9 @@ pub fn split(app: &mut AppState, direction: Direction) {
     let active_panel_index = app.active_panel();
     let new_split = match app.get_split_mut(active_split) {
         None => {
-            panic!("split not found")
+            app.add_error("Active panel's split not found. Resetting state.");
+            app.reset();
+            return;
         }
         Some(split) => {
             // find child index for active panel
