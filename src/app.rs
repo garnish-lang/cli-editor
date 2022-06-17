@@ -202,6 +202,29 @@ impl AppState {
         split(self, Direction::Vertical)
     }
 
+    pub fn add_panel_to_active_split(&mut self, _code: KeyCode) {
+        let active_split = match self.get_active_panel() {
+            Some((s,_)) => *s,
+            None => {
+                self.add_error("No active panel. Setting to be last panel.");
+                self.active_panel = 1;
+                return;
+            },
+        };
+
+        let new_panel_index = self.panels_len();
+        self.panels.push((active_split, Box::new(TextEditPanel::new())));
+
+        match self.splits.get_mut(active_split) {
+            Some(s) => s.panels.push(UserSplits::Panel(new_panel_index)),
+            None => {
+                self.add_error("Active panel's split not found. Resetting state.");
+                self.reset();
+                return;
+            }
+        }
+    }
+
     pub fn delete_active_panel(&mut self, _code: KeyCode) {
         let (active_split, active_panel_id) = match self.get_active_panel() {
             None => {
@@ -390,6 +413,52 @@ mod tests {
         app.reset();
 
         assert_is_default(&app);
+    }
+
+    #[test]
+    fn add_panel_to_active_split() {
+        let mut app = AppState::new();
+
+        app.add_panel_to_active_split(KeyCode::Null);
+
+        assert_eq!(app.panels.len(), 3);
+        assert_eq!(app.splits.len(), 1);
+
+        assert_eq!(app.splits[0].panels, vec![
+            UserSplits::Panel(0),
+            UserSplits::Panel(1),
+            UserSplits::Panel(2)
+        ]);
+
+        assert_eq!(app.panels[1].0, 0);
+        assert_eq!(app.panels[2].0, 0);
+    }
+
+    #[test]
+    fn add_panel_to_active_split_no_active_panel() {
+        let mut app = AppState::new();
+        app.active_panel = 100;
+
+        app.add_panel_to_active_split(KeyCode::Null);
+
+        assert!(app.messages.contains(&Message {
+            channel: MessageChannel::ERROR,
+            text: "No active panel. Setting to be last panel.".to_string()
+        }));
+    }
+
+    #[test]
+    fn add_panel_to_active_split_no_active_split() {
+        let mut app = AppState::new();
+        app.panels.push((10, Box::new(TextEditPanel::new())));
+        app.active_panel = 2;
+
+        app.add_panel_to_active_split(KeyCode::Null);
+
+        assert!(app.messages.contains(&Message {
+            channel: MessageChannel::ERROR,
+            text: "Active panel's split not found. Resetting state.".to_string()
+        }));
     }
 
     #[test]
