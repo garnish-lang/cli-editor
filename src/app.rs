@@ -1,14 +1,50 @@
-use crate::{split, Panel, PanelSplit, PromptPanel, TextEditPanel, UserSplits, Commands, key, ctrl_key, CommandDetails, catch_all};
-use crossterm::event::KeyCode;
 use std::collections::HashSet;
+
+use crossterm::event::KeyCode;
 use tui::layout::Direction;
+
+use crate::{
+    catch_all, ctrl_key, key, split, CommandDetails, Commands, Panel, PanelSplit, PromptPanel,
+    TextEditPanel, UserSplits,
+};
+
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub enum MessageChannel {
+    ERROR,
+    #[allow(dead_code)]
+    WARNING,
+    INFO,
+}
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub struct Message {
+    channel: MessageChannel,
+    text: String,
+}
+
+impl Message {
+    pub fn error<T: ToString>(text: T) -> Message {
+        Message {
+            channel: MessageChannel::ERROR,
+            text: text.to_string(),
+        }
+    }
+
+    pub fn info<T: ToString>(text: T) -> Message {
+        Message {
+            channel: MessageChannel::INFO,
+            text: text.to_string(),
+        }
+    }
+}
 
 pub struct AppState {
     panels: Vec<(usize, Box<dyn Panel>)>,
     splits: Vec<PanelSplit>,
     active_panel: usize,
     selecting_panel: bool,
-    static_panels: Vec<char>
+    static_panels: Vec<char>,
+    messages: Vec<Message>,
 }
 
 const PROMPT_PANEL_ID: char = '$';
@@ -20,7 +56,8 @@ impl AppState {
             splits: vec![],
             active_panel: 0,
             selecting_panel: false,
-            static_panels: vec![]
+            static_panels: vec![],
+            messages: vec![],
         };
 
         app.reset();
@@ -43,6 +80,7 @@ impl AppState {
         self.panels = vec![(0, Box::new(prompt_panel)), (0, Box::new(text_panel))];
         self.active_panel = 1;
         self.selecting_panel = false;
+        self.static_panels = vec![PROMPT_PANEL_ID]
     }
 
     pub fn static_panels(&self) -> &Vec<char> {
@@ -159,12 +197,17 @@ impl AppState {
     pub fn delete_active_panel(&mut self, _code: KeyCode) {
         let (active_split, active_panel_id) = match self.get_active_panel() {
             None => {
-                panic!("active panel not found")
+                self.active_panel = 1;
+                self.messages
+                    .push(Message::error("No active panel. Setting to be last panel."));
+                return;
             }
             Some((split_i, active_panel)) => (*split_i, active_panel.get_id()),
         };
 
         if self.static_panels().contains(&active_panel_id) {
+            self.messages
+                .push(Message::info(format!("Cannot delete static panel.")));
             return;
         }
 
@@ -172,14 +215,26 @@ impl AppState {
         let active_panel_index = self.active_panel();
 
         let remove_split = match self.splits.get_mut(active_split) {
-            None => unimplemented!(),
+            None => {
+                self.messages.push(Message::error(
+                    "Active panels split doesn't exist. Resetting state.",
+                ));
+                self.reset();
+                return;
+            }
             Some(split) => {
                 let index = match split.panels.iter().enumerate().find(|(_, s)| match s {
                     UserSplits::Panel(index) => *index == active_panel_index,
                     UserSplits::Split(..) => false,
                 }) {
                     Some(i) => i.0,
-                    None => return, //error
+                    None => {
+                        self.messages.push(Message::error(
+                            "Active panel's split doesn't contain active panel. Resetting state.",
+                        ));
+                        self.reset();
+                        return;
+                    }
                 };
 
                 split.panels.remove(index);
@@ -196,21 +251,27 @@ impl AppState {
             // error below
             let mut parent_index = 0;
             let mut child_index = 0;
-            'outer: for (i, s)in self.splits.iter().enumerate() {
+            'outer: for (i, s) in self.splits.iter().enumerate() {
                 for (j, p) in s.panels.iter().enumerate() {
                     match p {
                         UserSplits::Panel(_) => (),
-                        UserSplits::Split(index) => if *index == active_split {
-                            parent_index = i;
-                            child_index = j;
-                            break 'outer;
+                        UserSplits::Split(index) => {
+                            if *index == active_split {
+                                parent_index = i;
+                                child_index = j;
+                                break 'outer;
+                            }
                         }
                     }
                 }
             }
 
             if parent_index == 0 && child_index == 0 {
-                unimplemented!()
+                self.messages.push(Message::error(
+                    "Split not found in parent when removing due to being empty. Resetting state.",
+                ));
+                self.reset();
+                return;
             }
 
             match self.get_split_mut(parent_index) {
@@ -218,12 +279,13 @@ impl AppState {
                     p.panels.remove(child_index);
                 }
                 None => {
-                    // needs test
-                    // might be unreachable
+                    // should be unreachable
                     // indexes used were gotten by enumerate
                     // so they should exist
 
-                    // todo log
+                    self.messages.push(Message::error(
+                        "Invalid split index after enumeration. Resetting state.",
+                    ));
                     self.reset();
                     return;
                 }
@@ -247,16 +309,15 @@ impl AppState {
             match self.get_split_mut(last) {
                 Some(s) => s.panels.push(UserSplits::Panel(index)),
                 None => {
-                    // needs test
-                    // might be unreachable
+                    // should be unreachable
                     // getting here means splits is empty
                     // which should only be possible if we had removed the prompt panel
                     // causing the removal of top split
-                    // this is prevented by skipping static panel deletion
+                    // this is caught above during the split removal
 
-                    // unimplemented!("No split when replacing removed panel: {}", last)
-
-                    // todo log
+                    self.messages.push(Message::error(
+                        "No splits remaining. Resetting state.",
+                    ));
                     self.reset();
                     return;
                 }
@@ -272,28 +333,25 @@ type GlobalAction = fn(&mut AppState, KeyCode);
 pub fn global_commands() -> Result<Commands<GlobalAction>, String> {
     let mut commands = Commands::<GlobalAction>::new();
 
-    commands
-        .insert(|b| {
-            b.node(ctrl_key('p')).node(key('h')).action(
-                CommandDetails::split_horizontal(),
-                AppState::split_current_panel_horizontal,
-            )
-        })?;
+    commands.insert(|b| {
+        b.node(ctrl_key('p')).node(key('h')).action(
+            CommandDetails::split_horizontal(),
+            AppState::split_current_panel_horizontal,
+        )
+    })?;
 
-    commands
-        .insert(|b| {
-            b.node(ctrl_key('p')).node(key('v')).action(
-                CommandDetails::split_vertical(),
-                AppState::split_current_panel_vertical,
-            )
-        })?;
+    commands.insert(|b| {
+        b.node(ctrl_key('p')).node(key('v')).action(
+            CommandDetails::split_vertical(),
+            AppState::split_current_panel_vertical,
+        )
+    })?;
 
-    commands
-        .insert(|b| {
-            b.node(ctrl_key('a').action(AppState::start_selecting_panel))
-                .node(catch_all())
-                .action(CommandDetails::select_panel(), AppState::select_panel)
-        })?;
+    commands.insert(|b| {
+        b.node(ctrl_key('a').action(AppState::start_selecting_panel))
+            .node(catch_all())
+            .action(CommandDetails::select_panel(), AppState::select_panel)
+    })?;
 
     Ok(commands)
 }
@@ -301,7 +359,17 @@ pub fn global_commands() -> Result<Commands<GlobalAction>, String> {
 #[cfg(test)]
 mod tests {
     use crossterm::event::KeyCode;
+
+    use crate::app::{Message, MessageChannel};
     use crate::{AppState, Panel, TextEditPanel};
+
+    fn assert_is_default(app: &AppState) {
+        assert_eq!(app.panels.len(), 2);
+        assert_eq!(app.splits.len(), 1);
+        assert_eq!(app.active_panel, 1);
+        assert_eq!(app.selecting_panel, false);
+        assert_eq!(app.static_panels, vec!['$'])
+    }
 
     #[test]
     fn set_default() {
@@ -313,10 +381,7 @@ mod tests {
 
         app.reset();
 
-        assert_eq!(app.panels.len(), 2);
-        assert_eq!(app.splits.len(), 1);
-        assert_eq!(app.active_panel, 1);
-        assert_eq!(app.selecting_panel, false);
+        assert_is_default(&app);
     }
 
     #[test]
@@ -349,6 +414,10 @@ mod tests {
 
         assert_eq!(app.panels.len(), 2);
         assert_eq!(app.splits.len(), 1);
+
+        assert!(app
+            .messages
+            .contains(&Message::info("Cannot delete static panel.")))
     }
 
     #[test]
@@ -376,7 +445,7 @@ mod tests {
 
         match app.get_active_panel() {
             Some((_, panel)) => assert_eq!(panel.get_title().clone(), "Editor".to_string()),
-            None => panic!("No active panel")
+            None => panic!("No active panel"),
         }
 
         assert_eq!(app.panels.len(), 2);
@@ -403,5 +472,72 @@ mod tests {
 
         assert_eq!(app.panels.len(), 2);
         assert_eq!(app.splits.len(), 2);
+    }
+
+    #[test]
+    fn delete_invalid_active_panel_logs_message() {
+        let mut app = AppState::new();
+        app.active_panel = 100;
+
+        app.delete_active_panel(KeyCode::Null);
+
+        assert_eq!(app.active_panel, 1);
+        assert!(app.messages.contains(&Message {
+            channel: MessageChannel::ERROR,
+            text: "No active panel. Setting to be last panel.".to_string()
+        }))
+    }
+
+    #[test]
+    fn delete_panel_with_invalid_split_logs_message() {
+        let mut app = AppState::new();
+        app.panels.push((10, Box::new(TextEditPanel::new())));
+        app.active_panel = 2;
+
+        app.delete_active_panel(KeyCode::Null);
+
+        assert_is_default(&app);
+        assert!(app.messages.contains(&Message {
+            channel: MessageChannel::ERROR,
+            text: "Active panels split doesn't exist. Resetting state.".to_string()
+        }))
+    }
+
+    #[test]
+    fn delete_panel_split_doesnt_have_panel_logs_message() {
+        let mut app = AppState::new();
+        app.splits[0].panels.remove(1);
+
+        app.delete_active_panel(KeyCode::Null);
+
+        assert_is_default(&app);
+        assert!(app.messages.contains(&Message {
+            channel: MessageChannel::ERROR,
+            text: "Active panel's split doesn't contain active panel. Resetting state.".to_string()
+        }))
+    }
+
+    #[test]
+    fn delete_empty_split_not_present_in_parent_logs_message() {
+        let mut app = AppState::new();
+
+        let second = app.panels_len();
+        app.split_current_panel_horizontal(KeyCode::Null);
+        app.set_active_panel(second);
+
+        let third = app.panels_len();
+        app.split_current_panel_horizontal(KeyCode::Null);
+        app.set_active_panel(third);
+
+        app.splits[1].panels.remove(1);
+
+        app.delete_active_panel(KeyCode::Null);
+        app.set_active_panel(second);
+        app.delete_active_panel(KeyCode::Null);
+
+        assert_is_default(&app);
+        assert!(app.messages.contains(&Message::error(
+            "Split not found in parent when removing due to being empty. Resetting state."
+        )))
     }
 }
