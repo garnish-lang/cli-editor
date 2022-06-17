@@ -403,6 +403,20 @@ mod tests {
     }
 
     #[test]
+    fn split_panel_not_in_split_logs_message() {
+        let mut app = AppState::new();
+        app.splits[0].panels.remove(1);
+
+        app.split_current_panel_horizontal(KeyCode::Null);
+
+        assert_is_default(&app);
+        assert!(app.messages.contains(&Message {
+            channel: MessageChannel::ERROR,
+            text: "Active panel not present in split. Setting to be last panel.".to_string()
+        }))
+    }
+
+    #[test]
     fn split_no_active_panel_logs_message() {
         let mut app = AppState::new();
         app.set_active_panel(100);

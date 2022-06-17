@@ -65,20 +65,27 @@ pub fn split(app: &mut AppState, direction: Direction) {
         }
         Some(split) => {
             // find child index for active panel
-            let mut child_index = 0;
+            let mut child_index = None;
             for (i, child) in split.panels.iter().enumerate() {
                 match child {
                     UserSplits::Split(_) => (),
                     UserSplits::Panel(addr) => {
                         if *addr == active_panel_index {
-                            child_index = i;
+                            child_index = Some(i);
                             break;
                         }
                     }
                 }
             }
 
-            split.panels[child_index] = UserSplits::Split(new_split_index);
+            match child_index {
+                Some(i) => split.panels[i] = UserSplits::Split(new_split_index),
+                None => {
+                    app.add_error("Active panel not present in split. Setting to be last panel.");
+                    app.reset();
+                    return;
+                }
+            }
 
             new_panel_split
         }
