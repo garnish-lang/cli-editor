@@ -216,8 +216,17 @@ impl AppState {
             match self.get_split_mut(parent_index) {
                 Some(p) => {
                     p.panels.remove(child_index);
-                },
-                None => unimplemented!(), // error
+                }
+                None => {
+                    // needs test
+                    // might be unreachable
+                    // indexes used were gotten by enumerate
+                    // so they should exist
+
+                    // todo log
+                    self.reset();
+                    return;
+                }
             }
         }
 
@@ -237,7 +246,20 @@ impl AppState {
             let last = self.splits_len() - 1;
             match self.get_split_mut(last) {
                 Some(s) => s.panels.push(UserSplits::Panel(index)),
-                None => unimplemented!("No split when replacing removed panel: {}", last)
+                None => {
+                    // needs test
+                    // might be unreachable
+                    // getting here means splits is empty
+                    // which should only be possible if we had removed the prompt panel
+                    // causing the removal of top split
+                    // this is prevented by skipping static panel deletion
+
+                    // unimplemented!("No split when replacing removed panel: {}", last)
+
+                    // todo log
+                    self.reset();
+                    return;
+                }
             }
 
             self.panels.push((last, Box::new(text_panel)));
