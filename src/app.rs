@@ -216,13 +216,14 @@ impl AppState {
             }
         }
 
-        // if this is last panel besides prompt panel
+        self.panels.remove(active_panel_index);
+
+        // if this is last panel besides static panels
         // we will replace it
-        if self.panels.len() <= self.static_panels.len() + 1 {
+        if self.panels.len() <= self.static_panels.len() {
             // get id before removal so its different
             // done in order to detect change
             let new_id = self.first_available_id();
-            self.panels.remove(active_panel_index);
             let index = self.panels_len();
             let mut text_panel = TextEditPanel::new();
             text_panel.set_id(new_id);
@@ -235,8 +236,6 @@ impl AppState {
             }
 
             self.panels.push((last, Box::new(text_panel)));
-        } else {
-            self.panels.remove(active_panel_index);
         }
     }
 }
@@ -275,7 +274,7 @@ pub fn global_commands() -> Result<Commands<GlobalAction>, String> {
 #[cfg(test)]
 mod tests {
     use crossterm::event::KeyCode;
-    use crate::AppState;
+    use crate::{AppState, Panel, TextEditPanel};
 
     #[test]
     fn split_panel() {
@@ -326,11 +325,14 @@ mod tests {
     #[test]
     fn delete_active_panel_replaces_if_only_one_left() {
         let mut app = AppState::new();
+        let mut panel = TextEditPanel::new();
+        panel.set_title("Temp".to_string());
+        panel.set_id('a');
 
         app.delete_active_panel(KeyCode::Null);
 
         match app.get_active_panel() {
-            Some((_, panel)) => assert_eq!(panel.get_id(), 'b'),
+            Some((_, panel)) => assert_eq!(panel.get_title().clone(), "Editor".to_string()),
             None => panic!("No active panel")
         }
 

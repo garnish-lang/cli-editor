@@ -10,7 +10,8 @@ use crate::EditorFrame;
 pub trait Panel {
     fn make_widget(&self, frame: &mut EditorFrame, rect: Rect, is_active: bool, block: Block);
     fn get_cursor(&self, rect: &Rect) -> (u16, u16);
-    fn get_title(&self) -> String;
+    fn get_title(&self) -> &String;
+    fn set_title(&mut self, title: String);
     fn get_length(&self) -> u16 {
         0
     }
@@ -27,8 +28,10 @@ pub struct TextEditPanel {
     cursor_x: u16,
     cursor_y: u16,
     text: String,
+    title: String,
 }
 
+#[allow(dead_code)]
 impl TextEditPanel {
     pub fn new() -> Self {
         TextEditPanel {
@@ -38,7 +41,16 @@ impl TextEditPanel {
             min_x: 1,
             min_y: 1,
             text: String::new(),
+            title: "Editor".to_string()
         }
+    }
+
+    pub fn get_text(&self) -> &String {
+        &self.text
+    }
+
+    pub fn set_text(&mut self, text: String) {
+        self.text = text;
     }
 }
 
@@ -58,8 +70,12 @@ impl Panel for TextEditPanel {
         (rect.x + self.cursor_x, rect.y + self.cursor_y)
     }
 
-    fn get_title(&self) -> String {
-        "Editor".to_string()
+    fn get_title(&self) -> &String {
+        &self.title
+    }
+
+    fn set_title(&mut self, title: String) {
+        self.title = title
     }
 
     fn get_id(&self) -> char {
@@ -134,6 +150,7 @@ pub struct PromptPanel {
     cursor_x: u16,
     cursor_y: u16,
     text: String,
+    title: String,
 }
 
 impl PromptPanel {
@@ -145,6 +162,7 @@ impl PromptPanel {
             min_x: 1,
             min_y: 1,
             text: String::new(),
+            title: "Prompt".to_string()
         }
     }
 }
@@ -166,8 +184,12 @@ impl Panel for PromptPanel {
         (rect.x + self.cursor_x, rect.y + self.cursor_y)
     }
 
-    fn get_title(&self) -> String {
-        "Prompt".to_string()
+    fn get_title(&self) -> &String {
+        &self.title
+    }
+
+    fn set_title(&mut self, title: String) {
+        self.title = title
     }
 
     fn get_length(&self) -> u16 {
