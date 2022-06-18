@@ -215,46 +215,51 @@ impl Panel for PromptPanel {
     }
 
     fn receive_key(&mut self, event: KeyEvent) -> bool {
-        // match event.code {
-        //     KeyCode::Backspace => {
-        //         match self.text.pop() {
-        //             None => {
-        //                 self.cursor_x = self.min_x;
-        //                 self.cursor_y = self.min_y;
-        //             }
-        //             Some(c) => {
-        //                 match c {
-        //                     '\n' => {
-        //                         self.cursor_y -= 1;
-        //                         self.cursor_x = self.min_x;
-        //
-        //                         // count from back until a newline is reached
-        //                         for c in self.text.chars().rev() {
-        //                             if c == '\n' {
-        //                                 break;
-        //                             }
-        //                             self.cursor_x += 1;
-        //                         }
-        //                     }
-        //                     _ => {
-        //                         self.cursor_x -= 1;
-        //                     }
-        //                 }
-        //             }
-        //         }
-        //     }
-        //     KeyCode::Delete => {
-        //         // ??
-        //     }
-        //     KeyCode::Enter => {
-        //         // perform action
-        //     }
-        //     KeyCode::Char(c) => {
-        //         self.cursor_x += 1;
-        //         self.text.push(c);
-        //     }
-        //     _ => return false,
-        // }
+        // temp ignore all modifiers
+        if !event.modifiers.is_empty() {
+            return false;
+        }
+
+        match event.code {
+            KeyCode::Backspace => {
+                match self.text.pop() {
+                    None => {
+                        self.cursor_x = self.min_x;
+                        self.cursor_y = self.min_y;
+                    }
+                    Some(c) => {
+                        match c {
+                            '\n' => {
+                                self.cursor_y -= 1;
+                                self.cursor_x = self.min_x;
+
+                                // count from back until a newline is reached
+                                for c in self.text.chars().rev() {
+                                    if c == '\n' {
+                                        break;
+                                    }
+                                    self.cursor_x += 1;
+                                }
+                            }
+                            _ => {
+                                self.cursor_x -= 1;
+                            }
+                        }
+                    }
+                }
+            }
+            KeyCode::Delete => {
+                // ??
+            }
+            KeyCode::Enter => {
+                // perform action
+            }
+            KeyCode::Char(c) => {
+                self.cursor_x += 1;
+                self.text.push(c);
+            }
+            _ => return false,
+        }
 
         false
     }

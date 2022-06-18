@@ -16,19 +16,47 @@ pub fn render_split(split: usize, app: &AppState, frame: &mut EditorFrame, chunk
                 Direction::Vertical => chunk.height,
             };
 
-            let active_panels = split.panels.iter().filter(|split| match split {
-                UserSplits::Split(_) => true,
-                UserSplits::Panel(panel_index) => match app.get_panel(*panel_index) {
-                    Some((_, panel)) => panel.get_active(),
-                    None => false,
-                }
-            }).collect::<Vec<&UserSplits>>();
+            let active_panels = split
+                .panels
+                .iter()
+                .filter(|split| match split {
+                    UserSplits::Split(_) => true,
+                    UserSplits::Panel(panel_index) => match app.get_panel(*panel_index) {
+                        Some((_, panel)) => panel.get_active(),
+                        None => false,
+                    },
+                })
+                .collect::<Vec<&UserSplits>>();
 
             let lengths = if active_panels.len() > 0 {
-                let part_size = total / active_panels.len() as u16;
-                let mut remaining = total;
+                let (fixed_count, fixed_total) = match active_panels
+                    .iter()
+                    .map(|split| match split {
+                        UserSplits::Split(_) => (0, 0),
+                        UserSplits::Panel(panel_index) => match app.get_panel(*panel_index) {
+                            Some((_, panel)) => match panel.get_length() {
+                                0 => (0, 0),
+                                n => (1, n),
+                            },
+                            None => (0, 0),
+                        },
+                    })
+                    .reduce(|total, item| (total.0 + item.0, total.1 + item.1))
+                {
+                    Some(v) => v,
+                    None => (0, 0),
+                };
 
-                let mut lengths: Vec<Constraint> = active_panels.iter()
+                let dynamic_count = active_panels.len() - fixed_count;
+                let mut remaining = total - fixed_total;
+                let part_size = if dynamic_count == 0 {
+                    remaining
+                } else {
+                    remaining / dynamic_count as u16
+                };
+
+                let mut lengths: Vec<Constraint> = active_panels
+                    .iter()
                     .take(active_panels.len() - 1)
                     .map(|s| {
                         let l = match s {
