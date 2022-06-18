@@ -370,6 +370,14 @@ pub fn catch_all<T>() -> CommandKeyBuilder<T> {
     }
 }
 
+pub fn shift_catch_all<T>() -> CommandKeyBuilder<T> {
+    CommandKeyBuilder {
+        code: KeyCode::Null,
+        mods: KeyModifiers::SHIFT,
+        action: None,
+    }
+}
+
 pub struct CommandSequenceBuilder<T> {
     nodes: Vec<CommandKeyBuilder<T>>,
     details: CommandDetails,

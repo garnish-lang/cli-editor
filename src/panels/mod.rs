@@ -6,13 +6,15 @@ pub use edit::TextEditPanel;
 pub use null::NullPanel;
 pub use input::InputPanel;
 
-use crate::EditorFrame;
+use crate::{AppState, EditorFrame};
+use crate::app::StateChangeRequest;
 
 mod edit;
 mod null;
 mod input;
 
 pub trait Panel {
+    fn init(&mut self, _state: &mut AppState) {}
     fn make_widget(&self, _frame: &mut EditorFrame, _rect: Rect, _is_active: bool, _block: Block) {}
     fn get_cursor(&self, _rect: &Rect) -> (u16, u16) {
         (0, 0)
@@ -28,8 +30,8 @@ pub trait Panel {
         '\0'
     }
     fn set_id(&mut self, _id: char) {}
-    fn receive_key(&mut self, _event: KeyEvent) -> bool {
-        false
+    fn receive_key(&mut self, _event: KeyEvent) -> (bool, Vec<StateChangeRequest>) {
+        (false, vec![])
     }
     fn set_active(&mut self) {}
     fn get_active(&self) -> bool {

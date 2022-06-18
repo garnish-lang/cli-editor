@@ -40,6 +40,17 @@ impl Message {
     }
 }
 
+pub enum StateChangeRequest {
+    // String - prompt to display for input
+    Input(String)
+}
+
+impl StateChangeRequest {
+    pub fn input_request(prompt: String) -> StateChangeRequest {
+        StateChangeRequest::Input(prompt)
+    }
+}
+
 pub struct AppState {
     panels: Vec<(usize, Box<dyn Panel>)>,
     splits: Vec<PanelSplit>,
@@ -86,6 +97,9 @@ impl AppState {
 
         let mut prompt_panel = InputPanel::new();
         prompt_panel.set_id(PROMPT_PANEL_ID);
+
+        text_panel.init(self);
+        prompt_panel.init(self);
 
         self.panels = vec![(0, Box::new(prompt_panel)), (0, Box::new(text_panel))];
         self.active_panel = 1;
@@ -169,6 +183,14 @@ impl AppState {
         id
     }
 
+    pub fn handle_changes(&mut self, changes: Vec<StateChangeRequest>) {
+        for change in changes {
+            match change {
+                StateChangeRequest::Input(prompt) => ()
+            }
+        }
+    }
+
     //
     // Command Actions
     //
@@ -226,6 +248,9 @@ impl AppState {
 
     pub(crate) fn add_panel(&mut self, split: usize) -> usize {
         let new_id = self.first_available_id();
+        let mut new_panel = Box::new(TextEditPanel::new());
+        new_panel.init(self);
+        new_panel.set_id(new_id);
         // find first inactive slot and replace value with new panel and given split
         match self
             .panels
@@ -235,15 +260,12 @@ impl AppState {
         {
             Some((i, v)) => {
                 v.0 = split;
-                v.1 = Box::new(TextEditPanel::new());
-                v.1.set_id(new_id);
+                v.1 = new_panel;
                 i
             }
             // if there are no inactive panels, create new slot
             None => {
-                let mut p = Box::new(TextEditPanel::new());
-                p.set_id(new_id);
-                self.panels.push((split, p));
+                self.panels.push((split, new_panel));
                 self.panels.len() - 1
             }
         }
@@ -363,15 +385,9 @@ impl AppState {
         // if this is last panel besides static panels
         // we will replace it
         if active_count <= self.static_panels.len() {
-            // get id before removal so its different
-            // done in order to detect change
-            let new_id = self.first_available_id();
-            let index = self.panels_len();
-            let mut text_panel = TextEditPanel::new();
-            text_panel.set_id(new_id);
-
             // use last split that we have for new panel's split
             let last = self.splits_len() - 1;
+            let index = self.add_panel(last);
             match self.get_split_mut(last) {
                 Some(s) => s.panels.push(UserSplits::Panel(index)),
                 None => {
@@ -388,7 +404,6 @@ impl AppState {
                 }
             }
 
-            self.panels.push((last, Box::new(text_panel)));
             self.active_panel = index;
         } else {
             self.active_panel = next_active_panel;

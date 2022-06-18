@@ -5,6 +5,7 @@ use tui::text::{Span};
 use tui::widgets::{Block, Paragraph, Wrap};
 
 use crate::{EditorFrame, Panel};
+use crate::app::StateChangeRequest;
 
 pub struct InputPanel {
     id: char,
@@ -67,10 +68,10 @@ impl Panel for InputPanel {
         self.id = id;
     }
 
-    fn receive_key(&mut self, event: KeyEvent) -> bool {
+    fn receive_key(&mut self, event: KeyEvent) -> (bool, Vec<StateChangeRequest>) {
         // temp ignore all modifiers
         if !event.modifiers.is_empty() {
-            return false;
+            return (false, vec![]);
         }
 
         match event.code {
@@ -111,13 +112,9 @@ impl Panel for InputPanel {
                 self.cursor_x += 1;
                 self.text.push(c);
             }
-            _ => return false,
+            _ => return (false, vec![]),
         }
 
-        false
-    }
-
-    fn set_active(&mut self) {
-        todo!()
+        (false, vec![])
     }
 }

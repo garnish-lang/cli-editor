@@ -57,10 +57,12 @@ fn main() -> Result<(), String> {
                 let (end, action) = if global_commands.has_progress() {
                     global_commands.advance(CommandKeyId::new(event.code, event.modifiers))
                 } else {
-                    let handled = match app_state.get_active_panel_mut() {
+                    let (handled, changes) = match app_state.get_active_panel_mut() {
                         Some((_, panel)) => panel.receive_key(event),
-                        None => false, // error?
+                        None => (false, vec![]), // error?
                     };
+
+                    app_state.handle_changes(changes);
 
                     if handled {
                         (false, None)
