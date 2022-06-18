@@ -1,4 +1,4 @@
-use crate::Panel;
+use crate::{Panel};
 
 pub struct NullPanel {}
 
@@ -10,6 +10,10 @@ impl NullPanel {
 
 impl Panel for NullPanel {
     fn get_active(&self) -> bool {
+        false
+    }
+
+    fn visible(&self) -> bool {
         false
     }
 }

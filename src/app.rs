@@ -3,12 +3,12 @@ use std::collections::HashSet;
 use crossterm::event::KeyCode;
 use tui::layout::Direction;
 
-use crate::commands::ctrl_alt_key;
-use crate::panels::NullPanel;
 use crate::{
-    catch_all, ctrl_key, key, CommandDetails, Commands, Panel, PanelSplit, InputPanel,
+    catch_all, CommandDetails, Commands, ctrl_key, InputPanel, key, Panel, PanelSplit,
     TextEditPanel, UserSplits,
 };
+use crate::commands::ctrl_alt_key;
+use crate::panels::NullPanel;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub enum MessageChannel {
@@ -18,7 +18,7 @@ pub enum MessageChannel {
     INFO,
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Message {
     channel: MessageChannel,
     text: String,
@@ -43,19 +43,29 @@ impl Message {
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub enum StateChangeRequest {
     // String - prompt to display for input
-    Input(String)
+    Input(String),
+    InputComplete(String),
+    Message(Message),
 }
 
 impl StateChangeRequest {
     pub fn input_request(prompt: String) -> StateChangeRequest {
         StateChangeRequest::Input(prompt)
     }
+
+    pub fn input_complete(text: String) -> StateChangeRequest {
+        StateChangeRequest::InputComplete(text)
+    }
+
+    pub fn error<T: ToString>(message: T) -> StateChangeRequest {
+        StateChangeRequest::Message(Message::error(message))
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
 struct InputRequest {
     prompt: String,
-    requestor_id: char
+    requestor_id: usize
 }
 
 pub struct AppState {
@@ -152,10 +162,6 @@ impl AppState {
         self.splits.push(split)
     }
 
-    pub fn panels_len(&self) -> usize {
-        self.panels.len()
-    }
-
     pub fn get_panel(&self, index: usize) -> Option<&(usize, Box<dyn Panel>)> {
         self.panels.get(index)
     }
@@ -202,7 +208,7 @@ impl AppState {
         };
 
         for change in changes {
-            match change {
+            let additional_changes = match change {
                 StateChangeRequest::Input(prompt) => {
                     // only one input request at a time, override existing
                     if self.static_panels.contains(&active_panel_id) {
@@ -211,13 +217,61 @@ impl AppState {
                     }
 
                     self.input_request = Some(InputRequest {
-                        prompt,
-                        requestor_id: active_panel_id
+                        prompt: prompt.clone(),
+                        requestor_id: self.active_panel
                     });
 
                     self.active_panel = 0;
+
+                    match self.get_panel_mut(0) {
+                        Some((_, panel)) => {
+                            panel.show();
+                            panel.set_title(prompt.clone());
+                        },
+                        None => unimplemented!()
+                    }
+
+                    vec![]
                 }
-            }
+                StateChangeRequest::InputComplete(input) => {
+                    let index = match &self.input_request {
+                        Some(request) => {
+                            request.requestor_id
+                        }
+                        None => {
+                            self.messages.push(Message::error("No active input request."));
+                            return;
+                        }
+                    };
+
+                    let changes = match self.get_panel_mut(index) {
+                        Some((_, panel)) => {
+                            panel.receive_input(input)
+                        }
+                        None => {
+                            self.messages.push(Message::error("Requesting panel doesn't exist."));
+                            return;
+                        }
+                    };
+
+                    self.active_panel = index;
+
+                    match self.get_panel_mut(0) {
+                        Some((_, panel)) => {
+                            panel.hide();
+                        },
+                        None => unimplemented!()
+                    }
+
+                    changes
+                }
+                StateChangeRequest::Message(message) => {
+                    self.messages.push(message);
+                    vec![]
+                }
+            };
+
+            self.handle_changes(additional_changes);
         }
     }
 
@@ -596,9 +650,9 @@ pub fn global_commands() -> Result<Commands<GlobalAction>, String> {
 mod tests {
     use crossterm::event::KeyCode;
 
+    use crate::{AppState, Panel, TextEditPanel, UserSplits};
     use crate::app::{Message, MessageChannel};
     use crate::panels::NullPanel;
-    use crate::{AppState, Panel, TextEditPanel, UserSplits};
 
     fn assert_is_default(app: &AppState) {
         assert_eq!(app.panels.len(), 2, "Panels not set");
@@ -750,7 +804,7 @@ mod tests {
     #[test]
     fn delete_active_panel() {
         let mut app = AppState::new();
-        let next_panel_index = app.panels_len();
+        let next_panel_index = app.panels.len();
 
         app.split_current_panel_horizontal(KeyCode::Null);
         app.set_active_panel(next_panel_index);
@@ -786,11 +840,11 @@ mod tests {
     fn delete_active_panel_deletes_empty_split() {
         let mut app = AppState::new();
 
-        let second = app.panels_len();
+        let second = app.panels.len();
         app.split_current_panel_horizontal(KeyCode::Null);
         app.set_active_panel(second);
 
-        let third = app.panels_len();
+        let third = app.panels.len();
         app.split_current_panel_horizontal(KeyCode::Null);
         app.set_active_panel(third);
 
@@ -842,11 +896,11 @@ mod tests {
     fn delete_empty_split_not_present_in_parent_logs_message() {
         let mut app = AppState::new();
 
-        let second = app.panels_len();
+        let second = app.panels.len();
         app.split_current_panel_horizontal(KeyCode::Null);
         app.set_active_panel(second);
 
-        let third = app.panels_len();
+        let third = app.panels.len();
         app.split_current_panel_horizontal(KeyCode::Null);
         app.set_active_panel(third);
 
@@ -1034,8 +1088,25 @@ mod tests {
 
 #[cfg(test)]
 mod state_changes {
+    use crate::{AppState, Panel};
     use crate::app::{InputRequest, MessageChannel, StateChangeRequest};
-    use crate::AppState;
+
+    #[allow(dead_code)]
+    struct TestPanel {
+        expected_input: String,
+        actual_input: String
+    }
+
+    impl Panel for TestPanel {
+        fn get_title(&self) -> &str {
+            &self.actual_input
+        }
+
+        fn receive_input(&mut self, input: String) -> Vec<StateChangeRequest> {
+            self.actual_input = input;
+            vec![]
+        }
+    }
 
     #[test]
     fn input_request() {
@@ -1047,7 +1118,7 @@ mod state_changes {
 
         assert_eq!(state.input_request, Some(InputRequest {
             prompt: "Test Input".to_string(),
-            requestor_id: 'a'
+            requestor_id: 1
         }));
         assert_eq!(state.active_panel, 0);
     }
@@ -1071,6 +1142,87 @@ mod state_changes {
 
         state.handle_changes(vec![
             StateChangeRequest::input_request("Test Input".to_string())
+        ]);
+
+        assert_eq!(state.messages[0].channel, MessageChannel::ERROR)
+    }
+
+    #[test]
+    fn input_complete() {
+        let mut state = AppState::new();
+        state.input_request = Some(InputRequest {
+            prompt: "Test Input".to_string(),
+            requestor_id: 1,
+        });
+        state.active_panel = 0;
+
+        let mut panel = TestPanel {
+            expected_input: "Test Input".to_string(),
+            actual_input: "".to_string()
+        };
+
+        panel.set_id('a');
+
+        state.panels[1] = (0, Box::new(panel));
+
+        state.handle_changes(vec![
+            StateChangeRequest::input_complete("Test Input".to_string())
+        ]);
+
+        assert_eq!(state.active_panel, 1);
+        assert_eq!(state.panels[1].1.get_title(), "Test Input".to_string());
+    }
+
+    #[test]
+    fn input_complete_no_request() {
+        let mut state = AppState::new();
+
+        let mut panel = TestPanel {
+            expected_input: "Test Input".to_string(),
+            actual_input: "".to_string()
+        };
+
+        panel.set_id('a');
+
+        state.panels[1] = (0, Box::new(panel));
+
+        state.handle_changes(vec![
+            StateChangeRequest::input_complete("Test Input".to_string())
+        ]);
+
+        assert_eq!(state.messages[0].channel, MessageChannel::ERROR)
+    }
+
+    #[test]
+    fn input_complete_requestor_doesnt_exist() {
+        let mut state = AppState::new();
+        state.input_request = Some(InputRequest {
+            prompt: "Test Input".to_string(),
+            requestor_id: 10,
+        });
+
+        let mut panel = TestPanel {
+            expected_input: "Test Input".to_string(),
+            actual_input: "".to_string()
+        };
+
+        panel.set_id('a');
+
+        state.panels[1] = (0, Box::new(panel));
+
+        state.handle_changes(vec![
+            StateChangeRequest::input_complete("Test Input".to_string())
+        ]);
+
+        assert_eq!(state.messages[0].channel, MessageChannel::ERROR)
+    }
+
+    #[test]
+    fn error_message() {
+        let mut state = AppState::new();
+
+        state.handle_changes(vec![
+            StateChangeRequest::error("Test Input".to_string())
         ]);
 
         assert_eq!(state.messages[0].channel, MessageChannel::ERROR)

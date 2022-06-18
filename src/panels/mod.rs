@@ -3,15 +3,15 @@ use tui::layout::Rect;
 use tui::widgets::Block;
 
 pub use edit::TextEditPanel;
-pub use null::NullPanel;
 pub use input::InputPanel;
+pub use null::NullPanel;
 
-use crate::{AppState, EditorFrame};
 use crate::app::StateChangeRequest;
+use crate::{AppState, EditorFrame};
 
 mod edit;
-mod null;
 mod input;
+mod null;
 
 pub trait Panel {
     fn init(&mut self, _state: &mut AppState) {}
@@ -35,6 +35,14 @@ pub trait Panel {
     }
     fn set_active(&mut self) {}
     fn get_active(&self) -> bool {
+        true
+    }
+    fn receive_input(&mut self, _input: String) -> Vec<StateChangeRequest> {
+        vec![]
+    }
+    fn show(&mut self) {}
+    fn hide(&mut self) {}
+    fn visible(&self) -> bool {
         true
     }
 }

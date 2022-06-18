@@ -22,7 +22,7 @@ pub fn render_split(split: usize, app: &AppState, frame: &mut EditorFrame, chunk
                 .filter(|split| match split {
                     UserSplits::Split(_) => true,
                     UserSplits::Panel(panel_index) => match app.get_panel(*panel_index) {
-                        Some((_, panel)) => panel.get_active(),
+                        Some((_, panel)) => panel.get_active() && panel.visible(),
                         None => false,
                     },
                 })

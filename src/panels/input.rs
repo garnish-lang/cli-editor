@@ -4,8 +4,9 @@ use tui::style::{Color, Style};
 use tui::text::{Span};
 use tui::widgets::{Block, Paragraph, Wrap};
 
-use crate::{EditorFrame, Panel};
+use crate::{AppState, catch_all, CommandDetails, CommandKeyId, Commands, EditorFrame, Panel};
 use crate::app::StateChangeRequest;
+use crate::commands::shift_catch_all;
 
 pub struct InputPanel {
     id: char,
@@ -15,6 +16,9 @@ pub struct InputPanel {
     cursor_y: u16,
     text: String,
     title: String,
+    commands: Commands<InputCommand>,
+    length: u16,
+    visible: bool,
 }
 
 impl InputPanel {
@@ -26,55 +30,21 @@ impl InputPanel {
             min_x: 1,
             min_y: 1,
             text: String::new(),
-            title: "Input".to_string(),
+            title: "".to_string(),
+            commands: Commands::<InputCommand>::new(),
+            length: 3,
+            visible: false
         }
     }
-}
 
-impl Panel for InputPanel {
-    fn make_widget(&self, frame: &mut EditorFrame, rect: Rect, _is_active: bool, block: Block) {
-        let para_text = Span::from(self.text.clone());
-
-        let para = Paragraph::new(para_text)
-            .block(block)
-            .style(Style::default().fg(Color::White).bg(Color::Black))
-            .alignment(Alignment::Left)
-            .wrap(Wrap { trim: true });
-
-        frame.render_widget(para, rect);
+    #[allow(dead_code)]
+    pub fn set_text(&mut self, text: String) {
+        self.text = text;
     }
 
-    fn get_cursor(&self, rect: &Rect) -> (u16, u16) {
-        (rect.x + self.cursor_x, rect.y + self.cursor_y)
-    }
-
-    fn get_title(&self) -> &str {
-        &self.title
-    }
-
-    fn set_title(&mut self, title: String) {
-        self.title = title
-    }
-
-    fn get_length(&self) -> u16 {
-        3
-    }
-
-    fn get_id(&self) -> char {
-        self.id
-    }
-
-    fn set_id(&mut self, id: char) {
-        self.id = id;
-    }
-
-    fn receive_key(&mut self, event: KeyEvent) -> (bool, Vec<StateChangeRequest>) {
-        // temp ignore all modifiers
-        if !event.modifiers.is_empty() {
-            return (false, vec![]);
-        }
-
-        match event.code {
+    fn handle_key_stroke(&mut self, code: KeyCode) -> (bool, Vec<StateChangeRequest>) {
+        let mut requests = vec![];
+        match code {
             KeyCode::Backspace => {
                 match self.text.pop() {
                     None => {
@@ -106,7 +76,11 @@ impl Panel for InputPanel {
                 // ??
             }
             KeyCode::Enter => {
-                // perform action
+                requests.push(StateChangeRequest::input_complete(self.text.clone()));
+                self.text = String::new();
+                // self.text.push('\n');
+                // self.cursor_y += 1;
+                // self.cursor_x = 1;
             }
             KeyCode::Char(c) => {
                 self.cursor_x += 1;
@@ -115,6 +89,92 @@ impl Panel for InputPanel {
             _ => return (false, vec![]),
         }
 
-        (false, vec![])
+        (true, requests)
     }
+}
+
+impl Panel for InputPanel {
+    fn init(&mut self, state: &mut AppState) {
+        match make_commands() {
+            Ok(commands) => self.commands = commands,
+            Err(e) => state.add_error(e)
+        }
+    }
+
+    fn make_widget(&self, frame: &mut EditorFrame, rect: Rect, _is_active: bool, block: Block) {
+        let para_text = Span::from(self.text.clone());
+
+        let para = Paragraph::new(para_text)
+            .block(block)
+            .style(Style::default().fg(Color::White).bg(Color::Black))
+            .alignment(Alignment::Left)
+            .wrap(Wrap { trim: true });
+
+        frame.render_widget(para, rect);
+    }
+
+    fn get_cursor(&self, rect: &Rect) -> (u16, u16) {
+        (rect.x + self.cursor_x, rect.y + self.cursor_y)
+    }
+
+    fn get_title(&self) -> &str {
+        &self.title
+    }
+
+    fn set_title(&mut self, title: String) {
+        self.title = title
+    }
+
+    fn get_length(&self) -> u16 {
+        self.length
+    }
+
+    fn get_id(&self) -> char {
+        self.id
+    }
+
+    fn set_id(&mut self, id: char) {
+        self.id = id;
+    }
+
+    fn receive_key(&mut self, event: KeyEvent) -> (bool, Vec<StateChangeRequest>) {
+        let (end, action) = self.commands.advance(CommandKeyId::new(event.code, event.modifiers));
+
+        if end {
+            self.commands.reset();
+        }
+
+        match action {
+            Some(a) => a(self, event.code),
+            None => (!end, vec![])
+        }
+    }
+
+    fn show(&mut self) {
+        self.visible = true;
+    }
+
+    fn hide(&mut self) {
+        self.visible = false;
+    }
+
+    fn visible(&self) -> bool {
+        self.visible
+    }
+}
+
+type InputCommand = fn(&mut InputPanel, KeyCode) -> (bool, Vec<StateChangeRequest>);
+
+pub fn make_commands() -> Result<Commands<InputCommand>, String> {
+    let mut commands = Commands::<InputCommand>::new();
+
+    commands.insert(|b| {
+        b.node(catch_all()).action(CommandDetails::empty(), InputPanel::handle_key_stroke)
+    })?;
+
+    commands.insert(|b| {
+        b.node(shift_catch_all()).action(CommandDetails::empty(), InputPanel::handle_key_stroke)
+    })?;
+
+    Ok(commands)
 }

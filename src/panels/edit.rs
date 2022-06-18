@@ -1,10 +1,11 @@
+use std::fs;
 use crossterm::event::{KeyCode, KeyEvent};
 use tui::layout::{Alignment, Rect};
 use tui::style::{Color, Style};
 use tui::text::Text;
 use tui::widgets::{Block, Paragraph, Wrap};
 
-use crate::{AppState, catch_all, CommandDetails, CommandKeyId, Commands, EditorFrame, Panel};
+use crate::{AppState, catch_all, CommandDetails, CommandKeyId, Commands, ctrl_key, EditorFrame, Panel};
 use crate::app::StateChangeRequest;
 use crate::commands::shift_catch_all;
 
@@ -88,6 +89,27 @@ impl TextEditPanel {
 
         (true, vec![])
     }
+
+    fn open_file(&mut self, _code: KeyCode) -> (bool, Vec<StateChangeRequest>) {
+        (false, vec![StateChangeRequest::input_request("File Name".to_string())])
+    }
+
+    fn set_cursor_to_end(&mut self) {
+        self.cursor_x = self.min_x;
+        self.cursor_y = self.min_y;
+
+        for c in self.text.chars() {
+            match c {
+                '\n' => {
+                    self.cursor_x = self.min_x;
+                    self.cursor_y += 1;
+                }
+                _ => {
+                    self.cursor_x += 1;
+                }
+            }
+        }
+    }
 }
 
 impl Panel for TextEditPanel {
@@ -141,6 +163,19 @@ impl Panel for TextEditPanel {
             None => (!end, vec![])
         }
     }
+
+    fn receive_input(&mut self, input: String) -> Vec<StateChangeRequest> {
+        let mut changes = vec![];
+
+        match fs::read_to_string(input) {
+            Err(e) => changes.push(StateChangeRequest::error(e)),
+            Ok(text) => self.text = text
+        }
+
+        self.set_cursor_to_end();
+
+        changes
+    }
 }
 
 type EditCommand = fn(&mut TextEditPanel, KeyCode) -> (bool, Vec<StateChangeRequest>);
@@ -154,6 +189,10 @@ pub fn make_commands() -> Result<Commands<EditCommand>, String> {
 
     commands.insert(|b| {
         b.node(shift_catch_all()).action(CommandDetails::empty(), TextEditPanel::handle_key_stroke)
+    })?;
+
+    commands.insert(|b| {
+        b.node(ctrl_key('o')).action(CommandDetails::open_file(), TextEditPanel::open_file)
     })?;
 
     Ok(commands)

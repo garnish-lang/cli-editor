@@ -121,6 +121,13 @@ impl CommandDetails {
             description: "Activate a panel by selecting its ID. The IDs will be displayed next to panel titles after first key.".to_string()
         }
     }
+
+    pub fn open_file() -> Self {
+        CommandDetails {
+            name: "Open File".to_string(),
+            description: "Open a file by typing name in input panel.".to_string()
+        }
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
