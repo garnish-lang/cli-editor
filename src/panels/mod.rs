@@ -1,5 +1,4 @@
 use crossterm::event::{KeyCode, KeyEvent};
-
 use tui::layout::{Alignment, Rect};
 use tui::style::{Color, Style};
 use tui::text::{Span, Text};
@@ -7,18 +6,29 @@ use tui::widgets::{Block, Paragraph, Wrap};
 
 use crate::EditorFrame;
 
+mod null;
+
+pub use null::NullPanel;
+
 pub trait Panel {
-    fn make_widget(&self, frame: &mut EditorFrame, rect: Rect, is_active: bool, block: Block);
-    fn get_cursor(&self, rect: &Rect) -> (u16, u16);
-    fn get_title(&self) -> &String;
-    fn set_title(&mut self, title: String);
+    fn make_widget(&self, _frame: &mut EditorFrame, _rect: Rect, _is_active: bool, _block: Block) {}
+    fn get_cursor(&self, _rect: &Rect) -> (u16, u16) {
+        (0, 0)
+    }
+    fn get_title(&self) -> &str { "" }
+    fn set_title(&mut self, _title: String) {}
     fn get_length(&self) -> u16 {
         0
     }
-    fn get_id(&self) -> char;
-    fn set_id(&mut self, id: char);
-    fn receive_key(&mut self, event: KeyEvent) -> bool;
-    fn set_active(&mut self);
+    fn get_id(&self) -> char {
+        '\0'
+    }
+    fn set_id(&mut self, _id: char) {}
+    fn receive_key(&mut self, _event: KeyEvent) -> bool {
+        false
+    }
+    fn set_active(&mut self) {}
+    fn get_active(&self) -> bool { true }
 }
 
 pub struct TextEditPanel {
@@ -41,11 +51,11 @@ impl TextEditPanel {
             min_x: 1,
             min_y: 1,
             text: String::new(),
-            title: "Editor".to_string()
+            title: "Editor".to_string(),
         }
     }
 
-    pub fn get_text(&self) -> &String {
+    pub fn get_text(&self) -> &str {
         &self.text
     }
 
@@ -70,7 +80,7 @@ impl Panel for TextEditPanel {
         (rect.x + self.cursor_x, rect.y + self.cursor_y)
     }
 
-    fn get_title(&self) -> &String {
+    fn get_title(&self) -> &str {
         &self.title
     }
 
@@ -162,7 +172,7 @@ impl PromptPanel {
             min_x: 1,
             min_y: 1,
             text: String::new(),
-            title: "Prompt".to_string()
+            title: "Prompt".to_string(),
         }
     }
 }
@@ -184,7 +194,7 @@ impl Panel for PromptPanel {
         (rect.x + self.cursor_x, rect.y + self.cursor_y)
     }
 
-    fn get_title(&self) -> &String {
+    fn get_title(&self) -> &str {
         &self.title
     }
 

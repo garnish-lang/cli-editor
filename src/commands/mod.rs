@@ -87,6 +87,20 @@ impl CommandDetails {
         }
     }
 
+    pub fn add_panel() -> Self {
+        CommandDetails {
+            name: "Add Panel".to_string(),
+            description: "Add panel to active split.".to_string(),
+        }
+    }
+
+    pub fn remove_panel() -> Self {
+        CommandDetails {
+            name: "Remove".to_string(),
+            description: "Remove active panel.".to_string(),
+        }
+    }
+
     pub fn select_panel() -> Self {
         CommandDetails {
             name: "Activate Panel".to_string(),

@@ -7,6 +7,7 @@ use crate::{
     catch_all, ctrl_key, key, split, CommandDetails, Commands, Panel, PanelSplit, PromptPanel,
     TextEditPanel, UserSplits,
 };
+use crate::panels::NullPanel;
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub enum MessageChannel {
@@ -204,16 +205,17 @@ impl AppState {
 
     pub fn add_panel_to_active_split(&mut self, _code: KeyCode) {
         let active_split = match self.get_active_panel() {
-            Some((s,_)) => *s,
+            Some((s, _)) => *s,
             None => {
                 self.add_error("No active panel. Setting to be last panel.");
                 self.active_panel = 1;
                 return;
-            },
+            }
         };
 
         let new_panel_index = self.panels_len();
-        self.panels.push((active_split, Box::new(TextEditPanel::new())));
+        self.panels
+            .push((active_split, Box::new(TextEditPanel::new())));
 
         match self.splits.get_mut(active_split) {
             Some(s) => s.panels.push(UserSplits::Panel(new_panel_index)),
@@ -285,7 +287,7 @@ impl AppState {
             'outer: for (i, s) in self.splits.iter().enumerate() {
                 for (j, p) in s.panels.iter().enumerate() {
                     match p {
-                        UserSplits::Panel(_) => (),
+                        UserSplits::Panel(_) => (), // skip panels
                         UserSplits::Split(index) => {
                             if *index == active_split {
                                 parent_index = i;
@@ -323,7 +325,8 @@ impl AppState {
             }
         }
 
-        self.panels.remove(active_panel_index);
+        // verified that it exists from first check getting active panel
+        self.panels[active_panel_index] = (0, Box::new(NullPanel::new()));
 
         // if this is last panel besides static panels
         // we will replace it
@@ -346,9 +349,8 @@ impl AppState {
                     // causing the removal of top split
                     // this is caught above during the split removal
 
-                    self.messages.push(Message::error(
-                        "No splits remaining. Resetting state.",
-                    ));
+                    self.messages
+                        .push(Message::error("No splits remaining. Resetting state."));
                     self.reset();
                     return;
                 }
@@ -356,6 +358,73 @@ impl AppState {
 
             self.panels.push((last, Box::new(text_panel)));
         }
+    }
+
+    pub fn active_next_panel(&mut self, _code: KeyCode) {
+        let order = self.build_order();
+        let mut active_panel_index = None;
+        for (i, panel_index) in order.iter().enumerate() {
+            if *panel_index == self.active_panel {
+                active_panel_index = Some(i);
+            }
+        }
+
+        match active_panel_index {
+            None => unimplemented!(),
+            Some(index) => {
+                let next = if index + 1 >= order.len() {
+                    0
+                } else {
+                    index + 1
+                };
+
+                self.active_panel = order[next];
+            }
+        }
+    }
+
+    pub fn active_previous_panel(&mut self, _code: KeyCode) {
+        let order = self.build_order();
+        let mut active_panel_index = None;
+        for (i, panel_index) in order.iter().enumerate() {
+            if *panel_index == self.active_panel {
+                active_panel_index = Some(i);
+            }
+        }
+
+        match active_panel_index {
+            None => unimplemented!(),
+            Some(index) => {
+                let next = if index == 0 {
+                    order.len() - 1
+                } else {
+                    index - 1
+                };
+
+                self.active_panel = order[next];
+            }
+        }
+    }
+
+    fn build_order(&self) -> Vec<usize> {
+        let mut nodes = vec![0];
+        let mut order = vec![];
+
+        while let Some(node) = nodes.pop() {
+            match self.splits.get(node) {
+                None => unimplemented!(),
+                Some(split) => {
+                    for panel in &split.panels {
+                        match panel  {
+                            UserSplits::Panel(panel_index) => order.push(*panel_index),
+                            UserSplits::Split(split_index) => nodes.push(*split_index)
+                        }
+                    }
+                }
+            }
+        }
+
+        order
     }
 }
 
@@ -379,6 +448,20 @@ pub fn global_commands() -> Result<Commands<GlobalAction>, String> {
     })?;
 
     commands.insert(|b| {
+        b.node(ctrl_key('p')).node(key('d')).action(
+            CommandDetails::remove_panel(),
+            AppState::delete_active_panel,
+        )
+    })?;
+
+    commands.insert(|b| {
+        b.node(ctrl_key('p')).node(key('n')).action(
+            CommandDetails::add_panel(),
+            AppState::add_panel_to_active_split,
+        )
+    })?;
+
+    commands.insert(|b| {
         b.node(ctrl_key('a').action(AppState::start_selecting_panel))
             .node(catch_all())
             .action(CommandDetails::select_panel(), AppState::select_panel)
@@ -393,6 +476,7 @@ mod tests {
 
     use crate::app::{Message, MessageChannel};
     use crate::{AppState, Panel, TextEditPanel, UserSplits};
+    use crate::panels::NullPanel;
 
     fn assert_is_default(app: &AppState) {
         assert_eq!(app.panels.len(), 2);
@@ -424,11 +508,14 @@ mod tests {
         assert_eq!(app.panels.len(), 3);
         assert_eq!(app.splits.len(), 1);
 
-        assert_eq!(app.splits[0].panels, vec![
-            UserSplits::Panel(0),
-            UserSplits::Panel(1),
-            UserSplits::Panel(2)
-        ]);
+        assert_eq!(
+            app.splits[0].panels,
+            vec![
+                UserSplits::Panel(0),
+                UserSplits::Panel(1),
+                UserSplits::Panel(2)
+            ]
+        );
 
         assert_eq!(app.panels[1].0, 0);
         assert_eq!(app.panels[2].0, 0);
@@ -470,10 +557,10 @@ mod tests {
         assert_eq!(app.panels.len(), 3);
         assert_eq!(app.splits.len(), 2);
 
-        assert_eq!(app.splits[1].panels, vec![
-            UserSplits::Panel(1),
-            UserSplits::Panel(2)
-        ]);
+        assert_eq!(
+            app.splits[1].panels,
+            vec![UserSplits::Panel(1), UserSplits::Panel(2)]
+        );
 
         assert_eq!(app.panels[1].0, 1);
         assert_eq!(app.panels[2].0, 1);
@@ -530,9 +617,9 @@ mod tests {
 
         assert_eq!(app.panels.len(), 2);
         assert_eq!(app.splits.len(), 1);
-        assert!(app.messages.contains(&Message::info(
-            "Cannot split static panel"
-        )));
+        assert!(app
+            .messages
+            .contains(&Message::info("Cannot split static panel")));
     }
 
     #[test]
@@ -560,8 +647,11 @@ mod tests {
 
         app.delete_active_panel(KeyCode::Null);
 
-        assert_eq!(app.panels.len(), 2);
+        assert_eq!(app.active_panel, 1);
+        assert_eq!(app.panels.len(), 3);
         assert_eq!(app.splits.len(), 2);
+
+        assert!(!app.panels[2].1.get_active());
     }
 
     #[test]
@@ -669,5 +759,59 @@ mod tests {
         assert!(app.messages.contains(&Message::error(
             "Split not found in parent when removing due to being empty. Resetting state."
         )));
+    }
+
+    #[test]
+    fn activate_next_panel() {
+        // 0 and 1
+        let mut app = AppState::new();
+        // 2
+        app.split_current_panel_vertical(KeyCode::Null);
+        // 3
+        app.split_current_panel_horizontal(KeyCode::Null);
+        // 4
+        app.add_panel_to_active_split(KeyCode::Null);
+        // 5
+        app.add_panel_to_active_split(KeyCode::Null);
+        app.set_active_panel(2);
+        // 6
+        app.split_current_panel_horizontal(KeyCode::Null);
+        // 7
+        app.add_panel_to_active_split(KeyCode::Null);
+        // 8
+        app.add_panel_to_active_split(KeyCode::Null);
+
+        app.set_active_panel(7);
+
+        app.active_next_panel(KeyCode::Null);
+
+        assert_eq!(app.active_panel(), 8)
+    }
+
+    #[test]
+    fn activate_previous_panel() {
+        // 0 and 1
+        let mut app = AppState::new();
+        // 2
+        app.split_current_panel_vertical(KeyCode::Null);
+        // 3
+        app.split_current_panel_horizontal(KeyCode::Null);
+        // 4
+        app.add_panel_to_active_split(KeyCode::Null);
+        // 5
+        app.add_panel_to_active_split(KeyCode::Null);
+        app.set_active_panel(2);
+        // 6
+        app.split_current_panel_horizontal(KeyCode::Null);
+        // 7
+        app.add_panel_to_active_split(KeyCode::Null);
+        // 8
+        app.add_panel_to_active_split(KeyCode::Null);
+
+        app.set_active_panel(7);
+
+        app.active_previous_panel(KeyCode::Null);
+
+        assert_eq!(app.active_panel(), 6)
     }
 }
