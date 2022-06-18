@@ -193,11 +193,13 @@ impl AppState {
     }
 
     pub fn split_current_panel_horizontal(&mut self, _code: KeyCode) {
-        self.split(Direction::Horizontal)
+        // opposite direction, because visual like will be vertical for horizontal layout
+        self.split(Direction::Vertical)
     }
 
     pub fn split_current_panel_vertical(&mut self, _code: KeyCode) {
-        self.split(Direction::Vertical)
+        // opposite direction, because visual like will be horizontal for vertical layout
+        self.split(Direction::Horizontal)
     }
 
     pub fn add_panel_to_active_split(&mut self, _code: KeyCode) {
@@ -450,32 +452,33 @@ impl AppState {
     }
 
     fn build_order(&self) -> Result<Vec<usize>, Message> {
-        let mut nodes = vec![0];
         let mut order = vec![];
+        self.push_panels(0, &mut order)?;
+        Ok(order)
+    }
 
-        while let Some(node) = nodes.pop() {
-            match self.splits.get(node) {
-                None => return Err(Message::error("Child split not found in splits.")),
-                Some(split) => {
-                    for panel in &split.panels {
-                        match panel {
-                            UserSplits::Panel(panel_index) => match self.panels.get(*panel_index) {
-                                Some((_, panel)) => match panel.get_active() {
-                                    true => order.push(*panel_index),
-                                    false => (),
-                                },
-                                None => {
-                                    return Err(Message::error("Child panel not found in panels."))
-                                }
+    fn push_panels(&self, split: usize, order: &mut Vec<usize>) -> Result<(), Message>{
+        match self.splits.get(split) {
+            None => return Err(Message::error("Child split not found in splits.")),
+            Some(split) => {
+                for child in split.panels.iter() {
+                    match child {
+                        UserSplits::Panel(panel_index) => match self.panels.get(*panel_index) {
+                            Some((_, panel)) => match panel.get_active() {
+                                true => order.push(*panel_index),
+                                false => (),
                             },
-                            UserSplits::Split(split_index) => nodes.push(*split_index),
-                        }
+                            None => {
+                                return Err(Message::error("Child panel not found in panels."))
+                            }
+                        },
+                        UserSplits::Split(split_index) => self.push_panels(*split_index, order)?,
                     }
                 }
             }
         }
 
-        Ok(order)
+        Ok(())
     }
 }
 
