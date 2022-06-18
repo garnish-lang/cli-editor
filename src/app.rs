@@ -40,6 +40,7 @@ impl Message {
     }
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub enum StateChangeRequest {
     // String - prompt to display for input
     Input(String)
@@ -51,6 +52,12 @@ impl StateChangeRequest {
     }
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
+struct InputRequest {
+    prompt: String,
+    requestor_id: char
+}
+
 pub struct AppState {
     panels: Vec<(usize, Box<dyn Panel>)>,
     splits: Vec<PanelSplit>,
@@ -58,6 +65,7 @@ pub struct AppState {
     selecting_panel: bool,
     static_panels: Vec<char>,
     messages: Vec<Message>,
+    input_request: Option<InputRequest>
 }
 
 const PROMPT_PANEL_ID: char = '$';
@@ -71,6 +79,7 @@ impl AppState {
             selecting_panel: false,
             static_panels: vec![],
             messages: vec![],
+            input_request: None
         };
 
         app.reset();
@@ -184,9 +193,28 @@ impl AppState {
     }
 
     pub fn handle_changes(&mut self, changes: Vec<StateChangeRequest>) {
+        let active_panel_id = match self.get_active_panel() {
+            Some((_, panel)) => panel.get_id(),
+            None => {
+                self.messages.push(Message::error("No active panel for change request."));
+                return;
+            }
+        };
+
         for change in changes {
             match change {
-                StateChangeRequest::Input(prompt) => ()
+                StateChangeRequest::Input(prompt) => {
+                    // only one input request at a time, override existing
+                    if self.static_panels.contains(&active_panel_id) {
+                        self.messages.push(Message::error("Input panel cannot make input request."));
+                        return;
+                    }
+
+                    self.input_request = Some(InputRequest {
+                        prompt,
+                        requestor_id: active_panel_id
+                    });
+                }
             }
         }
     }
@@ -999,5 +1027,49 @@ mod tests {
         app.split_current_panel_horizontal(KeyCode::Null);
 
         assert!(app.panels[1].1.get_active());
+    }
+}
+
+#[cfg(test)]
+mod state_changes {
+    use crate::app::{InputRequest, MessageChannel, StateChangeRequest};
+    use crate::AppState;
+
+    #[test]
+    fn input_request() {
+        let mut state = AppState::new();
+
+        state.handle_changes(vec![
+            StateChangeRequest::input_request("Test Input".to_string())
+        ]);
+
+        assert_eq!(state.input_request, Some(InputRequest {
+            prompt: "Test Input".to_string(),
+            requestor_id: 'a'
+        }));
+    }
+
+    #[test]
+    fn input_request_no_active_panel() {
+        let mut state = AppState::new();
+        state.active_panel = 100;
+
+        state.handle_changes(vec![
+            StateChangeRequest::input_request("Test Input".to_string())
+        ]);
+
+        assert_eq!(state.messages[0].channel, MessageChannel::ERROR)
+    }
+
+    #[test]
+    fn input_request_input_panel_is_active() {
+        let mut state = AppState::new();
+        state.active_panel = 0;
+
+        state.handle_changes(vec![
+            StateChangeRequest::input_request("Test Input".to_string())
+        ]);
+
+        assert_eq!(state.messages[0].channel, MessageChannel::ERROR)
     }
 }
