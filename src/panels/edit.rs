@@ -30,7 +30,7 @@ impl TextEditPanel {
             min_x: 1,
             min_y: 1,
             text: String::new(),
-            title: "Editor".to_string(),
+            title: "Buffer".to_string(),
             commands: Commands::<EditCommand>::new()
         }
     }
