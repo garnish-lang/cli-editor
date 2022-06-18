@@ -1,6 +1,5 @@
 use tui::layout::Direction;
 
-use crate::panels::{Panel, TextEditPanel};
 use crate::AppState;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -24,8 +23,6 @@ pub enum UserSplits {
 impl AppState {
     pub fn split(&mut self, direction: Direction) {
         let new_split_index = self.splits_len();
-        let new_id = self.first_available_id();
-        let new_panel_index = self.panels_len();
 
         let (active_split, active_panel_id) = match self.get_active_panel_mut() {
             None => {
@@ -37,7 +34,7 @@ impl AppState {
                 let r = (*split_i, active_panel.get_id());
                 *split_i = new_split_index;
                 r
-            },
+            }
         };
 
         if self.static_panels().contains(&active_panel_id) {
@@ -45,10 +42,7 @@ impl AppState {
             return;
         }
 
-        // create panel
-        let mut p = TextEditPanel::new();
-        p.set_id(new_id);
-        self.push_panel((new_split_index, Box::new(p)));
+        let new_panel_index = self.add_panel(new_split_index);
 
         let new_panel_split = PanelSplit::new(
             direction,
@@ -84,7 +78,9 @@ impl AppState {
                 match child_index {
                     Some(i) => split.panels[i] = UserSplits::Split(new_split_index),
                     None => {
-                        self.add_error("Active panel not present in split. Setting to be last panel.");
+                        self.add_error(
+                            "Active panel not present in split. Setting to be last panel.",
+                        );
                         self.reset();
                         return;
                     }
@@ -96,6 +92,4 @@ impl AppState {
 
         self.push_split(new_split);
     }
-
 }
-

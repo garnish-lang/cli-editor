@@ -141,10 +141,6 @@ impl AppState {
         self.panels.get_mut(index)
     }
 
-    pub fn push_panel(&mut self, panel: (usize, Box<dyn Panel>)) {
-        self.panels.push(panel)
-    }
-
     pub fn selecting_panel(&self) -> bool {
         self.selecting_panel
     }
@@ -226,7 +222,8 @@ impl AppState {
         }
     }
 
-    fn add_panel(&mut self, split: usize) -> usize {
+    pub(crate) fn add_panel(&mut self, split: usize) -> usize {
+        let new_id = self.first_available_id();
         // find first inactive slot and replace value with new panel and given split
         match self
             .panels
@@ -237,11 +234,14 @@ impl AppState {
             Some((i, v)) => {
                 v.0 = split;
                 v.1 = Box::new(TextEditPanel::new());
+                v.1.set_id(new_id);
                 i
             }
             // if there are no inactive panels, create new slot
             None => {
-                self.panels.push((split, Box::new(TextEditPanel::new())));
+                let mut p = Box::new(TextEditPanel::new());
+                p.set_id(new_id);
+                self.panels.push((split, p));
                 self.panels.len() - 1
             }
         }
@@ -595,6 +595,8 @@ mod tests {
 
         assert_eq!(app.panels[1].0, 0);
         assert_eq!(app.panels[2].0, 0);
+
+        assert_eq!(app.panels[2].1.get_id(), 'b')
     }
 
     #[test]
@@ -963,6 +965,22 @@ mod tests {
         assert!(!app.panels[1].1.get_active());
 
         app.add_panel_to_active_split(KeyCode::Null);
+
+        assert!(app.panels[1].1.get_active());
+    }
+
+    #[test]
+    fn split_panel_after_delete_uses_inactive_slot() {
+        let mut app = AppState::new();
+
+        app.add_panel_to_active_split(KeyCode::Null);
+        app.add_panel_to_active_split(KeyCode::Null);
+
+        app.delete_active_panel(KeyCode::Null);
+
+        assert!(!app.panels[1].1.get_active());
+
+        app.split_current_panel_horizontal(KeyCode::Null);
 
         assert!(app.panels[1].1.get_active());
     }
