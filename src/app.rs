@@ -3,12 +3,12 @@ use std::collections::HashSet;
 use crossterm::event::KeyCode;
 use tui::layout::Direction;
 
-use crate::{
-    catch_all, CommandDetails, Commands, ctrl_key, key, Panel, PanelSplit, PromptPanel, split,
-    TextEditPanel, UserSplits,
-};
 use crate::commands::ctrl_alt_key;
 use crate::panels::NullPanel;
+use crate::{
+    catch_all, ctrl_key, key, CommandDetails, Commands, Panel, PanelSplit, PromptPanel,
+    TextEditPanel, UserSplits,
+};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub enum MessageChannel {
@@ -197,11 +197,11 @@ impl AppState {
     }
 
     pub fn split_current_panel_horizontal(&mut self, _code: KeyCode) {
-        split(self, Direction::Horizontal)
+        self.split(Direction::Horizontal)
     }
 
     pub fn split_current_panel_vertical(&mut self, _code: KeyCode) {
-        split(self, Direction::Vertical)
+        self.split(Direction::Vertical)
     }
 
     pub fn add_panel_to_active_split(&mut self, _code: KeyCode) {
@@ -214,9 +214,7 @@ impl AppState {
             }
         };
 
-        let new_panel_index = self.panels_len();
-        self.panels
-            .push((active_split, Box::new(TextEditPanel::new())));
+        let new_panel_index = self.add_panel(active_split);
 
         match self.splits.get_mut(active_split) {
             Some(s) => s.panels.push(UserSplits::Panel(new_panel_index)),
@@ -228,13 +226,33 @@ impl AppState {
         }
     }
 
+    fn add_panel(&mut self, split: usize) -> usize {
+        // find first inactive slot and replace value with new panel and given split
+        match self
+            .panels
+            .iter_mut()
+            .enumerate()
+            .find(|(_, (_, panel))| !panel.get_active())
+        {
+            Some((i, v)) => {
+                v.0 = split;
+                v.1 = Box::new(TextEditPanel::new());
+                i
+            }
+            // if there are no inactive panels, create new slot
+            None => {
+                self.panels.push((split, Box::new(TextEditPanel::new())));
+                self.panels.len() - 1
+            }
+        }
+    }
+
     pub fn delete_active_panel(&mut self, _code: KeyCode) {
         let (next_active_panel, active_split, active_panel_id) =
             match (self.next_panel_index(), self.get_active_panel()) {
                 (Err(e), None) | (Err(e), _) => {
                     self.reset();
-                    self.messages
-                        .push(e);
+                    self.messages.push(e);
                     return;
                 }
                 (_, None) => {
@@ -413,7 +431,10 @@ impl AppState {
         })
     }
 
-    fn active_panel_index<F: FnOnce(usize, &Vec<usize>) -> usize>(&self, f: F) -> Result<usize, Message> {
+    fn active_panel_index<F: FnOnce(usize, &Vec<usize>) -> usize>(
+        &self,
+        f: F,
+    ) -> Result<usize, Message> {
         let order = self.build_order()?;
         let mut active_panel_index = None;
         for (i, panel_index) in order.iter().enumerate() {
@@ -424,9 +445,7 @@ impl AppState {
 
         match active_panel_index {
             None => Err(Message::error("Active panel not found after ordering.")),
-            Some(index) => {
-                Ok(order[f(index, &order)])
-            }
+            Some(index) => Ok(order[f(index, &order)]),
         }
     }
 
@@ -441,11 +460,13 @@ impl AppState {
                     for panel in &split.panels {
                         match panel {
                             UserSplits::Panel(panel_index) => match self.panels.get(*panel_index) {
-                                Some((_, panel))  => match panel.get_active() {
+                                Some((_, panel)) => match panel.get_active() {
                                     true => order.push(*panel_index),
-                                    false => ()
+                                    false => (),
+                                },
+                                None => {
+                                    return Err(Message::error("Child panel not found in panels."))
                                 }
-                                None => return Err(Message::error("Child panel not found in panels."))
                             },
                             UserSplits::Split(split_index) => nodes.push(*split_index),
                         }
@@ -529,9 +550,9 @@ pub fn global_commands() -> Result<Commands<GlobalAction>, String> {
 mod tests {
     use crossterm::event::KeyCode;
 
-    use crate::{AppState, Panel, TextEditPanel, UserSplits};
     use crate::app::{Message, MessageChannel};
     use crate::panels::NullPanel;
+    use crate::{AppState, Panel, TextEditPanel, UserSplits};
 
     fn assert_is_default(app: &AppState) {
         assert_eq!(app.panels.len(), 2, "Panels not set");
@@ -928,5 +949,21 @@ mod tests {
 
         assert_eq!(app.active_panel, 1);
         assert_eq!(app.messages[0].channel, MessageChannel::ERROR)
+    }
+
+    #[test]
+    fn new_panel_after_delete_uses_inactive_slot() {
+        let mut app = AppState::new();
+
+        app.add_panel_to_active_split(KeyCode::Null);
+        app.add_panel_to_active_split(KeyCode::Null);
+
+        app.delete_active_panel(KeyCode::Null);
+
+        assert!(!app.panels[1].1.get_active());
+
+        app.add_panel_to_active_split(KeyCode::Null);
+
+        assert!(app.panels[1].1.get_active());
     }
 }

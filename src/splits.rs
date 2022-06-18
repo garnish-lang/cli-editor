@@ -21,77 +21,81 @@ pub enum UserSplits {
     Panel(usize),
 }
 
-pub fn split(app: &mut AppState, direction: Direction) {
-    let new_split_index = app.splits_len();
-    let new_id = app.first_available_id();
-    let new_panel_index = app.panels_len();
+impl AppState {
+    pub fn split(&mut self, direction: Direction) {
+        let new_split_index = self.splits_len();
+        let new_id = self.first_available_id();
+        let new_panel_index = self.panels_len();
 
-    let (active_split, active_panel_id) = match app.get_active_panel_mut() {
-        None => {
-            app.add_error("No active panel. Setting to be last panel.");
-            app.reset();
+        let (active_split, active_panel_id) = match self.get_active_panel_mut() {
+            None => {
+                self.add_error("No active panel. Setting to be last panel.");
+                self.reset();
+                return;
+            }
+            Some((split_i, active_panel)) => {
+                let r = (*split_i, active_panel.get_id());
+                *split_i = new_split_index;
+                r
+            },
+        };
+
+        if self.static_panels().contains(&active_panel_id) {
+            self.add_info("Cannot split static panel");
             return;
         }
-        Some((split_i, active_panel)) => {
-            let r = (*split_i, active_panel.get_id());
-            *split_i = new_split_index;
-            r
-        },
-    };
 
-    if app.static_panels().contains(&active_panel_id) {
-        app.add_info("Cannot split static panel");
-        return;
-    }
+        // create panel
+        let mut p = TextEditPanel::new();
+        p.set_id(new_id);
+        self.push_panel((new_split_index, Box::new(p)));
 
-    // create panel
-    let mut p = TextEditPanel::new();
-    p.set_id(new_id);
-    app.push_panel((new_split_index, Box::new(p)));
+        let new_panel_split = PanelSplit::new(
+            direction,
+            vec![
+                UserSplits::Panel(self.active_panel()),
+                UserSplits::Panel(new_panel_index),
+            ],
+        );
 
-    let new_panel_split = PanelSplit::new(
-        direction,
-        vec![
-            UserSplits::Panel(app.active_panel()),
-            UserSplits::Panel(new_panel_index),
-        ],
-    );
-
-    // replace active panel within its split with new split
-    let active_panel_index = app.active_panel();
-    let new_split = match app.get_split_mut(active_split) {
-        None => {
-            app.add_error("Active panel's split not found. Resetting state.");
-            app.reset();
-            return;
-        }
-        Some(split) => {
-            // find child index for active panel
-            let mut child_index = None;
-            for (i, child) in split.panels.iter().enumerate() {
-                match child {
-                    UserSplits::Split(_) => (),
-                    UserSplits::Panel(addr) => {
-                        if *addr == active_panel_index {
-                            child_index = Some(i);
-                            break;
+        // replace active panel within its split with new split
+        let active_panel_index = self.active_panel();
+        let new_split = match self.get_split_mut(active_split) {
+            None => {
+                self.add_error("Active panel's split not found. Resetting state.");
+                self.reset();
+                return;
+            }
+            Some(split) => {
+                // find child index for active panel
+                let mut child_index = None;
+                for (i, child) in split.panels.iter().enumerate() {
+                    match child {
+                        UserSplits::Split(_) => (),
+                        UserSplits::Panel(addr) => {
+                            if *addr == active_panel_index {
+                                child_index = Some(i);
+                                break;
+                            }
                         }
                     }
                 }
-            }
 
-            match child_index {
-                Some(i) => split.panels[i] = UserSplits::Split(new_split_index),
-                None => {
-                    app.add_error("Active panel not present in split. Setting to be last panel.");
-                    app.reset();
-                    return;
+                match child_index {
+                    Some(i) => split.panels[i] = UserSplits::Split(new_split_index),
+                    None => {
+                        self.add_error("Active panel not present in split. Setting to be last panel.");
+                        self.reset();
+                        return;
+                    }
                 }
+
+                new_panel_split
             }
+        };
 
-            new_panel_split
-        }
-    };
+        self.push_split(new_split);
+    }
 
-    app.push_split(new_split);
 }
+

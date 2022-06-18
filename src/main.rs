@@ -15,7 +15,7 @@ use tui::{Frame, Terminal};
 use crate::commands::{catch_all, ctrl_key, key, CommandDetails, CommandKeyId, Commands};
 use crate::panels::{Panel, PromptPanel, TextEditPanel};
 use crate::render::render_split;
-use crate::splits::{split, PanelSplit, UserSplits};
+use crate::splits::{PanelSplit, UserSplits};
 
 mod app;
 mod commands;
