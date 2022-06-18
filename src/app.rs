@@ -214,6 +214,8 @@ impl AppState {
                         prompt,
                         requestor_id: active_panel_id
                     });
+
+                    self.active_panel = 0;
                 }
             }
         }
@@ -1047,6 +1049,7 @@ mod state_changes {
             prompt: "Test Input".to_string(),
             requestor_id: 'a'
         }));
+        assert_eq!(state.active_panel, 0);
     }
 
     #[test]
