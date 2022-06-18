@@ -457,7 +457,7 @@ impl AppState {
         Ok(order)
     }
 
-    fn push_panels(&self, split: usize, order: &mut Vec<usize>) -> Result<(), Message>{
+    fn push_panels(&self, split: usize, order: &mut Vec<usize>) -> Result<(), Message> {
         match self.splits.get(split) {
             None => return Err(Message::error("Child split not found in splits.")),
             Some(split) => {
@@ -468,9 +468,7 @@ impl AppState {
                                 true => order.push(*panel_index),
                                 false => (),
                             },
-                            None => {
-                                return Err(Message::error("Child panel not found in panels."))
-                            }
+                            None => return Err(Message::error("Child panel not found in panels.")),
                         },
                         UserSplits::Split(split_index) => self.push_panels(*split_index, order)?,
                     }

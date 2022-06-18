@@ -9,7 +9,7 @@ use crossterm::terminal::{
 };
 use tui::backend::CrosstermBackend;
 
-use crate::app::{AppState, global_commands};
+use crate::app::{global_commands, AppState};
 use tui::{Frame, Terminal};
 
 use crate::commands::{catch_all, ctrl_key, key, CommandDetails, CommandKeyId, Commands};
@@ -29,7 +29,8 @@ fn main() -> Result<(), String> {
     enable_raw_mode().or_else(|err| Err(err.to_string()))?;
 
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture).or_else(|err| Err(err.to_string()))?;
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)
+        .or_else(|err| Err(err.to_string()))?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend).or_else(|err| Err(err.to_string()))?;
 
@@ -37,7 +38,9 @@ fn main() -> Result<(), String> {
     let mut global_commands = global_commands()?;
 
     loop {
-        terminal.draw(|frame| render_split(0, &app_state, frame, frame.size())).or_else(|err| Err(err.to_string()))?;
+        terminal
+            .draw(|frame| render_split(0, &app_state, frame, frame.size()))
+            .or_else(|err| Err(err.to_string()))?;
 
         match read().or_else(|err| Err(err.to_string()))? {
             Event::Key(event) => {
@@ -81,7 +84,8 @@ fn main() -> Result<(), String> {
             Event::Resize(width, height) => execute!(
                 terminal.backend_mut(),
                 Print(format!("New size {}x{}", width, height))
-            ).or_else(|err| Err(err.to_string()))?,
+            )
+            .or_else(|err| Err(err.to_string()))?,
         }
     }
 
@@ -90,7 +94,8 @@ fn main() -> Result<(), String> {
         terminal.backend_mut(),
         LeaveAlternateScreen,
         DisableMouseCapture
-    ).or_else(|err| Err(err.to_string()))?;
+    )
+    .or_else(|err| Err(err.to_string()))?;
     terminal.show_cursor().or_else(|err| Err(err.to_string()))?;
 
     Ok(())

@@ -104,14 +104,14 @@ impl CommandDetails {
     pub fn activate_next_panel() -> Self {
         CommandDetails {
             name: "Next Panel".to_string(),
-            description: "Activate next panel".to_string()
+            description: "Activate next panel".to_string(),
         }
     }
 
     pub fn activate_previous_panel() -> Self {
         CommandDetails {
             name: "Previous Panel".to_string(),
-            description: "Activate previous panel".to_string()
+            description: "Activate previous panel".to_string(),
         }
     }
 
