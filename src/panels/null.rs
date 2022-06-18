@@ -1,17 +1,10 @@
-use crossterm::event::KeyEvent;
-use tui::layout::Rect;
-use tui::widgets::Block;
-use crate::{EditorFrame, Panel};
+use crate::Panel;
 
-pub struct NullPanel {
-    title: String
-}
+pub struct NullPanel {}
 
 impl NullPanel {
     pub fn new() -> Self {
-        NullPanel {
-            title: "".to_string()
-        }
+        NullPanel {}
     }
 }
 
