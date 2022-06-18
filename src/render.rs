@@ -16,14 +16,20 @@ pub fn render_split(split: usize, app: &AppState, frame: &mut EditorFrame, chunk
                 Direction::Vertical => chunk.height,
             };
 
-            let lengths = if split.panels.len() > 0 {
-                let part_size = total / split.panels.len() as u16;
+            let active_panels = split.panels.iter().filter(|split| match split {
+                UserSplits::Split(_) => true,
+                UserSplits::Panel(panel_index) => match app.get_panel(*panel_index) {
+                    Some((_, panel)) => panel.get_active(),
+                    None => false,
+                }
+            }).collect::<Vec<&UserSplits>>();
+
+            let lengths = if active_panels.len() > 0 {
+                let part_size = total / active_panels.len() as u16;
                 let mut remaining = total;
 
-                let mut lengths: Vec<Constraint> = split
-                    .panels
-                    .iter()
-                    .take(split.panels.len() - 1)
+                let mut lengths: Vec<Constraint> = active_panels.iter()
+                    .take(active_panels.len() - 1)
                     .map(|s| {
                         let l = match s {
                             UserSplits::Panel(index) => match app.get_panel(*index) {
@@ -57,7 +63,7 @@ pub fn render_split(split: usize, app: &AppState, frame: &mut EditorFrame, chunk
                 .split(chunk);
 
             // loop through children and render
-            for (child, chunk) in split.panels.iter().zip(chunks) {
+            for (child, chunk) in active_panels.iter().zip(chunks) {
                 match child {
                     UserSplits::Panel(panel_i) => match app.get_panel(*panel_i) {
                         None => (), // error

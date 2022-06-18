@@ -7,6 +7,7 @@ use crate::{
     catch_all, CommandDetails, Commands, ctrl_key, key, Panel, PanelSplit, PromptPanel, split,
     TextEditPanel, UserSplits,
 };
+use crate::commands::ctrl_alt_key;
 use crate::panels::NullPanel;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
@@ -374,11 +375,11 @@ impl AppState {
         }
     }
 
-    pub fn active_next_panel(&mut self, _code: KeyCode) {
+    pub fn activate_next_panel(&mut self, _code: KeyCode) {
         self.resolve_panel_change(self.next_panel_index());
     }
 
-    pub fn active_previous_panel(&mut self, _code: KeyCode) {
+    pub fn activate_previous_panel(&mut self, _code: KeyCode) {
         self.resolve_panel_change(self.previous_panel_index());
     }
 
@@ -462,6 +463,10 @@ type GlobalAction = fn(&mut AppState, KeyCode);
 pub fn global_commands() -> Result<Commands<GlobalAction>, String> {
     let mut commands = Commands::<GlobalAction>::new();
 
+    //
+    // Panel creation/deletion
+    //
+
     commands.insert(|b| {
         b.node(ctrl_key('p')).node(key('h')).action(
             CommandDetails::split_horizontal(),
@@ -477,18 +482,39 @@ pub fn global_commands() -> Result<Commands<GlobalAction>, String> {
     })?;
 
     commands.insert(|b| {
+        b.node(ctrl_key('p')).node(key('n')).action(
+            CommandDetails::add_panel(),
+            AppState::add_panel_to_active_split,
+        )
+    })?;
+
+    commands.insert(|b| {
         b.node(ctrl_key('p')).node(key('d')).action(
             CommandDetails::remove_panel(),
             AppState::delete_active_panel,
         )
     })?;
 
+    //
+    // Panel Navigation
+    //
     commands.insert(|b| {
-        b.node(ctrl_key('p')).node(key('n')).action(
-            CommandDetails::add_panel(),
-            AppState::add_panel_to_active_split,
+        b.node(ctrl_alt_key('l')).action(
+            CommandDetails::activate_next_panel(),
+            AppState::activate_next_panel,
         )
     })?;
+
+    commands.insert(|b| {
+        b.node(ctrl_alt_key('j')).action(
+            CommandDetails::activate_previous_panel(),
+            AppState::activate_previous_panel,
+        )
+    })?;
+
+    //
+    // Panel Selection
+    //
 
     commands.insert(|b| {
         b.node(ctrl_key('a').action(AppState::start_selecting_panel))
@@ -787,7 +813,7 @@ mod tests {
 
         app.set_active_panel(7);
 
-        app.active_next_panel(KeyCode::Null);
+        app.activate_next_panel(KeyCode::Null);
 
         assert_eq!(app.active_panel(), 8)
     }
@@ -816,7 +842,7 @@ mod tests {
 
         app.panels[7] = (app.panels[7].0, Box::new(NullPanel::new()));
 
-        app.active_next_panel(KeyCode::Null);
+        app.activate_next_panel(KeyCode::Null);
 
         assert_eq!(app.active_panel(), 8)
     }
@@ -843,7 +869,7 @@ mod tests {
 
         app.set_active_panel(10);
 
-        app.active_next_panel(KeyCode::Null);
+        app.activate_next_panel(KeyCode::Null);
 
         assert_eq!(app.active_panel, 1);
         assert_eq!(app.messages[0].channel, MessageChannel::ERROR)
@@ -871,7 +897,7 @@ mod tests {
 
         app.set_active_panel(7);
 
-        app.active_previous_panel(KeyCode::Null);
+        app.activate_previous_panel(KeyCode::Null);
 
         assert_eq!(app.active_panel(), 6)
     }
@@ -898,7 +924,7 @@ mod tests {
 
         app.set_active_panel(10);
 
-        app.active_previous_panel(KeyCode::Null);
+        app.activate_previous_panel(KeyCode::Null);
 
         assert_eq!(app.active_panel, 1);
         assert_eq!(app.messages[0].channel, MessageChannel::ERROR)

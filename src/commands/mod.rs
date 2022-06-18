@@ -101,6 +101,20 @@ impl CommandDetails {
         }
     }
 
+    pub fn activate_next_panel() -> Self {
+        CommandDetails {
+            name: "Next Panel".to_string(),
+            description: "Activate next panel".to_string()
+        }
+    }
+
+    pub fn activate_previous_panel() -> Self {
+        CommandDetails {
+            name: "Previous Panel".to_string(),
+            description: "Activate previous panel".to_string()
+        }
+    }
+
     pub fn select_panel() -> Self {
         CommandDetails {
             name: "Activate Panel".to_string(),
@@ -319,6 +333,14 @@ pub fn ctrl_key<T>(key: char) -> CommandKeyBuilder<T> {
     CommandKeyBuilder {
         code: KeyCode::Char(key),
         mods: KeyModifiers::CONTROL,
+        action: None,
+    }
+}
+
+pub fn ctrl_alt_key<T>(key: char) -> CommandKeyBuilder<T> {
+    CommandKeyBuilder {
+        code: KeyCode::Char(key),
+        mods: KeyModifiers::CONTROL | KeyModifiers::ALT,
         action: None,
     }
 }
