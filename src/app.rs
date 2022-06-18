@@ -6,7 +6,7 @@ use tui::layout::Direction;
 use crate::commands::ctrl_alt_key;
 use crate::panels::NullPanel;
 use crate::{
-    catch_all, ctrl_key, key, CommandDetails, Commands, Panel, PanelSplit, PromptPanel,
+    catch_all, ctrl_key, key, CommandDetails, Commands, Panel, PanelSplit, InputPanel,
     TextEditPanel, UserSplits,
 };
 
@@ -84,7 +84,7 @@ impl AppState {
         let mut text_panel = TextEditPanel::new();
         text_panel.set_id('a');
 
-        let mut prompt_panel = PromptPanel::new();
+        let mut prompt_panel = InputPanel::new();
         prompt_panel.set_id(PROMPT_PANEL_ID);
 
         self.panels = vec![(0, Box::new(prompt_panel)), (0, Box::new(text_panel))];

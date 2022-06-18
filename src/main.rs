@@ -13,7 +13,7 @@ use crate::app::{global_commands, AppState};
 use tui::{Frame, Terminal};
 
 use crate::commands::{catch_all, ctrl_key, key, CommandDetails, CommandKeyId, Commands};
-use crate::panels::{Panel, PromptPanel, TextEditPanel};
+use crate::panels::{Panel, InputPanel, TextEditPanel};
 use crate::render::render_split;
 use crate::splits::{PanelSplit, UserSplits};
 

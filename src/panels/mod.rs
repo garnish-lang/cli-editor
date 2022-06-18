@@ -4,13 +4,13 @@ use tui::widgets::Block;
 
 pub use edit::TextEditPanel;
 pub use null::NullPanel;
-pub use prompt::PromptPanel;
+pub use input::InputPanel;
 
 use crate::EditorFrame;
 
 mod edit;
 mod null;
-mod prompt;
+mod input;
 
 pub trait Panel {
     fn make_widget(&self, _frame: &mut EditorFrame, _rect: Rect, _is_active: bool, _block: Block) {}

@@ -6,7 +6,7 @@ use tui::widgets::{Block, Paragraph, Wrap};
 
 use crate::{EditorFrame, Panel};
 
-pub struct PromptPanel {
+pub struct InputPanel {
     id: char,
     min_x: u16,
     min_y: u16,
@@ -16,21 +16,21 @@ pub struct PromptPanel {
     title: String,
 }
 
-impl PromptPanel {
+impl InputPanel {
     pub fn new() -> Self {
-        PromptPanel {
+        InputPanel {
             id: '\0',
             cursor_x: 1,
             cursor_y: 1,
             min_x: 1,
             min_y: 1,
             text: String::new(),
-            title: "Prompt".to_string(),
+            title: "Input".to_string(),
         }
     }
 }
 
-impl Panel for PromptPanel {
+impl Panel for InputPanel {
     fn make_widget(&self, frame: &mut EditorFrame, rect: Rect, _is_active: bool, block: Block) {
         let para_text = Span::from(self.text.clone());
 
