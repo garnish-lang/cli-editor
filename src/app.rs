@@ -439,7 +439,13 @@ impl AppState {
                 Some(split) => {
                     for panel in &split.panels {
                         match panel {
-                            UserSplits::Panel(panel_index) => order.push(*panel_index),
+                            UserSplits::Panel(panel_index) => match self.panels.get(*panel_index) {
+                                Some((_, panel))  => match panel.get_active() {
+                                    true => order.push(*panel_index),
+                                    false => ()
+                                }
+                                None => return Err(Message::error("Child panel not found in panels."))
+                            },
                             UserSplits::Split(split_index) => nodes.push(*split_index),
                         }
                     }
@@ -499,6 +505,7 @@ mod tests {
 
     use crate::{AppState, Panel, TextEditPanel, UserSplits};
     use crate::app::{Message, MessageChannel};
+    use crate::panels::NullPanel;
 
     fn assert_is_default(app: &AppState) {
         assert_eq!(app.panels.len(), 2, "Panels not set");
@@ -779,6 +786,35 @@ mod tests {
         app.add_panel_to_active_split(KeyCode::Null);
 
         app.set_active_panel(7);
+
+        app.active_next_panel(KeyCode::Null);
+
+        assert_eq!(app.active_panel(), 8)
+    }
+
+    #[test]
+    fn activate_next_panel_skip_inactive() {
+        // 0 and 1
+        let mut app = AppState::new();
+        // 2
+        app.split_current_panel_vertical(KeyCode::Null);
+        // 3
+        app.split_current_panel_horizontal(KeyCode::Null);
+        // 4
+        app.add_panel_to_active_split(KeyCode::Null);
+        // 5
+        app.add_panel_to_active_split(KeyCode::Null);
+        app.set_active_panel(2);
+        // 6
+        app.split_current_panel_horizontal(KeyCode::Null);
+        // 7
+        app.add_panel_to_active_split(KeyCode::Null);
+        // 8
+        app.add_panel_to_active_split(KeyCode::Null);
+
+        app.set_active_panel(6);
+
+        app.panels[7] = (app.panels[7].0, Box::new(NullPanel::new()));
 
         app.active_next_panel(KeyCode::Null);
 
