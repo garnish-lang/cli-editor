@@ -349,14 +349,22 @@ impl AppState {
         self.selecting_panel = false;
         match code {
             KeyCode::Char(c) => {
-                for (index, (_, panel)) in self.panels.iter().enumerate() {
-                    if panel.get_id() == c {
+                match self.panels.iter().enumerate().find(|(index, (_, panel))| panel.get_id() == c) {
+                    None => {
+                        self.messages.push(Message::info(format!("No panel with ID '{}'", c)));
+                    }
+                    Some((index, _)) => {
                         self.set_active_panel(index);
-                        break;
+                        if self.input_request.is_some() {
+                            self.input_request = None;
+                            self.messages.push(Message::info("Canceled input request due to panel selection."))
+                        }
                     }
                 }
             }
-            _ => (), // soft error
+            _ => {
+                self.messages.push(Message::info("Invalid key for panel id. Options are letters a-z, lower or capital."));
+            }
         }
     }
 
@@ -751,6 +759,58 @@ mod tests {
         app.reset();
 
         assert_is_default(&app);
+    }
+
+    #[test]
+    fn select_panel() {
+        let mut app = AppState::new();
+        app.selecting_panel = true;
+        app.add_panel_to_active_split(KeyCode::Null);
+
+        app.select_panel(KeyCode::Char('b'));
+
+        assert_eq!(app.active_panel, 2);
+        assert!(!app.selecting_panel);
+    }
+
+    #[test]
+    fn select_panel_invalid_code() {
+        let mut app = AppState::new();
+        app.selecting_panel = true;
+        app.add_panel_to_active_split(KeyCode::Null);
+
+        app.select_panel(KeyCode::Enter);
+
+        assert_eq!(app.active_panel, 1);
+        assert_eq!(app.messages[0].channel, MessageChannel::INFO);
+    }
+
+    #[test]
+    fn select_panel_invalid_id() {
+        let mut app = AppState::new();
+        app.selecting_panel = true;
+        app.add_panel_to_active_split(KeyCode::Null);
+
+        app.select_panel(KeyCode::Char('z'));
+
+        assert_eq!(app.active_panel, 1);
+        assert_eq!(app.messages[0].channel, MessageChannel::INFO);
+    }
+
+    #[test]
+    fn select_panel_cancels_input_request() {
+        let mut app = AppState::new();
+        app.selecting_panel = true;
+        app.add_panel_to_active_split(KeyCode::Null);
+        app.input_request = Some(InputRequest {
+            prompt: "Test".to_string(),
+            requestor_id: TOP_REQUESTOR_ID
+        });
+
+        app.select_panel(KeyCode::Char('b'));
+
+        assert_eq!(app.messages[0].channel, MessageChannel::INFO);
+        assert!(app.input_request.is_none());
     }
 
     #[test]
