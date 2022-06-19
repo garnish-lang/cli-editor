@@ -101,6 +101,13 @@ impl CommandDetails {
         }
     }
 
+    pub fn change_panel_type() -> Self {
+        CommandDetails {
+            name: "Change Panel Type".to_string(),
+            description: "Change type of active panel".to_string()
+        }
+    }
+
     pub fn activate_next_panel() -> Self {
         CommandDetails {
             name: "Next Panel".to_string(),

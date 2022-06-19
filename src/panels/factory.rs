@@ -7,6 +7,7 @@ use crate::{InputPanel, Panel, TextEditPanel};
 
 pub struct PanelFactory {}
 
+#[allow(dead_code)]
 impl PanelFactory {
     pub fn options() -> Vec<&'static str> {
         vec![

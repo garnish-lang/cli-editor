@@ -29,7 +29,7 @@ fn main() -> Result<(), String> {
     enable_raw_mode().or_else(|err| Err(err.to_string()))?;
 
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)
+    execute!(stdout, EnterAlternateScreen, DisableMouseCapture)
         .or_else(|err| Err(err.to_string()))?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend).or_else(|err| Err(err.to_string()))?;

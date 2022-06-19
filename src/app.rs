@@ -288,9 +288,13 @@ impl AppState {
                                 match self.get_panel_mut(for_panel) {
                                     None => unimplemented!(),
                                     Some((_, panel)) => {
+                                        let id = panel.get_id();
                                         *panel = match PanelFactory::panel(input.as_str()) {
                                             None => unimplemented!(),
-                                            Some(p) => p,
+                                            Some(mut p) => {
+                                                p.set_id(id);
+                                                p
+                                            },
                                         }
                                     }
                                 }
@@ -579,6 +583,13 @@ impl AppState {
             prompt: "Panel Type".to_string(),
             requestor_id: TOP_REQUESTOR_ID,
         });
+        match self.get_panel_mut(0) {
+            Some((_, panel)) => {
+                panel.show();
+                panel.set_title("Panel Type".to_string());
+            }
+            None => unimplemented!(),
+        }
     }
 
     fn resolve_panel_change(&mut self, r: Result<usize, Message>) {
@@ -692,6 +703,13 @@ pub fn global_commands() -> Result<Commands<GlobalAction>, String> {
         b.node(ctrl_key('p')).node(key('d')).action(
             CommandDetails::remove_panel(),
             AppState::delete_active_panel,
+        )
+    })?;
+
+    commands.insert(|b| {
+        b.node(ctrl_key('p')).node(key('t')).action(
+            CommandDetails::change_panel_type(),
+            AppState::change_active_panel_type,
         )
     })?;
 
@@ -1404,6 +1422,7 @@ mod state_changes {
 
         app.handle_changes(vec![InputComplete(MESSAGE_PANEL_TYPE_ID.to_string())]);
 
+        assert_ne!(app.get_panel(1).unwrap().1.get_id(), '\0');
         assert_eq!(app.active_panel, 1);
         assert_eq!(app.state, State::Normal);
         assert!(app.input_request.is_none())
