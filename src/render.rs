@@ -98,8 +98,8 @@ pub fn render_split(split: usize, app: &AppState, frame: &mut EditorFrame, chunk
                         Some(lp) => {
                             let is_active = *panel_i == app.active_panel();
                             if is_active {
-                                let (x, y) = lp.panel().get_cursor(&chunk);
-                                frame.set_cursor(x, y);
+                                let (x, y) = lp.panel().get_cursor();
+                                frame.set_cursor(chunk.x + x, chunk.y + y);
                             }
 
                             let mut title = vec![];

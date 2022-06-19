@@ -115,8 +115,8 @@ impl Panel for InputPanel {
         frame.render_widget(para, rect);
     }
 
-    fn get_cursor(&self, rect: &Rect) -> (u16, u16) {
-        (rect.x + self.cursor_x, rect.y + self.cursor_y)
+    fn get_cursor(&self) -> (u16, u16) {
+        (self.cursor_x, self.cursor_y)
     }
 
     fn make_title(&self, state: &AppState) -> Vec<Span> {

@@ -335,6 +335,8 @@ impl AppState {
                         }
                     };
 
+                    self.input_request = None;
+
                     let changes = if index == TOP_REQUESTOR_ID {
                         match self.state {
                             State::WaitingPanelType(for_panel) => {
@@ -350,7 +352,6 @@ impl AppState {
 
                                 self.active_panel = for_panel;
                                 self.state = State::Normal;
-                                self.input_request = None;
                             }
                             State::Normal => unimplemented!(),
                         }
@@ -802,7 +803,7 @@ mod tests {
 
     use crate::app::{InputRequest, LayoutPanel, Message, MessageChannel, State, TOP_REQUESTOR_ID};
     use crate::panels::NullPanel;
-    use crate::{AppState, Panel, TextEditPanel, UserSplits};
+    use crate::{AppState, TextEditPanel, UserSplits};
 
     fn assert_is_default(app: &AppState) {
         assert_eq!(app.panels.len(), 2, "Panels not set");
@@ -1032,12 +1033,11 @@ mod tests {
     #[test]
     fn delete_active_panel_replaces_if_only_one_left() {
         let mut app = AppState::new();
-        let mut panel = TextEditPanel::new();
 
         app.delete_active_panel(KeyCode::Null);
 
         match app.get_active_panel() {
-            Some(lp) => assert_eq!(!lp.is_null()),
+            Some(lp) => assert!(!lp.is_null()),
             None => panic!("No active panel"),
         }
 
@@ -1300,6 +1300,7 @@ mod tests {
 #[cfg(test)]
 mod state_changes {
     use crossterm::event::KeyCode;
+    use tui::text::Span;
 
     use crate::app::StateChangeRequest::InputComplete;
     use crate::app::{
@@ -1319,8 +1320,8 @@ mod state_changes {
             "Test"
         }
 
-        fn make_title(&self, _app: &AppState) -> &str {
-            &self.actual_input
+        fn make_title(&self, _app: &AppState) -> Vec<Span> {
+            vec![Span::raw(&self.actual_input)]
         }
 
         fn receive_input(&mut self, input: String) -> Vec<StateChangeRequest> {
@@ -1391,8 +1392,8 @@ mod state_changes {
             "Test Input".to_string(),
         )]);
 
+        assert!(state.input_request.is_none());
         assert_eq!(state.active_panel, 1);
-        assert_eq!(state.panels[1].panel.make_title(), "Test Input".to_string());
     }
 
     #[test]
@@ -1410,6 +1411,7 @@ mod state_changes {
             "Test Input".to_string(),
         )]);
 
+        assert!(state.input_request.is_none());
         assert_eq!(state.messages[0].channel, MessageChannel::ERROR)
     }
 
@@ -1432,6 +1434,7 @@ mod state_changes {
             "Test Input".to_string(),
         )]);
 
+        assert!(state.input_request.is_none());
         assert_eq!(state.messages[0].channel, MessageChannel::ERROR)
     }
 

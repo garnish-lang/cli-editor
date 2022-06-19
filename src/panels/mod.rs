@@ -30,7 +30,7 @@ pub trait Panel {
         _block: Block,
     ) {
     }
-    fn get_cursor(&self, _rect: &Rect) -> (u16, u16) {
+    fn get_cursor(&self) -> (u16, u16) {
         (0, 0)
     }
     fn make_title(&self, _state: &AppState) -> Vec<Span> {
