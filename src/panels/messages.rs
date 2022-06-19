@@ -53,7 +53,7 @@ impl Panel for MessagesPanel {
         frame.render_widget(para, rect);
     }
 
-    fn get_title(&self) -> &str {
-        "Messages"
+    fn make_title(&self, _state: &AppState) -> Vec<Span> {
+        vec![Span::raw("Messages")]
     }
 }

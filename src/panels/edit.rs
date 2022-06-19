@@ -1,16 +1,19 @@
-use std::fs;
 use std::env;
+use std::fs;
 use std::io::Read;
 use std::path::PathBuf;
+
 use crossterm::event::{KeyCode, KeyEvent};
 use tui::layout::{Alignment, Rect};
 use tui::style::{Color, Style};
-use tui::text::Text;
+use tui::text::{Span, Text};
 use tui::widgets::{Block, Paragraph, Wrap};
 
-use crate::{AppState, catch_all, CommandDetails, CommandKeyId, Commands, ctrl_key, EditorFrame, Panel};
 use crate::app::StateChangeRequest;
 use crate::commands::shift_catch_all;
+use crate::{
+    catch_all, ctrl_key, AppState, CommandDetails, CommandKeyId, Commands, EditorFrame, Panel,
+};
 
 pub const EDIT_PANEL_TYPE_ID: &str = "Edit";
 
@@ -36,7 +39,7 @@ impl TextEditPanel {
             text: String::new(),
             title: "Buffer".to_string(),
             commands: Commands::<EditCommand>::new(),
-            file_path: PathBuf::new()
+            file_path: PathBuf::new(),
         }
     }
 
@@ -96,7 +99,10 @@ impl TextEditPanel {
     }
 
     fn open_file(&mut self, _code: KeyCode) -> (bool, Vec<StateChangeRequest>) {
-        (false, vec![StateChangeRequest::input_request("File Name".to_string())])
+        (
+            false,
+            vec![StateChangeRequest::input_request("File Name".to_string())],
+        )
     }
 
     fn set_cursor_to_end(&mut self) {
@@ -125,11 +131,18 @@ impl Panel for TextEditPanel {
     fn init(&mut self, state: &mut AppState) {
         match make_commands() {
             Ok(commands) => self.commands = commands,
-            Err(e) => state.add_error(e)
+            Err(e) => state.add_error(e),
         }
     }
 
-    fn make_widget(&self, _state: &AppState, frame: &mut EditorFrame, rect: Rect, _is_active: bool, block: Block) {
+    fn make_widget(
+        &self,
+        _state: &AppState,
+        frame: &mut EditorFrame,
+        rect: Rect,
+        _is_active: bool,
+        block: Block,
+    ) {
         let para_text = Text::from(self.text.clone());
         let para = Paragraph::new(para_text)
             .block(block)
@@ -144,16 +157,14 @@ impl Panel for TextEditPanel {
         (rect.x + self.cursor_x, rect.y + self.cursor_y)
     }
 
-    fn get_title(&self) -> &str {
-        &self.title
-    }
-
-    fn set_title(&mut self, title: String) {
-        self.title = title
+    fn make_title(&self, _state: &AppState) -> Vec<Span> {
+        vec![Span::raw(self.title.clone())]
     }
 
     fn receive_key(&mut self, event: KeyEvent) -> (bool, Vec<StateChangeRequest>) {
-        let (end, action) = self.commands.advance(CommandKeyId::new(event.code, event.modifiers));
+        let (end, action) = self
+            .commands
+            .advance(CommandKeyId::new(event.code, event.modifiers));
 
         if end {
             self.commands.reset();
@@ -161,7 +172,7 @@ impl Panel for TextEditPanel {
 
         match action {
             Some(a) => a(self, event.code),
-            None => (!end, vec![])
+            None => (!end, vec![]),
         }
     }
 
@@ -172,7 +183,7 @@ impl Panel for TextEditPanel {
             Err(e) => {
                 changes.push(StateChangeRequest::error(e));
                 return changes;
-            },
+            }
             Ok(p) => p,
         };
 
@@ -192,8 +203,8 @@ impl Panel for TextEditPanel {
                                 Err(e) => {
                                     changes.push(StateChangeRequest::error(e));
                                     self.file_path.to_string_lossy().to_string()
-                                },
-                                Ok(p) => p.as_os_str().to_string_lossy().to_string()
+                                }
+                                Ok(p) => p.as_os_str().to_string_lossy().to_string(),
                             }
                         } else {
                             self.file_path.to_string_lossy().to_string()
@@ -215,15 +226,18 @@ pub fn make_commands() -> Result<Commands<EditCommand>, String> {
     let mut commands = Commands::<EditCommand>::new();
 
     commands.insert(|b| {
-        b.node(catch_all()).action(CommandDetails::empty(), TextEditPanel::handle_key_stroke)
+        b.node(catch_all())
+            .action(CommandDetails::empty(), TextEditPanel::handle_key_stroke)
     })?;
 
     commands.insert(|b| {
-        b.node(shift_catch_all()).action(CommandDetails::empty(), TextEditPanel::handle_key_stroke)
+        b.node(shift_catch_all())
+            .action(CommandDetails::empty(), TextEditPanel::handle_key_stroke)
     })?;
 
     commands.insert(|b| {
-        b.node(ctrl_key('o')).action(CommandDetails::open_file(), TextEditPanel::open_file)
+        b.node(ctrl_key('o'))
+            .action(CommandDetails::open_file(), TextEditPanel::open_file)
     })?;
 
     Ok(commands)

@@ -3,8 +3,8 @@ use tui::style::{Color, Modifier, Style};
 use tui::text::{Span, Spans};
 use tui::widgets::{Block, Borders};
 
-use crate::splits::UserSplits;
 use crate::{AppState, EditorFrame};
+use crate::splits::UserSplits;
 
 pub fn render_split(split: usize, app: &AppState, frame: &mut EditorFrame, chunk: Rect) {
     match app.get_split(split) {
@@ -102,29 +102,24 @@ pub fn render_split(split: usize, app: &AppState, frame: &mut EditorFrame, chunk
                                 frame.set_cursor(x, y);
                             }
 
-                            // if selecting, display id on top right side
-                            let title = match app.selecting_panel() {
-                                true => Spans::from(vec![
+                            let mut title = vec![];
+
+                            if app.selecting_panel() {
+                                title.push(
                                     Span::styled(
                                         format!(" {} ", lp.id()),
                                         Style::default()
                                             .fg(Color::Green)
                                             .bg(Color::White)
                                             .add_modifier(Modifier::BOLD),
-                                    ),
-                                    Span::styled(
-                                        lp.panel().get_title(),
-                                        Style::default().fg(Color::White),
-                                    ),
-                                ]),
-                                false => Spans::from(vec![Span::styled(
-                                    lp.panel().get_title(),
-                                    Style::default().fg(Color::White),
-                                )]),
-                            };
+                                    )
+                                );
+                            }
+
+                            title.extend(lp.panel().make_title(&app));
 
                             let block = Block::default()
-                                .title(title)
+                                .title(Spans::from(title))
                                 .borders(Borders::ALL)
                                 .border_style(Style::default().fg(match is_active {
                                     true => Color::Green,

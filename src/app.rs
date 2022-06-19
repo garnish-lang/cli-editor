@@ -79,9 +79,15 @@ impl StateChangeRequest {
 const TOP_REQUESTOR_ID: usize = usize::MAX;
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
-struct InputRequest {
+pub struct InputRequest {
     prompt: String,
     requestor_id: usize,
+}
+
+impl InputRequest {
+    pub fn prompt(&self) -> &String {
+        &self.prompt
+    }
 }
 
 pub struct LayoutPanel {
@@ -246,6 +252,10 @@ impl AppState {
         &self.messages
     }
 
+    pub fn input_request(&self) -> Option<&InputRequest> {
+        self.input_request.as_ref()
+    }
+
     pub fn first_available_id(&mut self) -> char {
         let mut current = HashSet::new();
 
@@ -309,7 +319,6 @@ impl AppState {
                     match self.get_panel_mut(0) {
                         Some(lp) => {
                             lp.panel.show();
-                            lp.panel.set_title(prompt.clone());
                         }
                         None => unimplemented!(),
                     }
@@ -631,7 +640,6 @@ impl AppState {
         match self.get_panel_mut(0) {
             Some(lp) => {
                 lp.panel.show();
-                lp.panel.set_title("Panel Type".to_string());
             }
             None => unimplemented!(),
         }
@@ -1025,12 +1033,11 @@ mod tests {
     fn delete_active_panel_replaces_if_only_one_left() {
         let mut app = AppState::new();
         let mut panel = TextEditPanel::new();
-        panel.set_title("Temp".to_string());
 
         app.delete_active_panel(KeyCode::Null);
 
         match app.get_active_panel() {
-            Some(lp) => assert_eq!(lp.panel.get_title().clone(), "Buffer".to_string()),
+            Some(lp) => assert_eq!(!lp.is_null()),
             None => panic!("No active panel"),
         }
 
@@ -1312,7 +1319,7 @@ mod state_changes {
             "Test"
         }
 
-        fn get_title(&self) -> &str {
+        fn make_title(&self, _app: &AppState) -> &str {
             &self.actual_input
         }
 
@@ -1385,7 +1392,7 @@ mod state_changes {
         )]);
 
         assert_eq!(state.active_panel, 1);
-        assert_eq!(state.panels[1].panel.get_title(), "Test Input".to_string());
+        assert_eq!(state.panels[1].panel.make_title(), "Test Input".to_string());
     }
 
     #[test]

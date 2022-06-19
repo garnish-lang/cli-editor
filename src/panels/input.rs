@@ -16,7 +16,6 @@ pub struct InputPanel {
     cursor_x: u16,
     cursor_y: u16,
     text: String,
-    title: String,
     commands: Commands<InputCommand>,
     length: u16,
     visible: bool,
@@ -30,7 +29,6 @@ impl InputPanel {
             min_x: 1,
             min_y: 1,
             text: String::new(),
-            title: "".to_string(),
             commands: Commands::<InputCommand>::new(),
             length: 3,
             visible: false
@@ -121,12 +119,13 @@ impl Panel for InputPanel {
         (rect.x + self.cursor_x, rect.y + self.cursor_y)
     }
 
-    fn get_title(&self) -> &str {
-        &self.title
-    }
-
-    fn set_title(&mut self, title: String) {
-        self.title = title
+    fn make_title(&self, state: &AppState) -> Vec<Span> {
+        match state.input_request() {
+            Some(request) => {
+                vec![Span::raw(request.prompt().clone())]
+            }
+            None => vec![]
+        }
     }
 
     fn get_length(&self) -> u16 {

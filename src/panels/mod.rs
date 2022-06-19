@@ -1,33 +1,41 @@
 use crossterm::event::KeyEvent;
 use tui::layout::Rect;
+use tui::text::Span;
 use tui::widgets::Block;
 
 pub use edit::TextEditPanel;
-pub use input::InputPanel;
-pub use null::NullPanel;
-pub use messages::MessagesPanel;
 pub use factory::*;
+pub use input::InputPanel;
+pub use messages::MessagesPanel;
+pub use null::NullPanel;
 
 use crate::app::StateChangeRequest;
 use crate::{AppState, EditorFrame};
 
 mod edit;
-mod input;
-mod null;
-mod messages;
 mod factory;
+mod input;
+mod messages;
+mod null;
 
 pub trait Panel {
     fn type_id(&self) -> &str;
     fn init(&mut self, _state: &mut AppState) {}
-    fn make_widget(&self, _state: &AppState, _frame: &mut EditorFrame, _rect: Rect, _is_active: bool, _block: Block) {}
+    fn make_widget(
+        &self,
+        _state: &AppState,
+        _frame: &mut EditorFrame,
+        _rect: Rect,
+        _is_active: bool,
+        _block: Block,
+    ) {
+    }
     fn get_cursor(&self, _rect: &Rect) -> (u16, u16) {
         (0, 0)
     }
-    fn get_title(&self) -> &str {
-        ""
+    fn make_title(&self, _state: &AppState) -> Vec<Span> {
+        vec![]
     }
-    fn set_title(&mut self, _title: String) {}
     fn get_length(&self) -> u16 {
         0
     }
