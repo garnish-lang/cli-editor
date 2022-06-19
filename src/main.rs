@@ -22,6 +22,7 @@ mod commands;
 mod panels;
 mod render;
 mod splits;
+mod autocomplete;
 
 pub type EditorFrame<'a> = Frame<'a, CrosstermBackend<Stdout>>;
 
