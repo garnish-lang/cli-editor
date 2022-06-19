@@ -853,11 +853,11 @@ mod tests {
         app.delete_active_panel(KeyCode::Null);
 
         match app.get_active_panel() {
-            Some((_, panel)) => assert_eq!(panel.get_title().clone(), "Editor".to_string()),
+            Some((_, panel)) => assert_eq!(panel.get_title().clone(), "Buffer".to_string()),
             None => panic!("No active panel"),
         }
 
-        assert_eq!(app.panels.len(), 3);
+        assert_eq!(app.panels.len(), 2);
         assert_eq!(app.splits.len(), 1);
     }
 
@@ -1113,8 +1113,11 @@ mod tests {
 
 #[cfg(test)]
 mod state_changes {
+    use crossterm::event::KeyEvent;
+    use tui::layout::Rect;
+    use tui::widgets::Block;
     use crate::app::{InputRequest, MessageChannel, StateChangeRequest};
-    use crate::{AppState, Panel};
+    use crate::{AppState, EditorFrame, Panel};
 
     #[allow(dead_code)]
     struct TestPanel {
@@ -1123,6 +1126,10 @@ mod state_changes {
     }
 
     impl Panel for TestPanel {
+        fn type_id(&self) -> &str {
+            "Test"
+        }
+
         fn get_title(&self) -> &str {
             &self.actual_input
         }
