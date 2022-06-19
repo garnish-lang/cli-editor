@@ -6,6 +6,7 @@ pub use edit::TextEditPanel;
 pub use input::InputPanel;
 pub use null::NullPanel;
 pub use messages::MessagesPanel;
+pub use factory::*;
 
 use crate::app::StateChangeRequest;
 use crate::{AppState, EditorFrame};

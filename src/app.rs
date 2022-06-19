@@ -4,7 +4,7 @@ use crossterm::event::KeyCode;
 use tui::layout::Direction;
 
 use crate::commands::ctrl_alt_key;
-use crate::panels::NullPanel;
+use crate::panels::{NullPanel, PanelFactory};
 use crate::{
     catch_all, ctrl_key, key, CommandDetails, Commands, InputPanel, Panel, PanelSplit,
     TextEditPanel, UserSplits,
@@ -48,6 +48,12 @@ impl Message {
     }
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+enum State {
+    Normal,
+    WaitingPanelType(usize),
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub enum StateChangeRequest {
     // String - prompt to display for input
@@ -70,6 +76,8 @@ impl StateChangeRequest {
     }
 }
 
+const TOP_REQUESTOR_ID: usize = usize::MAX;
+
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
 struct InputRequest {
     prompt: String,
@@ -84,6 +92,7 @@ pub struct AppState {
     static_panels: Vec<char>,
     messages: Vec<Message>,
     input_request: Option<InputRequest>,
+    state: State,
 }
 
 const PROMPT_PANEL_ID: char = '$';
@@ -98,6 +107,7 @@ impl AppState {
             static_panels: vec![],
             messages: vec![],
             input_request: None,
+            state: State::Normal,
         };
 
         app.reset();
@@ -270,16 +280,41 @@ impl AppState {
                         }
                     };
 
-                    let changes = match self.get_panel_mut(index) {
-                        Some((_, panel)) => panel.receive_input(input),
-                        None => {
-                            self.messages
-                                .push(Message::error("Requesting panel doesn't exist."));
-                            return;
-                        }
-                    };
+                    let changes = if index == TOP_REQUESTOR_ID {
+                        match self.state {
+                            State::WaitingPanelType(for_panel) => {
+                                match self.get_panel_mut(for_panel) {
+                                    None => unimplemented!(),
+                                    Some((_, panel)) => {
+                                        *panel = match PanelFactory::panel(input.as_str()) {
+                                            None => unimplemented!(),
+                                            Some(p) => p,
+                                        }
+                                    }
+                                }
 
-                    self.active_panel = index;
+                                self.active_panel = for_panel;
+                                self.state = State::Normal;
+                                self.input_request = None;
+                            }
+                            State::Normal => unimplemented!()
+                        }
+
+                        vec![]
+                    } else {
+                        let changes = match self.get_panel_mut(index) {
+                            Some((_, panel)) => panel.receive_input(input),
+                            None => {
+                                self.messages
+                                    .push(Message::error("Requesting panel doesn't exist."));
+                                return;
+                            }
+                        };
+
+                        self.active_panel = index;
+
+                        changes
+                    };
 
                     match self.get_panel_mut(0) {
                         Some((_, panel)) => {
@@ -527,6 +562,15 @@ impl AppState {
         self.resolve_panel_change(self.previous_panel_index());
     }
 
+    pub fn change_active_panel_type(&mut self, _code: KeyCode) {
+        self.state = State::WaitingPanelType(self.active_panel);
+        self.active_panel = 0;
+        self.input_request = Some(InputRequest {
+            prompt: "Panel Type".to_string(),
+            requestor_id: TOP_REQUESTOR_ID,
+        });
+    }
+
     fn resolve_panel_change(&mut self, r: Result<usize, Message>) {
         match r {
             Ok(next) => self.active_panel = next,
@@ -675,9 +719,10 @@ pub fn global_commands() -> Result<Commands<GlobalAction>, String> {
 mod tests {
     use crossterm::event::KeyCode;
 
-    use crate::app::{Message, MessageChannel};
-    use crate::panels::NullPanel;
+    use crate::app::{InputRequest, Message, MessageChannel, State, TOP_REQUESTOR_ID};
+    use crate::panels::{MESSAGE_PANEL_TYPE_ID, NullPanel};
     use crate::{AppState, Panel, TextEditPanel, UserSplits};
+    use crate::app::StateChangeRequest::InputComplete;
 
     fn assert_is_default(app: &AppState) {
         assert_eq!(app.panels.len(), 2, "Panels not set");
@@ -1108,6 +1153,39 @@ mod tests {
         app.split_current_panel_horizontal(KeyCode::Null);
 
         assert!(app.panels[1].1.get_active());
+    }
+
+    #[test]
+    fn change_panel_type() {
+        let mut app = AppState::new();
+
+        app.change_active_panel_type(KeyCode::Null);
+
+        assert_eq!(app.active_panel, 0);
+        assert_eq!(app.state, State::WaitingPanelType(1));
+        assert_eq!(app.input_request, Some(InputRequest {
+            prompt: "Panel Type".to_string(),
+            requestor_id: TOP_REQUESTOR_ID
+        }))
+    }
+
+    #[test]
+    fn change_panel_type_complete() {
+        let mut app = AppState::new();
+        app.active_panel = 0;
+        app.state = State::WaitingPanelType(1);
+        app.input_request = Some(InputRequest {
+            prompt: "Panel Type".to_string(),
+            requestor_id: TOP_REQUESTOR_ID
+        });
+
+        app.handle_changes(vec![
+            InputComplete(MESSAGE_PANEL_TYPE_ID.to_string())
+        ]);
+
+        assert_eq!(app.active_panel, 1);
+        assert_eq!(app.state, State::Normal);
+        assert!(app.input_request.is_none())
     }
 }
 
