@@ -15,7 +15,6 @@ use crate::commands::shift_catch_all;
 pub const EDIT_PANEL_TYPE_ID: &str = "Edit";
 
 pub struct TextEditPanel {
-    id: char,
     min_x: u16,
     min_y: u16,
     cursor_x: u16,
@@ -30,7 +29,6 @@ pub struct TextEditPanel {
 impl TextEditPanel {
     pub fn new() -> Self {
         TextEditPanel {
-            id: '\0',
             cursor_x: 1,
             cursor_y: 1,
             min_x: 1,
@@ -152,14 +150,6 @@ impl Panel for TextEditPanel {
 
     fn set_title(&mut self, title: String) {
         self.title = title
-    }
-
-    fn get_id(&self) -> char {
-        self.id
-    }
-
-    fn set_id(&mut self, id: char) {
-        self.id = id;
     }
 
     fn receive_key(&mut self, event: KeyEvent) -> (bool, Vec<StateChangeRequest>) {

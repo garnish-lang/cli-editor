@@ -31,10 +31,6 @@ pub trait Panel {
     fn get_length(&self) -> u16 {
         0
     }
-    fn get_id(&self) -> char {
-        '\0'
-    }
-    fn set_id(&mut self, _id: char) {}
     fn receive_key(&mut self, _event: KeyEvent) -> (bool, Vec<StateChangeRequest>) {
         (false, vec![])
     }

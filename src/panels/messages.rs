@@ -9,12 +9,11 @@ use crate::{AppState, EditorFrame, Panel};
 pub const MESSAGE_PANEL_TYPE_ID: &str = "Messages";
 
 pub struct MessagesPanel {
-    id: char,
 }
 
 impl MessagesPanel {
     pub fn new() -> Self {
-        MessagesPanel { id: '\0' }
+        MessagesPanel { }
     }
 }
 
@@ -56,13 +55,5 @@ impl Panel for MessagesPanel {
 
     fn get_title(&self) -> &str {
         "Messages"
-    }
-
-    fn set_id(&mut self, id: char) {
-        self.id = id
-    }
-
-    fn get_id(&self) -> char {
-        self.id
     }
 }

@@ -31,7 +31,7 @@ impl AppState {
                 return;
             }
             Some(lp) => {
-                let r = (lp.split(), lp.panel().get_id());
+                let r = (lp.split(), lp.id());
                 lp.set_split(new_split_index);
                 r
             }

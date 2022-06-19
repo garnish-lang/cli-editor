@@ -11,7 +11,6 @@ use crate::commands::shift_catch_all;
 pub const INPUT_PANEL_TYPE_ID: &str = "Input";
 
 pub struct InputPanel {
-    id: char,
     min_x: u16,
     min_y: u16,
     cursor_x: u16,
@@ -26,7 +25,6 @@ pub struct InputPanel {
 impl InputPanel {
     pub fn new() -> Self {
         InputPanel {
-            id: '\0',
             cursor_x: 1,
             cursor_y: 1,
             min_x: 1,
@@ -133,14 +131,6 @@ impl Panel for InputPanel {
 
     fn get_length(&self) -> u16 {
         self.length
-    }
-
-    fn get_id(&self) -> char {
-        self.id
-    }
-
-    fn set_id(&mut self, id: char) {
-        self.id = id;
     }
 
     fn receive_key(&mut self, event: KeyEvent) -> (bool, Vec<StateChangeRequest>) {

@@ -106,7 +106,7 @@ pub fn render_split(split: usize, app: &AppState, frame: &mut EditorFrame, chunk
                             let title = match app.selecting_panel() {
                                 true => Spans::from(vec![
                                     Span::styled(
-                                        format!(" {} ", lp.panel().get_id()),
+                                        format!(" {} ", lp.id()),
                                         Style::default()
                                             .fg(Color::Green)
                                             .bg(Color::White)
