@@ -34,10 +34,6 @@ pub trait Panel {
     fn receive_key(&mut self, _event: KeyEvent) -> (bool, Vec<StateChangeRequest>) {
         (false, vec![])
     }
-    fn set_active(&mut self) {}
-    fn get_active(&self) -> bool {
-        true
-    }
     fn receive_input(&mut self, _input: String) -> Vec<StateChangeRequest> {
         vec![]
     }

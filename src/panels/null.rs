@@ -15,10 +15,6 @@ impl Panel for NullPanel {
         NULL_PANEL_TYPE_ID
     }
 
-    fn get_active(&self) -> bool {
-        false
-    }
-
     fn visible(&self) -> bool {
         false
     }

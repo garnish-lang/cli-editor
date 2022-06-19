@@ -4,7 +4,7 @@ use crossterm::event::KeyCode;
 use tui::layout::Direction;
 
 use crate::commands::ctrl_alt_key;
-use crate::panels::{NullPanel, PanelFactory};
+use crate::panels::{NULL_PANEL_TYPE_ID, NullPanel, PanelFactory};
 use crate::{
     catch_all, ctrl_key, key, CommandDetails, Commands, InputPanel, Panel, PanelSplit,
     TextEditPanel, UserSplits,
@@ -117,6 +117,14 @@ impl LayoutPanel {
 
     pub fn set_split(&mut self, split: usize) {
         self.split_index = split;
+    }
+
+    pub fn visible(&self) -> bool {
+        self.panel.visible() && !self.is_null()
+    }
+
+    pub fn is_null(&self) -> bool {
+        self.panel.type_id() == NULL_PANEL_TYPE_ID
     }
 }
 
@@ -263,7 +271,7 @@ impl AppState {
         for lp in self
             .panels
             .iter_mut()
-            .filter(|lp| lp.panel.visible() && lp.panel.get_active())
+            .filter(|lp| lp.visible())
         {
             changes.extend(lp.panel.update());
         }
@@ -449,7 +457,7 @@ impl AppState {
             .panels
             .iter_mut()
             .enumerate()
-            .find(|(_, lp)| !lp.panel.get_active())
+            .find(|(_, lp)| lp.is_null())
         {
             Some((i, v)) => {
                 v.split_index = split;
@@ -574,7 +582,7 @@ impl AppState {
         let active_count = self
             .panels
             .iter()
-            .filter(|lp| lp.panel.get_active())
+            .filter(|lp| !lp.is_null())
             .count();
 
         // if this is last panel besides static panels
@@ -690,9 +698,9 @@ impl AppState {
                 for child in split.panels.iter() {
                     match child {
                         UserSplits::Panel(panel_index) => match self.panels.get(*panel_index) {
-                            Some(lp) => match lp.panel.get_active() {
-                                true => order.push(*panel_index),
-                                false => (),
+                            Some(lp) => match lp.is_null() {
+                                true => (),
+                                false => order.push(*panel_index),
                             },
                             None => return Err(Message::error("Child panel not found in panels.")),
                         },
@@ -1010,7 +1018,7 @@ mod tests {
         assert_eq!(app.panels.len(), 3);
         assert_eq!(app.splits.len(), 2);
 
-        assert!(!app.panels[2].panel().get_active());
+        assert!(app.panels[2].is_null());
     }
 
     #[test]
@@ -1258,11 +1266,11 @@ mod tests {
 
         app.delete_active_panel(KeyCode::Null);
 
-        assert!(!app.panels[1].panel.get_active());
+        assert!(app.panels[1].is_null());
 
         app.add_panel_to_active_split(KeyCode::Null);
 
-        assert!(app.panels[1].panel.get_active());
+        assert!(!app.panels[1].is_null());
     }
 
     #[test]
@@ -1274,11 +1282,11 @@ mod tests {
 
         app.delete_active_panel(KeyCode::Null);
 
-        assert!(!app.panels[1].panel.get_active());
+        assert!(app.panels[1].is_null());
 
         app.split_current_panel_horizontal(KeyCode::Null);
 
-        assert!(app.panels[1].panel.get_active());
+        assert!(!app.panels[1].is_null());
     }
 }
 
