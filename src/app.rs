@@ -9,6 +9,7 @@ use crate::{
     catch_all, ctrl_key, key, CommandDetails, Commands, InputPanel, Panel, PanelSplit,
     TextEditPanel, UserSplits,
 };
+use crate::autocomplete::{AutoCompleter, PanelAutoCompleter};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub enum MessageChannel {
@@ -54,17 +55,16 @@ enum State {
     WaitingPanelType(usize),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub enum StateChangeRequest {
     // String - prompt to display for input
-    Input(String),
+    Input(String, Option<Box<dyn AutoCompleter>>),
     InputComplete(String),
     Message(Message),
 }
 
 impl StateChangeRequest {
     pub fn input_request(prompt: String) -> StateChangeRequest {
-        StateChangeRequest::Input(prompt)
+        StateChangeRequest::Input(prompt, None)
     }
 
     pub fn input_complete(text: String) -> StateChangeRequest {
@@ -78,15 +78,19 @@ impl StateChangeRequest {
 
 const TOP_REQUESTOR_ID: usize = usize::MAX;
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct InputRequest {
     prompt: String,
+    auto_completer: Option<Box<dyn AutoCompleter>>,
     requestor_id: usize,
 }
 
 impl InputRequest {
     pub fn prompt(&self) -> &String {
         &self.prompt
+    }
+
+    pub fn completer(&self) -> Option<&Box<dyn AutoCompleter>> {
+        self.auto_completer.as_ref()
     }
 }
 
@@ -301,7 +305,7 @@ impl AppState {
 
         for change in changes {
             let additional_changes = match change {
-                StateChangeRequest::Input(prompt) => {
+                StateChangeRequest::Input(prompt, completer) => {
                     // only one input request at a time, override existing
                     if self.static_panels.contains(&active_panel_id) {
                         self.messages
@@ -311,6 +315,7 @@ impl AppState {
 
                     self.input_request = Some(InputRequest {
                         prompt: prompt.clone(),
+                        auto_completer: completer,
                         requestor_id: self.active_panel,
                     });
 
@@ -637,6 +642,7 @@ impl AppState {
         self.input_request = Some(InputRequest {
             prompt: "Panel Type".to_string(),
             requestor_id: TOP_REQUESTOR_ID,
+            auto_completer: Some(Box::new(PanelAutoCompleter::new()))
         });
         match self.get_panel_mut(0) {
             Some(lp) => {
@@ -824,6 +830,7 @@ mod tests {
         app.input_request = Some(InputRequest {
             prompt: "Prompt".to_string(),
             requestor_id: TOP_REQUESTOR_ID,
+            auto_completer: None
         });
         app.state = State::WaitingPanelType(1);
         app.set_selecting_panel(true);
@@ -877,6 +884,7 @@ mod tests {
         app.input_request = Some(InputRequest {
             prompt: "Test".to_string(),
             requestor_id: TOP_REQUESTOR_ID,
+            auto_completer: None
         });
 
         app.select_panel(KeyCode::Char('b'));
@@ -1338,13 +1346,10 @@ mod state_changes {
             "Test Input".to_string(),
         )]);
 
-        assert_eq!(
-            state.input_request,
-            Some(InputRequest {
-                prompt: "Test Input".to_string(),
-                requestor_id: 1
-            })
-        );
+        let request = state.input_request().unwrap();
+        assert_eq!(request.prompt, "Test Input".to_string());
+        assert_eq!(request.requestor_id, 1);
+        assert!(request.auto_completer.is_none());
         assert_eq!(state.active_panel, 0);
     }
 
@@ -1378,6 +1383,7 @@ mod state_changes {
         state.input_request = Some(InputRequest {
             prompt: "Test Input".to_string(),
             requestor_id: 1,
+            auto_completer: None
         });
         state.active_panel = 0;
 
@@ -1421,6 +1427,7 @@ mod state_changes {
         state.input_request = Some(InputRequest {
             prompt: "Test Input".to_string(),
             requestor_id: 10,
+            auto_completer: None
         });
 
         let panel = TestPanel {
@@ -1455,13 +1462,11 @@ mod state_changes {
 
         assert_eq!(app.active_panel, 0);
         assert_eq!(app.state, State::WaitingPanelType(1));
-        assert_eq!(
-            app.input_request,
-            Some(InputRequest {
-                prompt: "Panel Type".to_string(),
-                requestor_id: TOP_REQUESTOR_ID
-            })
-        )
+
+        let request = app.input_request().unwrap();
+        assert_eq!(request.prompt, "Panel Type".to_string());
+        assert_eq!(request.requestor_id, TOP_REQUESTOR_ID);
+        assert!(request.auto_completer.is_some());
     }
 
     #[test]
@@ -1472,6 +1477,7 @@ mod state_changes {
         app.input_request = Some(InputRequest {
             prompt: "Panel Type".to_string(),
             requestor_id: TOP_REQUESTOR_ID,
+            auto_completer: None
         });
 
         app.handle_changes(vec![InputComplete(MESSAGE_PANEL_TYPE_ID.to_string())]);

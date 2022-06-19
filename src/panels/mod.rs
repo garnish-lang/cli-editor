@@ -36,7 +36,7 @@ pub trait Panel {
     fn make_title(&self, _state: &AppState) -> Vec<Span> {
         vec![]
     }
-    fn get_length(&self) -> u16 {
+    fn get_length(&self, _state: &AppState) -> u16 {
         0
     }
     fn receive_key(&mut self, _event: KeyEvent) -> (bool, Vec<StateChangeRequest>) {

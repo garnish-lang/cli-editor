@@ -21,6 +21,14 @@ impl AutoCompleter for PanelAutoCompleter {
 mod tests {
     use crate::autocomplete::AutoCompleter;
     use crate::autocomplete::panels::PanelAutoCompleter;
+    use crate::panels::PanelFactory;
+
+    #[test]
+    fn empty_input_returns_all() {
+        let completer = PanelAutoCompleter::new();
+
+        assert_eq!(completer.get_options(""), PanelFactory::options());
+    }
 
     #[test]
     fn finds_match() {

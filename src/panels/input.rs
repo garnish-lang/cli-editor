@@ -1,8 +1,8 @@
 use crossterm::event::{KeyCode, KeyEvent};
-use tui::layout::{Alignment, Rect};
+use tui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Style};
-use tui::text::{Span};
-use tui::widgets::{Block, Paragraph, Wrap};
+use tui::text::Span;
+use tui::widgets::{Block, Paragraph};
 
 use crate::{AppState, catch_all, CommandDetails, CommandKeyId, Commands, EditorFrame, Panel};
 use crate::app::StateChangeRequest;
@@ -17,7 +17,6 @@ pub struct InputPanel {
     cursor_y: u16,
     text: String,
     commands: Commands<InputCommand>,
-    length: u16,
     visible: bool,
 }
 
@@ -30,8 +29,7 @@ impl InputPanel {
             min_y: 1,
             text: String::new(),
             commands: Commands::<InputCommand>::new(),
-            length: 3,
-            visible: false
+            visible: false,
         }
     }
 
@@ -99,20 +97,56 @@ impl Panel for InputPanel {
     fn init(&mut self, state: &mut AppState) {
         match make_commands() {
             Ok(commands) => self.commands = commands,
-            Err(e) => state.add_error(e)
+            Err(e) => state.add_error(e),
         }
     }
 
-    fn make_widget(&self, _state: &AppState, frame: &mut EditorFrame, rect: Rect, _is_active: bool, block: Block) {
+    fn make_widget(
+        &self,
+        state: &AppState,
+        frame: &mut EditorFrame,
+        rect: Rect,
+        _is_active: bool,
+        block: Block,
+    ) {
+        let inner_block = block.inner(rect);
+
         let para_text = Span::from(self.text.clone());
-
         let para = Paragraph::new(para_text)
-            .block(block)
             .style(Style::default().fg(Color::White).bg(Color::Black))
-            .alignment(Alignment::Left)
-            .wrap(Wrap { trim: true });
+            .alignment(Alignment::Left);
 
-        frame.render_widget(para, rect);
+        let divider = Paragraph::new(Span::from("-".repeat(inner_block.width as usize)))
+            .alignment(Alignment::Center);
+
+        let (complete_text, has_completer) = match state.input_request().and_then(|r| r.completer()) {
+            Some(completer) => (completer.get_options(self.text.as_str()).join(" | "), true),
+            None => (String::new(), false),
+        };
+
+        let complete_para = Paragraph::new(complete_text)
+            .style(Style::default().fg(Color::White).bg(Color::Black))
+            .alignment(Alignment::Left);
+
+        let paras = if has_completer {
+            vec![
+                para,
+                divider,
+                complete_para
+            ]
+        } else {
+            vec![para]
+        };
+
+        let layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(paras.iter().map(|_| Constraint::Length(1)).collect::<Vec<Constraint>>())
+            .split(inner_block);
+
+        frame.render_widget(block, rect);
+        for (i, p) in paras.iter().enumerate() {
+            frame.render_widget(p.clone(), layout[i])
+        }
     }
 
     fn get_cursor(&self) -> (u16, u16) {
@@ -124,16 +158,24 @@ impl Panel for InputPanel {
             Some(request) => {
                 vec![Span::raw(request.prompt().clone())]
             }
-            None => vec![]
+            None => vec![],
         }
     }
 
-    fn get_length(&self) -> u16 {
-        self.length
+    fn get_length(&self, state: &AppState) -> u16 {
+        match state.input_request() {
+            Some(request) => match request.completer() {
+                Some(_) => 5,
+                None => 3,
+            },
+            None => 3,
+        }
     }
 
     fn receive_key(&mut self, event: KeyEvent) -> (bool, Vec<StateChangeRequest>) {
-        let (end, action) = self.commands.advance(CommandKeyId::new(event.code, event.modifiers));
+        let (end, action) = self
+            .commands
+            .advance(CommandKeyId::new(event.code, event.modifiers));
 
         if end {
             self.commands.reset();
@@ -141,7 +183,7 @@ impl Panel for InputPanel {
 
         match action {
             Some(a) => a(self, event.code),
-            None => (!end, vec![])
+            None => (!end, vec![]),
         }
     }
 
@@ -164,11 +206,13 @@ pub fn make_commands() -> Result<Commands<InputCommand>, String> {
     let mut commands = Commands::<InputCommand>::new();
 
     commands.insert(|b| {
-        b.node(catch_all()).action(CommandDetails::empty(), InputPanel::handle_key_stroke)
+        b.node(catch_all())
+            .action(CommandDetails::empty(), InputPanel::handle_key_stroke)
     })?;
 
     commands.insert(|b| {
-        b.node(shift_catch_all()).action(CommandDetails::empty(), InputPanel::handle_key_stroke)
+        b.node(shift_catch_all())
+            .action(CommandDetails::empty(), InputPanel::handle_key_stroke)
     })?;
 
     Ok(commands)

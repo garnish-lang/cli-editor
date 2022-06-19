@@ -34,7 +34,7 @@ pub fn render_split(split: usize, app: &AppState, frame: &mut EditorFrame, chunk
                     .map(|split| match split {
                         UserSplits::Split(_) => (0, 0),
                         UserSplits::Panel(panel_index) => match app.get_panel(*panel_index) {
-                            Some(lp) => match lp.panel().get_length() {
+                            Some(lp) => match lp.panel().get_length(app) {
                                 0 => (0, 0),
                                 n => (1, n),
                             },
@@ -62,10 +62,10 @@ pub fn render_split(split: usize, app: &AppState, frame: &mut EditorFrame, chunk
                         let l = match s {
                             UserSplits::Panel(index) => match app.get_panel(*index) {
                                 Some(lp) => {
-                                    if lp.panel().get_length() == 0 {
+                                    if lp.panel().get_length(app) == 0 {
                                         part_size
                                     } else {
-                                        lp.panel().get_length()
+                                        lp.panel().get_length(app)
                                     }
                                 }
                                 None => part_size,

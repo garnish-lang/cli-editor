@@ -1,9 +1,8 @@
 pub use crate::panels::edit::EDIT_PANEL_TYPE_ID;
-pub use crate::panels::input::INPUT_PANEL_TYPE_ID;
 pub use crate::panels::messages::MESSAGE_PANEL_TYPE_ID;
 pub use crate::panels::null::NULL_PANEL_TYPE_ID;
 use crate::panels::{MessagesPanel, NullPanel};
-use crate::{InputPanel, Panel, TextEditPanel};
+use crate::{Panel, TextEditPanel};
 
 pub struct PanelFactory {}
 
@@ -13,7 +12,6 @@ impl PanelFactory {
         vec![
             NULL_PANEL_TYPE_ID,
             EDIT_PANEL_TYPE_ID,
-            INPUT_PANEL_TYPE_ID,
             MESSAGE_PANEL_TYPE_ID,
         ]
     }
@@ -22,7 +20,6 @@ impl PanelFactory {
         match type_id {
             NULL_PANEL_TYPE_ID => Some(Box::new(NullPanel::new())),
             EDIT_PANEL_TYPE_ID => Some(Box::new(TextEditPanel::new())),
-            INPUT_PANEL_TYPE_ID => Some(Box::new(InputPanel::new())),
             MESSAGE_PANEL_TYPE_ID => Some(Box::new(MessagesPanel::new())),
             _ => None,
         }
@@ -33,7 +30,6 @@ impl PanelFactory {
 mod tests {
     use crate::panels::edit::EDIT_PANEL_TYPE_ID;
     use crate::panels::factory::PanelFactory;
-    use crate::panels::input::INPUT_PANEL_TYPE_ID;
     use crate::panels::messages::MESSAGE_PANEL_TYPE_ID;
     use crate::panels::null::NULL_PANEL_TYPE_ID;
 
@@ -44,7 +40,6 @@ mod tests {
             vec![
                 NULL_PANEL_TYPE_ID,
                 EDIT_PANEL_TYPE_ID,
-                INPUT_PANEL_TYPE_ID,
                 MESSAGE_PANEL_TYPE_ID,
             ]
         )
@@ -68,14 +63,6 @@ mod tests {
         assert_eq!(
             PanelFactory::panel(EDIT_PANEL_TYPE_ID).unwrap().type_id(),
             EDIT_PANEL_TYPE_ID
-        );
-    }
-
-    #[test]
-    fn create_input_boxed() {
-        assert_eq!(
-            PanelFactory::panel(INPUT_PANEL_TYPE_ID).unwrap().type_id(),
-            INPUT_PANEL_TYPE_ID
         );
     }
 
