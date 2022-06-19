@@ -38,6 +38,8 @@ fn main() -> Result<(), String> {
     let mut global_commands = global_commands()?;
 
     loop {
+        app_state.update();
+
         terminal
             .draw(|frame| render_split(0, &app_state, frame, frame.size()))
             .or_else(|err| Err(err.to_string()))?;

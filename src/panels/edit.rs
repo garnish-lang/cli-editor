@@ -1,4 +1,7 @@
 use std::fs;
+use std::env;
+use std::io::Read;
+use std::path::PathBuf;
 use crossterm::event::{KeyCode, KeyEvent};
 use tui::layout::{Alignment, Rect};
 use tui::style::{Color, Style};
@@ -17,7 +20,8 @@ pub struct TextEditPanel {
     cursor_y: u16,
     text: String,
     title: String,
-    commands: Commands<EditCommand>
+    commands: Commands<EditCommand>,
+    file_path: PathBuf,
 }
 
 #[allow(dead_code)]
@@ -31,7 +35,8 @@ impl TextEditPanel {
             min_y: 1,
             text: String::new(),
             title: "Buffer".to_string(),
-            commands: Commands::<EditCommand>::new()
+            commands: Commands::<EditCommand>::new(),
+            file_path: PathBuf::new()
         }
     }
 
@@ -167,10 +172,40 @@ impl Panel for TextEditPanel {
     fn receive_input(&mut self, input: String) -> Vec<StateChangeRequest> {
         let mut changes = vec![];
 
-        match fs::read_to_string(input) {
+        let current_dir = match env::current_dir() {
+            Err(e) => {
+                changes.push(StateChangeRequest::error(e));
+                return changes;
+            },
+            Ok(p) => p,
+        };
+
+        self.file_path = (&current_dir).clone();
+        self.file_path.push(input);
+
+        match fs::File::open(&self.file_path) {
             Err(e) => changes.push(StateChangeRequest::error(e)),
-            Ok(text) => self.text = text
-        }
+            Ok(mut file) => {
+                let mut s = String::new();
+                match file.read_to_string(&mut s) {
+                    Err(e) => changes.push(StateChangeRequest::error(e)),
+                    Ok(_) => {
+                        self.text = s;
+                        self.title = if self.file_path.starts_with(&current_dir) {
+                            match self.file_path.strip_prefix(&current_dir) {
+                                Err(e) => {
+                                    changes.push(StateChangeRequest::error(e));
+                                    self.file_path.to_string_lossy().to_string()
+                                },
+                                Ok(p) => p.as_os_str().to_string_lossy().to_string()
+                            }
+                        } else {
+                            self.file_path.to_string_lossy().to_string()
+                        }
+                    }
+                }
+            }
+        };
 
         self.set_cursor_to_end();
 

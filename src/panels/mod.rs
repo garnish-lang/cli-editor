@@ -45,4 +45,7 @@ pub trait Panel {
     fn visible(&self) -> bool {
         true
     }
+    fn update(&mut self) -> Vec<StateChangeRequest> {
+        vec![]
+    }
 }
