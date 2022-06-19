@@ -16,6 +16,7 @@ mod null;
 mod messages;
 
 pub trait Panel {
+    fn type_id(&self) -> &str;
     fn init(&mut self, _state: &mut AppState) {}
     fn make_widget(&self, _state: &AppState, _frame: &mut EditorFrame, _rect: Rect, _is_active: bool, _block: Block) {}
     fn get_cursor(&self, _rect: &Rect) -> (u16, u16) {

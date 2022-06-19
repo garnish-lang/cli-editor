@@ -8,6 +8,8 @@ use crate::{AppState, catch_all, CommandDetails, CommandKeyId, Commands, EditorF
 use crate::app::StateChangeRequest;
 use crate::commands::shift_catch_all;
 
+const INPUT_PANEL_TYPE_ID: &str = "Input";
+
 pub struct InputPanel {
     id: char,
     min_x: u16,
@@ -94,6 +96,10 @@ impl InputPanel {
 }
 
 impl Panel for InputPanel {
+    fn type_id(&self) -> &str {
+        INPUT_PANEL_TYPE_ID
+    }
+
     fn init(&mut self, state: &mut AppState) {
         match make_commands() {
             Ok(commands) => self.commands = commands,

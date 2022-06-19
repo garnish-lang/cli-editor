@@ -12,6 +12,8 @@ use crate::{AppState, catch_all, CommandDetails, CommandKeyId, Commands, ctrl_ke
 use crate::app::StateChangeRequest;
 use crate::commands::shift_catch_all;
 
+const EDIT_PANEL_TYPE_ID: &str = "Edit";
+
 pub struct TextEditPanel {
     id: char,
     min_x: u16,
@@ -118,6 +120,10 @@ impl TextEditPanel {
 }
 
 impl Panel for TextEditPanel {
+    fn type_id(&self) -> &str {
+        EDIT_PANEL_TYPE_ID
+    }
+
     fn init(&mut self, state: &mut AppState) {
         match make_commands() {
             Ok(commands) => self.commands = commands,
