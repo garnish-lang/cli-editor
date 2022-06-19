@@ -141,7 +141,9 @@ impl AppState {
         self.panels = vec![(0, Box::new(prompt_panel)), (0, Box::new(text_panel))];
         self.active_panel = 1;
         self.selecting_panel = false;
-        self.static_panels = vec![PROMPT_PANEL_ID]
+        self.static_panels = vec![PROMPT_PANEL_ID];
+        self.state = State::Normal;
+        self.input_request = None;
     }
 
     pub fn static_panels(&self) -> &Vec<char> {
@@ -719,7 +721,7 @@ pub fn global_commands() -> Result<Commands<GlobalAction>, String> {
 mod tests {
     use crossterm::event::KeyCode;
 
-    use crate::app::{Message, MessageChannel};
+    use crate::app::{InputRequest, Message, MessageChannel, State, TOP_REQUESTOR_ID};
     use crate::panels::NullPanel;
     use crate::{AppState, Panel, TextEditPanel, UserSplits};
 
@@ -729,6 +731,8 @@ mod tests {
         assert_eq!(app.active_panel, 1, "Active panel not set");
         assert_eq!(app.selecting_panel, false, "Selecting panel not set");
         assert_eq!(app.static_panels, vec!['$'], "Static panels not set");
+        assert_eq!(app.state, State::Normal);
+        assert!(app.input_request.is_none());
     }
 
     #[test]
@@ -737,6 +741,11 @@ mod tests {
         app.split_current_panel_horizontal(KeyCode::Null);
         app.split_current_panel_horizontal(KeyCode::Null);
         app.split_current_panel_horizontal(KeyCode::Null);
+        app.input_request = Some(InputRequest {
+            prompt: "Prompt".to_string(),
+            requestor_id: TOP_REQUESTOR_ID,
+        });
+        app.state = State::WaitingPanelType(1);
         app.set_selecting_panel(true);
 
         app.reset();
