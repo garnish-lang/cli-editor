@@ -12,7 +12,7 @@ use crate::{AppState, catch_all, CommandDetails, CommandKeyId, Commands, ctrl_ke
 use crate::app::StateChangeRequest;
 use crate::commands::shift_catch_all;
 
-const EDIT_PANEL_TYPE_ID: &str = "Edit";
+pub const EDIT_PANEL_TYPE_ID: &str = "Edit";
 
 pub struct TextEditPanel {
     id: char,

@@ -14,6 +14,7 @@ mod edit;
 mod input;
 mod null;
 mod messages;
+mod factory;
 
 pub trait Panel {
     fn type_id(&self) -> &str;

@@ -8,7 +8,7 @@ use crate::{AppState, catch_all, CommandDetails, CommandKeyId, Commands, EditorF
 use crate::app::StateChangeRequest;
 use crate::commands::shift_catch_all;
 
-const INPUT_PANEL_TYPE_ID: &str = "Input";
+pub const INPUT_PANEL_TYPE_ID: &str = "Input";
 
 pub struct InputPanel {
     id: char,

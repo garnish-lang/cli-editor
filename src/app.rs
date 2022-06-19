@@ -1113,11 +1113,8 @@ mod tests {
 
 #[cfg(test)]
 mod state_changes {
-    use crossterm::event::KeyEvent;
-    use tui::layout::Rect;
-    use tui::widgets::Block;
     use crate::app::{InputRequest, MessageChannel, StateChangeRequest};
-    use crate::{AppState, EditorFrame, Panel};
+    use crate::{AppState, Panel};
 
     #[allow(dead_code)]
     struct TestPanel {

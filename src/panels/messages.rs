@@ -6,7 +6,7 @@ use tui::widgets::{Block, Paragraph, Wrap};
 use crate::app::MessageChannel;
 use crate::{AppState, EditorFrame, Panel};
 
-const MESSAGE_PANEL_TYPE_ID: &str = "Messages";
+pub const MESSAGE_PANEL_TYPE_ID: &str = "Messages";
 
 pub struct MessagesPanel {}
 
