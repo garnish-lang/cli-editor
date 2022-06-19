@@ -1,11 +1,9 @@
-use std::process::id;
-use crossterm::event::KeyEvent;
 use tui::layout::{Alignment, Rect};
 use tui::style::{Color, Style};
 use tui::text::{Span, Spans};
 use tui::widgets::{Block, Paragraph, Wrap};
 
-use crate::app::{MessageChannel, StateChangeRequest};
+use crate::app::MessageChannel;
 use crate::{AppState, EditorFrame, Panel};
 
 pub const MESSAGE_PANEL_TYPE_ID: &str = "Messages";

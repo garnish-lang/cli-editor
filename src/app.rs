@@ -294,7 +294,7 @@ impl AppState {
                                             Some(mut p) => {
                                                 p.set_id(id);
                                                 p
-                                            },
+                                            }
                                         }
                                     }
                                 }
@@ -353,21 +353,31 @@ impl AppState {
         self.selecting_panel = false;
         match code {
             KeyCode::Char(c) => {
-                match self.panels.iter().enumerate().find(|(index, (_, panel))| panel.get_id() == c) {
+                match self
+                    .panels
+                    .iter()
+                    .enumerate()
+                    .find(|(_, (_, panel))| panel.get_id() == c)
+                {
                     None => {
-                        self.messages.push(Message::info(format!("No panel with ID '{}'", c)));
+                        self.messages
+                            .push(Message::info(format!("No panel with ID '{}'", c)));
                     }
                     Some((index, _)) => {
                         self.set_active_panel(index);
                         if self.input_request.is_some() {
                             self.input_request = None;
-                            self.messages.push(Message::info("Canceled input request due to panel selection."))
+                            self.messages.push(Message::info(
+                                "Canceled input request due to panel selection.",
+                            ))
                         }
                     }
                 }
             }
             _ => {
-                self.messages.push(Message::info("Invalid key for panel id. Options are letters a-z, lower or capital."));
+                self.messages.push(Message::info(
+                    "Invalid key for panel id. Options are letters a-z, lower or capital.",
+                ));
             }
         }
     }
@@ -822,7 +832,7 @@ mod tests {
         app.add_panel_to_active_split(KeyCode::Null);
         app.input_request = Some(InputRequest {
             prompt: "Test".to_string(),
-            requestor_id: TOP_REQUESTOR_ID
+            requestor_id: TOP_REQUESTOR_ID,
         });
 
         app.select_panel(KeyCode::Char('b'));

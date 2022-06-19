@@ -1,7 +1,7 @@
 use std::io;
 use std::io::Stdout;
 
-use crossterm::event::{read, DisableMouseCapture, EnableMouseCapture, Event, KeyCode};
+use crossterm::event::{read, DisableMouseCapture, Event, KeyCode};
 use crossterm::execute;
 use crossterm::style::Print;
 use crossterm::terminal::{
