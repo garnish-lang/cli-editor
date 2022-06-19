@@ -125,7 +125,7 @@ impl Panel for TextEditPanel {
         }
     }
 
-    fn make_widget(&self, frame: &mut EditorFrame, rect: Rect, _is_active: bool, block: Block) {
+    fn make_widget(&self, _state: &AppState, frame: &mut EditorFrame, rect: Rect, _is_active: bool, block: Block) {
         let para_text = Text::from(self.text.clone());
         let para = Paragraph::new(para_text)
             .block(block)

@@ -38,6 +38,14 @@ impl Message {
             text: text.to_string(),
         }
     }
+
+    pub fn channel(&self) -> MessageChannel {
+        self.channel
+    }
+
+    pub fn text(&self) -> &String {
+        &self.text
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
@@ -176,6 +184,10 @@ impl AppState {
 
     pub fn set_selecting_panel(&mut self, selecting: bool) {
         self.selecting_panel = selecting;
+    }
+
+    pub fn get_messages(&self) -> &Vec<Message> {
+        &self.messages
     }
 
     pub fn first_available_id(&mut self) -> char {

@@ -5,6 +5,7 @@ use tui::widgets::Block;
 pub use edit::TextEditPanel;
 pub use input::InputPanel;
 pub use null::NullPanel;
+pub use messages::MessagesPanel;
 
 use crate::app::StateChangeRequest;
 use crate::{AppState, EditorFrame};
@@ -12,10 +13,11 @@ use crate::{AppState, EditorFrame};
 mod edit;
 mod input;
 mod null;
+mod messages;
 
 pub trait Panel {
     fn init(&mut self, _state: &mut AppState) {}
-    fn make_widget(&self, _frame: &mut EditorFrame, _rect: Rect, _is_active: bool, _block: Block) {}
+    fn make_widget(&self, _state: &AppState, _frame: &mut EditorFrame, _rect: Rect, _is_active: bool, _block: Block) {}
     fn get_cursor(&self, _rect: &Rect) -> (u16, u16) {
         (0, 0)
     }

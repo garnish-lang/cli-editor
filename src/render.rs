@@ -131,7 +131,7 @@ pub fn render_split(split: usize, app: &AppState, frame: &mut EditorFrame, chunk
                                     false => Color::White,
                                 }));
 
-                            panel.make_widget(frame, chunk, is_active, block);
+                            panel.make_widget(app, frame, chunk, is_active, block);
                         }
                     },
                     UserSplits::Split(split_index) => {
