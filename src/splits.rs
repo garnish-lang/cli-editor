@@ -30,9 +30,9 @@ impl AppState {
                 self.reset();
                 return;
             }
-            Some((split_i, active_panel)) => {
-                let r = (*split_i, active_panel.get_id());
-                *split_i = new_split_index;
+            Some(lp) => {
+                let r = (lp.split(), lp.panel().get_id());
+                lp.set_split(new_split_index);
                 r
             }
         };

@@ -22,7 +22,7 @@ pub fn render_split(split: usize, app: &AppState, frame: &mut EditorFrame, chunk
                 .filter(|split| match split {
                     UserSplits::Split(_) => true,
                     UserSplits::Panel(panel_index) => match app.get_panel(*panel_index) {
-                        Some((_, panel)) => panel.get_active() && panel.visible(),
+                        Some(lp) => lp.panel().get_active() && lp.panel().visible(),
                         None => false,
                     },
                 })
@@ -34,7 +34,7 @@ pub fn render_split(split: usize, app: &AppState, frame: &mut EditorFrame, chunk
                     .map(|split| match split {
                         UserSplits::Split(_) => (0, 0),
                         UserSplits::Panel(panel_index) => match app.get_panel(*panel_index) {
-                            Some((_, panel)) => match panel.get_length() {
+                            Some(lp) => match lp.panel().get_length() {
                                 0 => (0, 0),
                                 n => (1, n),
                             },
@@ -61,11 +61,11 @@ pub fn render_split(split: usize, app: &AppState, frame: &mut EditorFrame, chunk
                     .map(|s| {
                         let l = match s {
                             UserSplits::Panel(index) => match app.get_panel(*index) {
-                                Some((_, panel)) => {
-                                    if panel.get_length() == 0 {
+                                Some(lp) => {
+                                    if lp.panel().get_length() == 0 {
                                         part_size
                                     } else {
-                                        panel.get_length()
+                                        lp.panel().get_length()
                                     }
                                 }
                                 None => part_size,
@@ -95,10 +95,10 @@ pub fn render_split(split: usize, app: &AppState, frame: &mut EditorFrame, chunk
                 match child {
                     UserSplits::Panel(panel_i) => match app.get_panel(*panel_i) {
                         None => (), // error
-                        Some((_, panel)) => {
+                        Some(lp) => {
                             let is_active = *panel_i == app.active_panel();
                             if is_active {
-                                let (x, y) = panel.get_cursor(&chunk);
+                                let (x, y) = lp.panel().get_cursor(&chunk);
                                 frame.set_cursor(x, y);
                             }
 
@@ -106,19 +106,19 @@ pub fn render_split(split: usize, app: &AppState, frame: &mut EditorFrame, chunk
                             let title = match app.selecting_panel() {
                                 true => Spans::from(vec![
                                     Span::styled(
-                                        format!(" {} ", panel.get_id()),
+                                        format!(" {} ", lp.panel().get_id()),
                                         Style::default()
                                             .fg(Color::Green)
                                             .bg(Color::White)
                                             .add_modifier(Modifier::BOLD),
                                     ),
                                     Span::styled(
-                                        panel.get_title(),
+                                        lp.panel().get_title(),
                                         Style::default().fg(Color::White),
                                     ),
                                 ]),
                                 false => Spans::from(vec![Span::styled(
-                                    panel.get_title(),
+                                    lp.panel().get_title(),
                                     Style::default().fg(Color::White),
                                 )]),
                             };
@@ -131,7 +131,7 @@ pub fn render_split(split: usize, app: &AppState, frame: &mut EditorFrame, chunk
                                     false => Color::White,
                                 }));
 
-                            panel.make_widget(app, frame, chunk, is_active, block);
+                            lp.panel().make_widget(app, frame, chunk, is_active, block);
                         }
                     },
                     UserSplits::Split(split_index) => {

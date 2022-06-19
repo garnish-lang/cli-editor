@@ -84,8 +84,44 @@ struct InputRequest {
     requestor_id: usize,
 }
 
+pub struct LayoutPanel {
+    split_index: usize,
+    id: char,
+    panel: Box<dyn Panel>,
+}
+
+impl LayoutPanel {
+    fn new(split_index: usize, id: char, panel: Box<dyn Panel>) -> Self {
+        Self {
+            split_index,
+            id,
+            panel,
+        }
+    }
+
+    pub fn panel(&self) -> &Box<dyn Panel> {
+        &self.panel
+    }
+
+    pub fn panel_mut(&mut self) -> &mut Box<dyn Panel> {
+        &mut self.panel
+    }
+
+    pub fn id(&self) -> char {
+        self.id
+    }
+
+    pub fn split(&self) -> usize {
+        self.split_index
+    }
+
+    pub fn set_split(&mut self, split: usize) {
+        self.split_index = split;
+    }
+}
+
 pub struct AppState {
-    panels: Vec<(usize, Box<dyn Panel>)>,
+    panels: Vec<LayoutPanel>,
     splits: Vec<PanelSplit>,
     active_panel: usize,
     selecting_panel: bool,
@@ -138,7 +174,10 @@ impl AppState {
         text_panel.init(self);
         prompt_panel.init(self);
 
-        self.panels = vec![(0, Box::new(prompt_panel)), (0, Box::new(text_panel))];
+        self.panels = vec![
+            LayoutPanel::new(0, '$', Box::new(prompt_panel)),
+            LayoutPanel::new(0, 'a', Box::new(text_panel)),
+        ];
         self.active_panel = 1;
         self.selecting_panel = false;
         self.static_panels = vec![PROMPT_PANEL_ID];
@@ -158,11 +197,11 @@ impl AppState {
         self.active_panel = index;
     }
 
-    pub fn get_active_panel(&mut self) -> Option<&(usize, Box<dyn Panel>)> {
+    pub fn get_active_panel(&mut self) -> Option<&LayoutPanel> {
         self.get_panel(self.active_panel)
     }
 
-    pub fn get_active_panel_mut(&mut self) -> Option<&mut (usize, Box<dyn Panel>)> {
+    pub fn get_active_panel_mut(&mut self) -> Option<&mut LayoutPanel> {
         self.get_panel_mut(self.active_panel)
     }
 
@@ -182,11 +221,11 @@ impl AppState {
         self.splits.push(split)
     }
 
-    pub fn get_panel(&self, index: usize) -> Option<&(usize, Box<dyn Panel>)> {
+    pub fn get_panel(&self, index: usize) -> Option<&LayoutPanel> {
         self.panels.get(index)
     }
 
-    pub fn get_panel_mut(&mut self, index: usize) -> Option<&mut (usize, Box<dyn Panel>)> {
+    pub fn get_panel_mut(&mut self, index: usize) -> Option<&mut LayoutPanel> {
         self.panels.get_mut(index)
     }
 
@@ -205,8 +244,8 @@ impl AppState {
     pub fn first_available_id(&mut self) -> char {
         let mut current = HashSet::new();
 
-        for (_, panel) in self.panels.iter() {
-            current.insert(panel.get_id());
+        for lp in self.panels.iter() {
+            current.insert(lp.panel.get_id());
         }
 
         let options = ('a'..'z').chain('A'..'Z');
@@ -224,12 +263,12 @@ impl AppState {
 
     pub fn update(&mut self) {
         let mut changes = vec![];
-        for (_, p) in self
+        for lp in self
             .panels
             .iter_mut()
-            .filter(|(_, p)| p.visible() && p.get_active())
+            .filter(|lp| lp.panel.visible() && lp.panel.get_active())
         {
-            changes.extend(p.update());
+            changes.extend(lp.panel.update());
         }
 
         self.handle_changes(changes);
@@ -237,7 +276,7 @@ impl AppState {
 
     pub fn handle_changes(&mut self, changes: Vec<StateChangeRequest>) {
         let active_panel_id = match self.get_active_panel() {
-            Some((_, panel)) => panel.get_id(),
+            Some(lp) => lp.panel.get_id(),
             None => {
                 self.messages
                     .push(Message::error("No active panel for change request."));
@@ -263,9 +302,9 @@ impl AppState {
                     self.active_panel = 0;
 
                     match self.get_panel_mut(0) {
-                        Some((_, panel)) => {
-                            panel.show();
-                            panel.set_title(prompt.clone());
+                        Some(lp) => {
+                            lp.panel.show();
+                            lp.panel.set_title(prompt.clone());
                         }
                         None => unimplemented!(),
                     }
@@ -287,9 +326,9 @@ impl AppState {
                             State::WaitingPanelType(for_panel) => {
                                 match self.get_panel_mut(for_panel) {
                                     None => unimplemented!(),
-                                    Some((_, panel)) => {
-                                        let id = panel.get_id();
-                                        *panel = match PanelFactory::panel(input.as_str()) {
+                                    Some(lp) => {
+                                        let id = lp.panel.get_id();
+                                        lp.panel = match PanelFactory::panel(input.as_str()) {
                                             None => unimplemented!(),
                                             Some(mut p) => {
                                                 p.set_id(id);
@@ -309,7 +348,7 @@ impl AppState {
                         vec![]
                     } else {
                         let changes = match self.get_panel_mut(index) {
-                            Some((_, panel)) => panel.receive_input(input),
+                            Some(lp) => lp.panel.receive_input(input),
                             None => {
                                 self.messages
                                     .push(Message::error("Requesting panel doesn't exist."));
@@ -323,8 +362,8 @@ impl AppState {
                     };
 
                     match self.get_panel_mut(0) {
-                        Some((_, panel)) => {
-                            panel.hide();
+                        Some(lp) => {
+                            lp.panel.hide();
                         }
                         None => unimplemented!(),
                     }
@@ -357,7 +396,7 @@ impl AppState {
                     .panels
                     .iter()
                     .enumerate()
-                    .find(|(_, (_, panel))| panel.get_id() == c)
+                    .find(|(_, lp)| lp.panel.get_id() == c)
                 {
                     None => {
                         self.messages
@@ -394,7 +433,7 @@ impl AppState {
 
     pub fn add_panel_to_active_split(&mut self, _code: KeyCode) {
         let active_split = match self.get_active_panel() {
-            Some((s, _)) => *s,
+            Some(lp) => lp.split_index,
             None => {
                 self.add_error("No active panel. Setting to be last panel.");
                 self.active_panel = 1;
@@ -424,16 +463,16 @@ impl AppState {
             .panels
             .iter_mut()
             .enumerate()
-            .find(|(_, (_, panel))| !panel.get_active())
+            .find(|(_, lp)| !lp.panel.get_active())
         {
             Some((i, v)) => {
-                v.0 = split;
-                v.1 = new_panel;
+                v.split_index = split;
+                v.panel = new_panel;
                 i
             }
             // if there are no inactive panels, create new slot
             None => {
-                self.panels.push((split, new_panel));
+                self.panels.push(LayoutPanel::new(split, new_id, new_panel));
                 self.panels.len() - 1
             }
         }
@@ -453,8 +492,8 @@ impl AppState {
                         .push(Message::error("No active panel. Setting to be last panel."));
                     return;
                 }
-                (Ok(next), Some((split_i, active_panel))) => {
-                    (next, *split_i, active_panel.get_id())
+                (Ok(next), Some(lp)) => {
+                    (next, lp.split_index, lp.panel.get_id())
                 }
             };
 
@@ -546,9 +585,9 @@ impl AppState {
         }
 
         // verified that it exists from first check getting active panel
-        self.panels[active_panel_index] = (0, Box::new(NullPanel::new()));
+        self.panels[active_panel_index] = LayoutPanel::new(0, '\0', Box::new(NullPanel::new()));
 
-        let active_count = self.panels.iter().filter(|(_, p)| p.get_active()).count();
+        let active_count = self.panels.iter().filter(|lp| lp.panel.get_active()).count();
 
         // if this is last panel besides static panels
         // we will replace it
@@ -594,9 +633,9 @@ impl AppState {
             requestor_id: TOP_REQUESTOR_ID,
         });
         match self.get_panel_mut(0) {
-            Some((_, panel)) => {
-                panel.show();
-                panel.set_title("Panel Type".to_string());
+            Some(lp) => {
+                lp.panel.show();
+                lp.panel.set_title("Panel Type".to_string());
             }
             None => unimplemented!(),
         }
@@ -663,7 +702,7 @@ impl AppState {
                 for child in split.panels.iter() {
                     match child {
                         UserSplits::Panel(panel_index) => match self.panels.get(*panel_index) {
-                            Some((_, panel)) => match panel.get_active() {
+                            Some(lp) => match lp.panel.get_active() {
                                 true => order.push(*panel_index),
                                 false => (),
                             },
@@ -757,7 +796,7 @@ pub fn global_commands() -> Result<Commands<GlobalAction>, String> {
 mod tests {
     use crossterm::event::KeyCode;
 
-    use crate::app::{InputRequest, Message, MessageChannel, State, TOP_REQUESTOR_ID};
+    use crate::app::{InputRequest, LayoutPanel, Message, MessageChannel, State, TOP_REQUESTOR_ID};
     use crate::panels::NullPanel;
     use crate::{AppState, Panel, TextEditPanel, UserSplits};
 
@@ -859,10 +898,10 @@ mod tests {
             ]
         );
 
-        assert_eq!(app.panels[1].0, 0);
-        assert_eq!(app.panels[2].0, 0);
+        assert_eq!(app.panels[1].split_index, 0);
+        assert_eq!(app.panels[2].split_index, 0);
 
-        assert_eq!(app.panels[2].1.get_id(), 'b')
+        assert_eq!(app.panels[2].panel.get_id(), 'b')
     }
 
     #[test]
@@ -878,7 +917,8 @@ mod tests {
     #[test]
     fn add_panel_to_active_split_no_active_split() {
         let mut app = AppState::new();
-        app.panels.push((10, Box::new(TextEditPanel::new())));
+        app.panels
+            .push(LayoutPanel::new(10, 'b', Box::new(TextEditPanel::new())));
         app.active_panel = 2;
 
         app.add_panel_to_active_split(KeyCode::Null);
@@ -900,8 +940,8 @@ mod tests {
             vec![UserSplits::Panel(1), UserSplits::Panel(2)]
         );
 
-        assert_eq!(app.panels[1].0, 1);
-        assert_eq!(app.panels[2].0, 1);
+        assert_eq!(app.panels[1].split_index, 1);
+        assert_eq!(app.panels[2].split_index, 1);
     }
 
     #[test]
@@ -929,7 +969,8 @@ mod tests {
     #[test]
     fn split_active_panel_split_non_existent_logs_message() {
         let mut app = AppState::new();
-        app.panels.push((10, Box::new(TextEditPanel::new())));
+        app.panels
+            .push(LayoutPanel::new(10, 'b', Box::new(TextEditPanel::new())));
         app.active_panel = 2;
 
         app.split_current_panel_horizontal(KeyCode::Null);
@@ -981,7 +1022,7 @@ mod tests {
         assert_eq!(app.panels.len(), 3);
         assert_eq!(app.splits.len(), 2);
 
-        assert!(!app.panels[2].1.get_active());
+        assert!(!app.panels[2].panel().get_active());
     }
 
     #[test]
@@ -994,7 +1035,7 @@ mod tests {
         app.delete_active_panel(KeyCode::Null);
 
         match app.get_active_panel() {
-            Some((_, panel)) => assert_eq!(panel.get_title().clone(), "Buffer".to_string()),
+            Some(lp) => assert_eq!(lp.panel.get_title().clone(), "Buffer".to_string()),
             None => panic!("No active panel"),
         }
 
@@ -1038,7 +1079,8 @@ mod tests {
     #[test]
     fn delete_panel_with_invalid_split_logs_message() {
         let mut app = AppState::new();
-        app.panels.push((10, Box::new(TextEditPanel::new())));
+        app.panels
+            .push(LayoutPanel::new(10, 'b', Box::new(TextEditPanel::new())));
         app.active_panel = 2;
 
         app.delete_active_panel(KeyCode::Null);
@@ -1129,7 +1171,7 @@ mod tests {
 
         app.set_active_panel(6);
 
-        app.panels[7] = (app.panels[7].0, Box::new(NullPanel::new()));
+        app.panels[7] = LayoutPanel::new(app.panels[7].split_index, '\0', Box::new(NullPanel::new()));
 
         app.activate_next_panel(KeyCode::Null);
 
@@ -1228,11 +1270,11 @@ mod tests {
 
         app.delete_active_panel(KeyCode::Null);
 
-        assert!(!app.panels[1].1.get_active());
+        assert!(!app.panels[1].panel.get_active());
 
         app.add_panel_to_active_split(KeyCode::Null);
 
-        assert!(app.panels[1].1.get_active());
+        assert!(app.panels[1].panel.get_active());
     }
 
     #[test]
@@ -1244,11 +1286,11 @@ mod tests {
 
         app.delete_active_panel(KeyCode::Null);
 
-        assert!(!app.panels[1].1.get_active());
+        assert!(!app.panels[1].panel.get_active());
 
         app.split_current_panel_horizontal(KeyCode::Null);
 
-        assert!(app.panels[1].1.get_active());
+        assert!(app.panels[1].panel.get_active());
     }
 }
 
@@ -1257,7 +1299,7 @@ mod state_changes {
     use crossterm::event::KeyCode;
 
     use crate::app::StateChangeRequest::InputComplete;
-    use crate::app::{InputRequest, MessageChannel, State, StateChangeRequest, TOP_REQUESTOR_ID};
+    use crate::app::{InputRequest, LayoutPanel, MessageChannel, State, StateChangeRequest, TOP_REQUESTOR_ID};
     use crate::panels::MESSAGE_PANEL_TYPE_ID;
     use crate::{AppState, Panel};
 
@@ -1340,14 +1382,14 @@ mod state_changes {
 
         panel.set_id('a');
 
-        state.panels[1] = (0, Box::new(panel));
+        state.panels[1] = LayoutPanel::new(0, 'a', Box::new(panel));
 
         state.handle_changes(vec![StateChangeRequest::input_complete(
             "Test Input".to_string(),
         )]);
 
         assert_eq!(state.active_panel, 1);
-        assert_eq!(state.panels[1].1.get_title(), "Test Input".to_string());
+        assert_eq!(state.panels[1].panel.get_title(), "Test Input".to_string());
     }
 
     #[test]
@@ -1361,7 +1403,7 @@ mod state_changes {
 
         panel.set_id('a');
 
-        state.panels[1] = (0, Box::new(panel));
+        state.panels[1] = LayoutPanel::new(0, 'a', Box::new(panel));
 
         state.handle_changes(vec![StateChangeRequest::input_complete(
             "Test Input".to_string(),
@@ -1385,7 +1427,7 @@ mod state_changes {
 
         panel.set_id('a');
 
-        state.panels[1] = (0, Box::new(panel));
+        state.panels[1] = LayoutPanel::new(0, 'a', Box::new(panel));
 
         state.handle_changes(vec![StateChangeRequest::input_complete(
             "Test Input".to_string(),
@@ -1432,7 +1474,7 @@ mod state_changes {
 
         app.handle_changes(vec![InputComplete(MESSAGE_PANEL_TYPE_ID.to_string())]);
 
-        assert_ne!(app.get_panel(1).unwrap().1.get_id(), '\0');
+        assert_ne!(app.get_panel(1).unwrap().panel.get_id(), '\0');
         assert_eq!(app.active_panel, 1);
         assert_eq!(app.state, State::Normal);
         assert!(app.input_request.is_none())

@@ -60,7 +60,7 @@ fn main() -> Result<(), String> {
                     global_commands.advance(CommandKeyId::new(event.code, event.modifiers))
                 } else {
                     let (handled, changes) = match app_state.get_active_panel_mut() {
-                        Some((_, panel)) => panel.receive_key(event),
+                        Some(lp) => lp.panel_mut().receive_key(event),
                         None => (false, vec![]), // error?
                     };
 
