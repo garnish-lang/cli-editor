@@ -10,6 +10,12 @@ pub const MESSAGE_PANEL_TYPE_ID: &str = "Messages";
 
 pub struct MessagesPanel {}
 
+impl MessagesPanel {
+    pub fn new() -> Self {
+        MessagesPanel {}
+    }
+}
+
 impl Panel for MessagesPanel {
     fn type_id(&self) -> &str {
         MESSAGE_PANEL_TYPE_ID
