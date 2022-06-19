@@ -297,7 +297,7 @@ impl AppState {
                                 self.state = State::Normal;
                                 self.input_request = None;
                             }
-                            State::Normal => unimplemented!()
+                            State::Normal => unimplemented!(),
                         }
 
                         vec![]
@@ -719,10 +719,9 @@ pub fn global_commands() -> Result<Commands<GlobalAction>, String> {
 mod tests {
     use crossterm::event::KeyCode;
 
-    use crate::app::{InputRequest, Message, MessageChannel, State, TOP_REQUESTOR_ID};
-    use crate::panels::{MESSAGE_PANEL_TYPE_ID, NullPanel};
+    use crate::app::{Message, MessageChannel};
+    use crate::panels::NullPanel;
     use crate::{AppState, Panel, TextEditPanel, UserSplits};
-    use crate::app::StateChangeRequest::InputComplete;
 
     fn assert_is_default(app: &AppState) {
         assert_eq!(app.panels.len(), 2, "Panels not set");
@@ -1154,44 +1153,15 @@ mod tests {
 
         assert!(app.panels[1].1.get_active());
     }
-
-    #[test]
-    fn change_panel_type() {
-        let mut app = AppState::new();
-
-        app.change_active_panel_type(KeyCode::Null);
-
-        assert_eq!(app.active_panel, 0);
-        assert_eq!(app.state, State::WaitingPanelType(1));
-        assert_eq!(app.input_request, Some(InputRequest {
-            prompt: "Panel Type".to_string(),
-            requestor_id: TOP_REQUESTOR_ID
-        }))
-    }
-
-    #[test]
-    fn change_panel_type_complete() {
-        let mut app = AppState::new();
-        app.active_panel = 0;
-        app.state = State::WaitingPanelType(1);
-        app.input_request = Some(InputRequest {
-            prompt: "Panel Type".to_string(),
-            requestor_id: TOP_REQUESTOR_ID
-        });
-
-        app.handle_changes(vec![
-            InputComplete(MESSAGE_PANEL_TYPE_ID.to_string())
-        ]);
-
-        assert_eq!(app.active_panel, 1);
-        assert_eq!(app.state, State::Normal);
-        assert!(app.input_request.is_none())
-    }
 }
 
 #[cfg(test)]
 mod state_changes {
-    use crate::app::{InputRequest, MessageChannel, StateChangeRequest};
+    use crossterm::event::KeyCode;
+
+    use crate::app::StateChangeRequest::InputComplete;
+    use crate::app::{InputRequest, MessageChannel, State, StateChangeRequest, TOP_REQUESTOR_ID};
+    use crate::panels::MESSAGE_PANEL_TYPE_ID;
     use crate::{AppState, Panel};
 
     #[allow(dead_code)]
@@ -1334,5 +1304,39 @@ mod state_changes {
         state.handle_changes(vec![StateChangeRequest::error("Test Input".to_string())]);
 
         assert_eq!(state.messages[0].channel, MessageChannel::ERROR)
+    }
+
+    #[test]
+    fn change_panel_type() {
+        let mut app = AppState::new();
+
+        app.change_active_panel_type(KeyCode::Null);
+
+        assert_eq!(app.active_panel, 0);
+        assert_eq!(app.state, State::WaitingPanelType(1));
+        assert_eq!(
+            app.input_request,
+            Some(InputRequest {
+                prompt: "Panel Type".to_string(),
+                requestor_id: TOP_REQUESTOR_ID
+            })
+        )
+    }
+
+    #[test]
+    fn change_panel_type_complete() {
+        let mut app = AppState::new();
+        app.active_panel = 0;
+        app.state = State::WaitingPanelType(1);
+        app.input_request = Some(InputRequest {
+            prompt: "Panel Type".to_string(),
+            requestor_id: TOP_REQUESTOR_ID,
+        });
+
+        app.handle_changes(vec![InputComplete(MESSAGE_PANEL_TYPE_ID.to_string())]);
+
+        assert_eq!(app.active_panel, 1);
+        assert_eq!(app.state, State::Normal);
+        assert!(app.input_request.is_none())
     }
 }
