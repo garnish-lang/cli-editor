@@ -11,7 +11,7 @@ impl NullPanel {
 }
 
 impl Panel for NullPanel {
-    fn type_id(&self) -> &str {
+    fn panel_type(&self) -> &str {
         NULL_PANEL_TYPE_ID
     }
 

@@ -124,7 +124,7 @@ impl TextEditPanel {
 }
 
 impl Panel for TextEditPanel {
-    fn type_id(&self) -> &str {
+    fn panel_type(&self) -> &str {
         EDIT_PANEL_TYPE_ID
     }
 

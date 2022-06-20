@@ -90,7 +90,7 @@ impl InputPanel {
 }
 
 impl Panel for InputPanel {
-    fn type_id(&self) -> &str {
+    fn panel_type(&self) -> &str {
         INPUT_PANEL_TYPE_ID
     }
 

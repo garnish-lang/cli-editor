@@ -17,7 +17,7 @@ impl MessagesPanel {
 }
 
 impl Panel for MessagesPanel {
-    fn type_id(&self) -> &str {
+    fn panel_type(&self) -> &str {
         MESSAGE_PANEL_TYPE_ID
     }
 

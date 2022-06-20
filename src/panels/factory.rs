@@ -2,7 +2,7 @@ pub use crate::panels::edit::EDIT_PANEL_TYPE_ID;
 pub use crate::panels::messages::MESSAGE_PANEL_TYPE_ID;
 pub use crate::panels::null::NULL_PANEL_TYPE_ID;
 use crate::panels::{MessagesPanel, NullPanel};
-use crate::{Panel, TextEditPanel};
+use crate::{InputPanel, Panel, TextEditPanel};
 
 pub struct PanelFactory {}
 
@@ -27,6 +27,14 @@ impl PanelFactory {
 
     pub fn null() -> Box<dyn Panel> {
         Box::new(NullPanel::new())
+    }
+
+    pub fn input() -> Box<dyn Panel> {
+        Box::new(InputPanel::new())
+    }
+
+    pub fn edit() -> Box<dyn Panel> {
+        Box::new(TextEditPanel::new())
     }
 }
 
@@ -57,7 +65,7 @@ mod tests {
     #[test]
     fn create_null_boxed() {
         assert_eq!(
-            PanelFactory::panel(NULL_PANEL_TYPE_ID).unwrap().type_id(),
+            PanelFactory::panel(NULL_PANEL_TYPE_ID).unwrap().panel_type(),
             NULL_PANEL_TYPE_ID
         );
     }
@@ -65,7 +73,7 @@ mod tests {
     #[test]
     fn create_edit_boxed() {
         assert_eq!(
-            PanelFactory::panel(EDIT_PANEL_TYPE_ID).unwrap().type_id(),
+            PanelFactory::panel(EDIT_PANEL_TYPE_ID).unwrap().panel_type(),
             EDIT_PANEL_TYPE_ID
         );
     }
@@ -75,7 +83,7 @@ mod tests {
         assert_eq!(
             PanelFactory::panel(MESSAGE_PANEL_TYPE_ID)
                 .unwrap()
-                .type_id(),
+                .panel_type(),
             MESSAGE_PANEL_TYPE_ID
         );
     }

@@ -1,28 +1,27 @@
 use std::io;
 use std::io::Stdout;
 
-use crossterm::event::{read, DisableMouseCapture, Event, KeyCode};
+use crossterm::event::{read, DisableMouseCapture, Event, KeyCode, KeyEvent};
 use crossterm::execute;
 use crossterm::style::Print;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
 use tui::backend::CrosstermBackend;
-
-use crate::app::{global_commands, AppState};
 use tui::{Frame, Terminal};
 
+use crate::app::{global_commands, AppState};
 use crate::commands::{catch_all, ctrl_key, key, CommandDetails, CommandKeyId, Commands};
-use crate::panels::{Panel, InputPanel, TextEditPanel, Panels};
+use crate::panels::{InputPanel, Panel, Panels, TextEditPanel};
 use crate::render::render_split;
 use crate::splits::{PanelSplit, UserSplits};
 
 mod app;
+mod autocomplete;
 mod commands;
 mod panels;
 mod render;
 mod splits;
-mod autocomplete;
 
 pub type EditorFrame<'a> = Frame<'a, CrosstermBackend<Stdout>>;
 
@@ -37,13 +36,14 @@ fn main() -> Result<(), String> {
 
     let mut panels = Panels::new();
     let mut app_state = AppState::new();
+    app_state.init(&mut panels);
     let mut global_commands = global_commands()?;
 
     loop {
         app_state.update();
 
         terminal
-            .draw(|frame| render_split(0, &app_state, frame, frame.size()))
+            .draw(|frame| render_split(0, &app_state, &panels, frame, frame.size()))
             .or_else(|err| Err(err.to_string()))?;
 
         match read().or_else(|err| Err(err.to_string()))? {
@@ -62,11 +62,14 @@ fn main() -> Result<(), String> {
                     global_commands.advance(CommandKeyId::new(event.code, event.modifiers))
                 } else {
                     let (handled, changes) = match app_state.get_active_panel_mut() {
-                        Some(lp) => lp.panel_mut().receive_key(event),
+                        Some(lp) => match panels.get_mut(lp.panel_index()) {
+                            Some(panel) => panel.receive_key(event),
+                            None => (false, vec![])
+                        }
                         None => (false, vec![]), // error?
                     };
 
-                    app_state.handle_changes(changes);
+                    app_state.handle_changes(changes, &mut panels);
 
                     if handled {
                         (false, None)
@@ -76,7 +79,7 @@ fn main() -> Result<(), String> {
                 };
 
                 match action {
-                    Some(action) => action(&mut app_state, event.code),
+                    Some(action) => action(&mut app_state, event.code, &mut panels),
                     None => (),
                 };
 

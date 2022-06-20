@@ -19,7 +19,7 @@ mod messages;
 mod null;
 
 pub trait Panel {
-    fn type_id(&self) -> &str;
+    fn panel_type(&self) -> &str;
     fn init(&mut self, _state: &mut AppState) {}
     fn make_widget(
         &self,
@@ -55,9 +55,8 @@ pub trait Panel {
     }
 }
 
-
 pub struct Panels {
-    panels: Vec<Box<dyn Panel>>
+    panels: Vec<Box<dyn Panel>>,
 }
 
 impl Panels {
@@ -65,9 +64,13 @@ impl Panels {
         Self { panels: vec![] }
     }
 
+    pub fn len(&self) -> usize {
+        self.panels.len()
+    }
+
     pub fn push(&mut self, panel: Box<dyn Panel>) -> usize {
         for (i, p) in self.panels.iter_mut().enumerate() {
-            if p.type_id() == NULL_PANEL_TYPE_ID {
+            if p.panel_type() == NULL_PANEL_TYPE_ID {
                 *p = panel;
                 return i;
             }
@@ -81,14 +84,22 @@ impl Panels {
     pub fn remove(&mut self, index: usize) {
         match self.panels.get_mut(index) {
             None => (),
-            Some(panel) => *panel = PanelFactory::null()
+            Some(panel) => *panel = PanelFactory::null(),
         }
+    }
+
+    pub fn get(&self, index: usize) -> Option<&Box<dyn Panel>> {
+        self.panels.get(index)
+    }
+
+    pub fn get_mut(&mut self, index: usize) -> Option<&mut Box<dyn Panel>> {
+        self.panels.get_mut(index)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::panels::{NULL_PANEL_TYPE_ID, PanelFactory, Panels};
+    use crate::panels::{PanelFactory, Panels, NULL_PANEL_TYPE_ID};
 
     #[test]
     fn add_panel() {
@@ -103,7 +114,7 @@ mod tests {
         let index = panels.push(PanelFactory::panel("Edit").unwrap());
         panels.remove(index);
 
-        assert_eq!(panels.panels[0].type_id(), NULL_PANEL_TYPE_ID);
+        assert_eq!(panels.panels[0].panel_type(), NULL_PANEL_TYPE_ID);
     }
 
     #[test]
