@@ -396,10 +396,10 @@ pub fn shift_catch_all<T>() -> CommandKeyBuilder<T> {
     }
 }
 
-pub fn ctrl_catch_all<T>() -> CommandKeyBuilder<T> {
+pub fn alt_catch_all<T>() -> CommandKeyBuilder<T> {
     CommandKeyBuilder {
         code: KeyCode::Null,
-        mods: KeyModifiers::CONTROL,
+        mods: KeyModifiers::ALT,
         action: None,
     }
 }

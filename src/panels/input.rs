@@ -5,7 +5,7 @@ use tui::text::{Span, Spans};
 use tui::widgets::{Block, Paragraph};
 
 use crate::app::StateChangeRequest;
-use crate::commands::{code, ctrl_catch_all, shift_catch_all};
+use crate::commands::{code, alt_catch_all, shift_catch_all};
 use crate::{catch_all, AppState, CommandDetails, CommandKeyId, Commands, EditorFrame, Panel};
 use crate::app::StateChangeRequest::Message;
 
@@ -351,7 +351,7 @@ pub fn make_commands() -> Result<Commands<InputCommand>, String> {
     })?;
 
     commands.insert(|b| {
-        b.node(ctrl_catch_all())
+        b.node(alt_catch_all())
             .action(CommandDetails::empty(), InputPanel::fill_quick_select)
     })?;
 
@@ -363,12 +363,12 @@ pub fn make_commands() -> Result<Commands<InputCommand>, String> {
     })?;
 
     commands.insert(|b| {
-        b.node(code(KeyCode::Tab).mods(KeyModifiers::CONTROL))
+        b.node(code(KeyCode::Char('=')).mods(KeyModifiers::ALT))
             .action(CommandDetails::empty(), InputPanel::next_quick_select)
     })?;
 
     commands.insert(|b| {
-        b.node(code(KeyCode::BackTab))
+        b.node(code(KeyCode::Char('-')).mods(KeyModifiers::ALT))
             .action(CommandDetails::empty(), InputPanel::previous_quick_select)
     })?;
 
