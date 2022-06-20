@@ -168,21 +168,25 @@ impl AppState {
     pub fn reset(&mut self, panels: &mut Panels) {
         self.splits = vec![PanelSplit::new(
             Direction::Vertical,
-            vec![UserSplits::Panel(0), UserSplits::Panel(1)],
+            vec![UserSplits::Panel(0), UserSplits::Panel(1), UserSplits::Panel(2)],
         )];
 
-        let mut text_panel = TextEditPanel::new();
-        let mut prompt_panel = InputPanel::new();
+        let mut input = PanelFactory::input();
+        let mut edit = PanelFactory::edit();
+        let mut messages = PanelFactory::messages();
 
-        text_panel.init(self);
-        prompt_panel.init(self);
+        input.init(self);
+        edit.init(self);
+        messages.init(self);
 
-        let prompt_index = panels.push(PanelFactory::input());
-        let edit_index = panels.push(PanelFactory::edit());
+        let input_index = panels.push(input);
+        let edit_index = panels.push(edit);
+        let messages_index = panels.push(messages);
 
         self.panels = vec![
-            LayoutPanel::new(0, PROMPT_PANEL_ID, prompt_index),
+            LayoutPanel::new(0, PROMPT_PANEL_ID, input_index),
             LayoutPanel::new(0, 'a', edit_index),
+            LayoutPanel::new(0, 'b', messages_index),
         ];
         self.active_panel = 1;
         self.selecting_panel = false;

@@ -1,12 +1,13 @@
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use tui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Style};
-use tui::text::Span;
+use tui::text::{Span, Spans};
 use tui::widgets::{Block, Paragraph};
 
 use crate::app::StateChangeRequest;
-use crate::commands::shift_catch_all;
+use crate::commands::{code, ctrl_catch_all, shift_catch_all};
 use crate::{catch_all, AppState, CommandDetails, CommandKeyId, Commands, EditorFrame, Panel};
+use crate::app::StateChangeRequest::Message;
 
 pub const INPUT_PANEL_TYPE_ID: &str = "Input";
 
@@ -40,7 +41,11 @@ impl InputPanel {
         self.text = text;
     }
 
-    fn handle_key_stroke(&mut self, code: KeyCode) -> (bool, Vec<StateChangeRequest>) {
+    fn handle_key_stroke(
+        &mut self,
+        code: KeyCode,
+        _state: &mut AppState,
+    ) -> (bool, Vec<StateChangeRequest>) {
         let mut requests = vec![];
         match code {
             KeyCode::Backspace => {
@@ -95,7 +100,7 @@ impl InputPanel {
     pub fn next_quick_select(
         &mut self,
         _code: KeyCode,
-        state: &AppState,
+        state: &mut AppState,
     ) -> (bool, Vec<StateChangeRequest>) {
         match state.input_request().and_then(|r| r.completer()) {
             None => (),
@@ -115,7 +120,7 @@ impl InputPanel {
     pub fn previous_quick_select(
         &mut self,
         _code: KeyCode,
-        state: &AppState,
+        state: &mut AppState,
     ) -> (bool, Vec<StateChangeRequest>) {
         match state.input_request().and_then(|r| r.completer()) {
             None => (),
@@ -214,13 +219,40 @@ impl Panel for InputPanel {
         let divider = Paragraph::new(Span::from("-".repeat(inner_block.width as usize)))
             .alignment(Alignment::Center);
 
-        let (complete_text, has_completer) = match state.input_request().and_then(|r| r.completer())
-        {
-            Some(completer) => (completer.get_options(self.text.as_str()).join(" | "), true),
-            None => (String::new(), false),
-        };
+        let (complete_text, has_completer) =
+            match state.input_request().and_then(|r| r.completer()) {
+                Some(completer) => (
+                    completer
+                        .get_options(self.text.as_str())
+                        .iter()
+                        .take(9)
+                        .enumerate()
+                        .map(|(i, option)| {
+                            vec![
+                                Span::styled(
+                                    format!("{} {}", i + 1, option),
+                                    Style::default()
+                                        .fg(match i % 2 {
+                                            0 => Color::Cyan,
+                                            1 => Color::Magenta,
+                                            _ => Color::White,
+                                        })
+                                        .bg(match self.quick_select == i {
+                                            true => Color::Gray,
+                                            false => Color::Black,
+                                        }),
+                                ),
+                                Span::raw(" "),
+                            ]
+                        })
+                        .flatten()
+                        .collect::<Vec<Span>>(),
+                    true,
+                ),
+                None => (vec![], false),
+            };
 
-        let complete_para = Paragraph::new(complete_text)
+        let complete_para = Paragraph::new(Spans::from(complete_text))
             .style(Style::default().fg(Color::White).bg(Color::Black))
             .alignment(Alignment::Left);
 
@@ -272,7 +304,7 @@ impl Panel for InputPanel {
     fn receive_key(
         &mut self,
         event: KeyEvent,
-        _state: &mut AppState,
+        state: &mut AppState,
     ) -> (bool, Vec<StateChangeRequest>) {
         let (end, action) = self
             .commands
@@ -282,8 +314,10 @@ impl Panel for InputPanel {
             self.commands.reset();
         }
 
+
+
         match action {
-            Some(a) => a(self, event.code),
+            Some(a) => a(self, event.code, state),
             None => (!end, vec![]),
         }
     }
@@ -301,7 +335,7 @@ impl Panel for InputPanel {
     }
 }
 
-type InputCommand = fn(&mut InputPanel, KeyCode) -> (bool, Vec<StateChangeRequest>);
+type InputCommand = fn(&mut InputPanel, KeyCode, &mut AppState) -> (bool, Vec<StateChangeRequest>);
 
 pub fn make_commands() -> Result<Commands<InputCommand>, String> {
     let mut commands = Commands::<InputCommand>::new();
@@ -314,6 +348,28 @@ pub fn make_commands() -> Result<Commands<InputCommand>, String> {
     commands.insert(|b| {
         b.node(shift_catch_all())
             .action(CommandDetails::empty(), InputPanel::handle_key_stroke)
+    })?;
+
+    commands.insert(|b| {
+        b.node(ctrl_catch_all())
+            .action(CommandDetails::empty(), InputPanel::fill_quick_select)
+    })?;
+
+    commands.insert(|b| {
+        b.node(code(KeyCode::Tab)).action(
+            CommandDetails::empty(),
+            InputPanel::fill_current_quick_select,
+        )
+    })?;
+
+    commands.insert(|b| {
+        b.node(code(KeyCode::Tab).mods(KeyModifiers::CONTROL))
+            .action(CommandDetails::empty(), InputPanel::next_quick_select)
+    })?;
+
+    commands.insert(|b| {
+        b.node(code(KeyCode::BackTab))
+            .action(CommandDetails::empty(), InputPanel::previous_quick_select)
     })?;
 
     Ok(commands)

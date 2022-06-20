@@ -33,6 +33,10 @@ impl PanelFactory {
         Box::new(InputPanel::new())
     }
 
+    pub fn messages() -> Box<dyn Panel> {
+        Box::new(MessagesPanel::new())
+    }
+
     pub fn edit() -> Box<dyn Panel> {
         Box::new(TextEditPanel::new())
     }

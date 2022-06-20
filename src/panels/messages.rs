@@ -32,6 +32,7 @@ impl Panel for MessagesPanel {
         let spans: Vec<ListItem> = app
             .get_messages()
             .iter()
+            .rev()
             .map(|m| {
                 let color = match m.channel() {
                     MessageChannel::INFO => Color::White,

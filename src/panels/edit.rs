@@ -51,7 +51,7 @@ impl TextEditPanel {
         self.text = text;
     }
 
-    fn handle_key_stroke(&mut self, code: KeyCode) -> (bool, Vec<StateChangeRequest>) {
+    fn handle_key_stroke(&mut self, code: KeyCode, state: &mut AppState) -> (bool, Vec<StateChangeRequest>) {
         match code {
             KeyCode::Backspace => {
                 match self.text.pop() {
@@ -98,9 +98,10 @@ impl TextEditPanel {
         (true, vec![])
     }
 
-    fn open_file(&mut self, _code: KeyCode) -> (bool, Vec<StateChangeRequest>) {
+    fn open_file(&mut self, _code: KeyCode, state: &mut AppState) -> (bool, Vec<StateChangeRequest>) {
+        state.add_info(format!("request open file"));
         (
-            false,
+            true,
             vec![StateChangeRequest::input_request("File Name".to_string())],
         )
     }
@@ -161,7 +162,7 @@ impl Panel for TextEditPanel {
         vec![Span::raw(self.title.clone())]
     }
 
-    fn receive_key(&mut self, event: KeyEvent, _state: &mut AppState) -> (bool, Vec<StateChangeRequest>) {
+    fn receive_key(&mut self, event: KeyEvent, state: &mut AppState) -> (bool, Vec<StateChangeRequest>) {
         let (end, action) = self
             .commands
             .advance(CommandKeyId::new(event.code, event.modifiers));
@@ -171,7 +172,7 @@ impl Panel for TextEditPanel {
         }
 
         match action {
-            Some(a) => a(self, event.code),
+            Some(a) => a(self, event.code, state),
             None => (!end, vec![]),
         }
     }
@@ -220,7 +221,7 @@ impl Panel for TextEditPanel {
     }
 }
 
-type EditCommand = fn(&mut TextEditPanel, KeyCode) -> (bool, Vec<StateChangeRequest>);
+type EditCommand = fn(&mut TextEditPanel, KeyCode, &mut AppState) -> (bool, Vec<StateChangeRequest>);
 
 pub fn make_commands() -> Result<Commands<EditCommand>, String> {
     let mut commands = Commands::<EditCommand>::new();

@@ -64,6 +64,7 @@ impl Panels {
         Self { panels: vec![] }
     }
 
+    #[allow(dead_code)]
     pub fn len(&self) -> usize {
         self.panels.len()
     }
