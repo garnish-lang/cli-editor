@@ -60,6 +60,14 @@ fn main() -> Result<(), String> {
                 // if active panel doesn't handle event
                 // then check global
 
+                // Note for available controls as of crossterm "0.23"
+                // CTRL with number keys and their symbols don't work
+                // CTRL with 'i' and 'm' currently don't work
+                // All ALT and SHIFT letters, numbers and symbols work
+                //      except that shift symbols don't have the shift modifier
+                //      even though the given char is correct
+                // Shift not working with Backspace or Enter
+
                 let (end, action) = if global_commands.has_progress() {
                     global_commands.advance(CommandKeyId::new(event.code, event.modifiers))
                 } else {
