@@ -4,9 +4,9 @@ use tui::style::{Color, Style};
 use tui::text::Span;
 use tui::widgets::{Block, Paragraph};
 
-use crate::{AppState, catch_all, CommandDetails, CommandKeyId, Commands, EditorFrame, Panel};
 use crate::app::StateChangeRequest;
 use crate::commands::shift_catch_all;
+use crate::{catch_all, AppState, CommandDetails, CommandKeyId, Commands, EditorFrame, Panel};
 
 pub const INPUT_PANEL_TYPE_ID: &str = "Input";
 
@@ -18,6 +18,7 @@ pub struct InputPanel {
     text: String,
     commands: Commands<InputCommand>,
     visible: bool,
+    quick_select: usize,
 }
 
 impl InputPanel {
@@ -30,6 +31,7 @@ impl InputPanel {
             text: String::new(),
             commands: Commands::<InputCommand>::new(),
             visible: false,
+            quick_select: 0,
         }
     }
 
@@ -74,6 +76,8 @@ impl InputPanel {
             KeyCode::Enter => {
                 requests.push(StateChangeRequest::input_complete(self.text.clone()));
                 self.text = String::new();
+                self.cursor_x = self.min_x;
+                self.cursor_y = self.min_y;
                 // self.text.push('\n');
                 // self.cursor_y += 1;
                 // self.cursor_x = 1;
@@ -86,6 +90,47 @@ impl InputPanel {
         }
 
         (true, requests)
+    }
+
+    pub fn next_quick_select(
+        &mut self,
+        _code: KeyCode,
+        state: &AppState,
+    ) -> (bool, Vec<StateChangeRequest>) {
+        match state.input_request().and_then(|r| r.completer()) {
+            None => (),
+            Some(completer) => {
+                let option_count = completer.get_options(self.text.as_str()).len();
+
+                self.quick_select += 1;
+                if self.quick_select >= option_count {
+                    self.quick_select = 0;
+                }
+            }
+        }
+
+        (false, vec![])
+    }
+
+    pub fn previous_quick_select(
+        &mut self,
+        _code: KeyCode,
+        state: &AppState,
+    ) -> (bool, Vec<StateChangeRequest>) {
+        match state.input_request().and_then(|r| r.completer()) {
+            None => (),
+            Some(completer) => {
+                let option_count = completer.get_options(self.text.as_str()).len();
+
+                self.quick_select = if self.quick_select == 0 {
+                    option_count - 1
+                } else {
+                    self.quick_select - 1
+                }
+            }
+        }
+
+        (false, vec![])
     }
 }
 
@@ -119,7 +164,8 @@ impl Panel for InputPanel {
         let divider = Paragraph::new(Span::from("-".repeat(inner_block.width as usize)))
             .alignment(Alignment::Center);
 
-        let (complete_text, has_completer) = match state.input_request().and_then(|r| r.completer()) {
+        let (complete_text, has_completer) = match state.input_request().and_then(|r| r.completer())
+        {
             Some(completer) => (completer.get_options(self.text.as_str()).join(" | "), true),
             None => (String::new(), false),
         };
@@ -129,18 +175,19 @@ impl Panel for InputPanel {
             .alignment(Alignment::Left);
 
         let paras = if has_completer {
-            vec![
-                para,
-                divider,
-                complete_para
-            ]
+            vec![para, divider, complete_para]
         } else {
             vec![para]
         };
 
         let layout = Layout::default()
             .direction(Direction::Vertical)
-            .constraints(paras.iter().map(|_| Constraint::Length(1)).collect::<Vec<Constraint>>())
+            .constraints(
+                paras
+                    .iter()
+                    .map(|_| Constraint::Length(1))
+                    .collect::<Vec<Constraint>>(),
+            )
             .split(inner_block);
 
         frame.render_widget(block, rect);
@@ -172,7 +219,11 @@ impl Panel for InputPanel {
         }
     }
 
-    fn receive_key(&mut self, event: KeyEvent, _state: &mut AppState) -> (bool, Vec<StateChangeRequest>) {
+    fn receive_key(
+        &mut self,
+        event: KeyEvent,
+        _state: &mut AppState,
+    ) -> (bool, Vec<StateChangeRequest>) {
         let (end, action) = self
             .commands
             .advance(CommandKeyId::new(event.code, event.modifiers));
@@ -216,4 +267,107 @@ pub fn make_commands() -> Result<Commands<InputCommand>, String> {
     })?;
 
     Ok(commands)
+}
+
+#[cfg(test)]
+mod tests {
+    use crossterm::event::KeyCode;
+
+    use crate::app::StateChangeRequest;
+    use crate::autocomplete::AutoCompleter;
+    use crate::{AppState, InputPanel, Panels};
+
+    pub struct TestCompleter {}
+
+    impl AutoCompleter for TestCompleter {
+        fn get_options(&self, s: &str) -> Vec<String> {
+            ["abcd", "abc", "ab", "a"]
+                .iter()
+                .filter(|o| o.starts_with(s))
+                .map(|s| s.to_string())
+                .collect()
+        }
+    }
+
+    #[test]
+    fn next_quick_select() {
+        let mut panels = Panels::new();
+        let mut state = AppState::new();
+        state.init(&mut panels);
+        state.handle_changes(
+            vec![StateChangeRequest::Input(
+                "Test".to_string(),
+                Some(Box::new(TestCompleter {})),
+            )],
+            &mut panels,
+        );
+
+        let mut input = InputPanel::new();
+
+        input.next_quick_select(KeyCode::Null, &mut state);
+
+        assert_eq!(input.quick_select, 1);
+    }
+
+    #[test]
+    fn next_quick_select_past_options() {
+        let mut panels = Panels::new();
+        let mut state = AppState::new();
+        state.init(&mut panels);
+        state.handle_changes(
+            vec![StateChangeRequest::Input(
+                "Test".to_string(),
+                Some(Box::new(TestCompleter {})),
+            )],
+            &mut panels,
+        );
+
+        let mut input = InputPanel::new();
+        input.quick_select = 3;
+
+        input.next_quick_select(KeyCode::Null, &mut state);
+
+        assert_eq!(input.quick_select, 0);
+    }
+
+    #[test]
+    fn previous_quick_select() {
+        let mut panels = Panels::new();
+        let mut state = AppState::new();
+        state.init(&mut panels);
+        state.handle_changes(
+            vec![StateChangeRequest::Input(
+                "Test".to_string(),
+                Some(Box::new(TestCompleter {})),
+            )],
+            &mut panels,
+        );
+
+        let mut input = InputPanel::new();
+        input.quick_select = 3;
+
+        input.previous_quick_select(KeyCode::Null, &mut state);
+
+        assert_eq!(input.quick_select, 2);
+    }
+
+    #[test]
+    fn previous_quick_select_past_options() {
+        let mut panels = Panels::new();
+        let mut state = AppState::new();
+        state.init(&mut panels);
+        state.handle_changes(
+            vec![StateChangeRequest::Input(
+                "Test".to_string(),
+                Some(Box::new(TestCompleter {})),
+            )],
+            &mut panels,
+        );
+
+        let mut input = InputPanel::new();
+
+        input.previous_quick_select(KeyCode::Null, &mut state);
+
+        assert_eq!(input.quick_select, 3);
+    }
 }
