@@ -13,7 +13,7 @@ use crate::app::{global_commands, AppState};
 use tui::{Frame, Terminal};
 
 use crate::commands::{catch_all, ctrl_key, key, CommandDetails, CommandKeyId, Commands};
-use crate::panels::{Panel, InputPanel, TextEditPanel};
+use crate::panels::{Panel, InputPanel, TextEditPanel, Panels};
 use crate::render::render_split;
 use crate::splits::{PanelSplit, UserSplits};
 
@@ -35,6 +35,7 @@ fn main() -> Result<(), String> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend).or_else(|err| Err(err.to_string()))?;
 
+    let mut panels = Panels::new();
     let mut app_state = AppState::new();
     let mut global_commands = global_commands()?;
 

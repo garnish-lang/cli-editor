@@ -24,6 +24,10 @@ impl PanelFactory {
             _ => None,
         }
     }
+
+    pub fn null() -> Box<dyn Panel> {
+        Box::new(NullPanel::new())
+    }
 }
 
 #[cfg(test)]

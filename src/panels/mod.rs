@@ -54,3 +54,68 @@ pub trait Panel {
         vec![]
     }
 }
+
+
+pub struct Panels {
+    panels: Vec<Box<dyn Panel>>
+}
+
+impl Panels {
+    pub fn new() -> Self {
+        Self { panels: vec![] }
+    }
+
+    pub fn push(&mut self, panel: Box<dyn Panel>) -> usize {
+        for (i, p) in self.panels.iter_mut().enumerate() {
+            if p.type_id() == NULL_PANEL_TYPE_ID {
+                *p = panel;
+                return i;
+            }
+        }
+
+        // add new if no empty slots
+        self.panels.push(panel);
+        self.panels.len() - 1
+    }
+
+    pub fn remove(&mut self, index: usize) {
+        match self.panels.get_mut(index) {
+            None => (),
+            Some(panel) => *panel = PanelFactory::null()
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::panels::{NULL_PANEL_TYPE_ID, PanelFactory, Panels};
+
+    #[test]
+    fn add_panel() {
+        let mut panels = Panels::new();
+        let index = panels.push(PanelFactory::panel("Edit").unwrap());
+        assert_eq!(index, 0);
+    }
+
+    #[test]
+    fn remove_panel() {
+        let mut panels = Panels::new();
+        let index = panels.push(PanelFactory::panel("Edit").unwrap());
+        panels.remove(index);
+
+        assert_eq!(panels.panels[0].type_id(), NULL_PANEL_TYPE_ID);
+    }
+
+    #[test]
+    fn add_after_remove() {
+        let mut panels = Panels::new();
+        panels.push(PanelFactory::panel("Edit").unwrap());
+        panels.push(PanelFactory::panel("Edit").unwrap());
+
+        panels.remove(0);
+
+        let index = panels.push(PanelFactory::panel("Edit").unwrap());
+
+        assert_eq!(index, 0);
+    }
+}
