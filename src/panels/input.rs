@@ -133,23 +133,49 @@ impl InputPanel {
         (false, vec![])
     }
 
-    pub fn fill_quick_select(&mut self, code: KeyCode, state: &mut AppState) -> (bool, Vec<StateChangeRequest>) {
+    pub fn fill_quick_select(
+        &mut self,
+        code: KeyCode,
+        state: &mut AppState,
+    ) -> (bool, Vec<StateChangeRequest>) {
         match state.input_request().and_then(|r| r.completer()) {
             None => (),
             Some(completer) => {
                 let options = completer.get_options(self.text.as_str());
                 let input = match code {
-                    KeyCode::Char(c) => if ('1'..'9').contains(&c) {
-                        c as usize - '1' as usize
-                    } else {
-                        return (false, vec![])
+                    KeyCode::Char(c) => {
+                        if ('1'..'9').contains(&c) {
+                            c as usize - '1' as usize
+                        } else {
+                            return (false, vec![]);
+                        }
                     }
-                    _ => return (false, vec![])
+                    _ => return (false, vec![]),
                 };
 
                 match options.get(input) {
                     Some(selection) => self.text = selection.clone(),
-                    None => return (false, vec![])
+                    None => return (false, vec![]),
+                }
+            }
+        }
+
+        (false, vec![])
+    }
+
+    pub fn fill_current_quick_select(
+        &mut self,
+        _code: KeyCode,
+        state: &mut AppState,
+    ) -> (bool, Vec<StateChangeRequest>) {
+        match state.input_request().and_then(|r| r.completer()) {
+            None => (),
+            Some(completer) => {
+                let options = completer.get_options(self.text.as_str());
+                match options.get(self.quick_select) {
+                    // reset quick select to start
+                    None => self.quick_select = 0,
+                    Some(selection) => self.text = selection.clone(),
                 }
             }
         }
@@ -297,7 +323,7 @@ pub fn make_commands() -> Result<Commands<InputCommand>, String> {
 mod tests {
     use crossterm::event::KeyCode;
 
-    use crate::app::{MessageChannel, StateChangeRequest};
+    use crate::app::StateChangeRequest;
     use crate::autocomplete::AutoCompleter;
     use crate::{AppState, InputPanel, Panels};
 
@@ -477,5 +503,50 @@ mod tests {
         input.fill_quick_select(KeyCode::Char('9'), &mut state);
 
         assert_eq!(input.text, "se".to_string());
+    }
+
+    #[test]
+    fn fill_current_quick_select() {
+        let mut panels = Panels::new();
+        let mut state = AppState::new();
+        state.init(&mut panels);
+        state.handle_changes(
+            vec![StateChangeRequest::Input(
+                "Test".to_string(),
+                Some(Box::new(TestCompleter {})),
+            )],
+            &mut panels,
+        );
+
+        let mut input = InputPanel::new();
+        input.text = "ca".to_string();
+        input.quick_select = 1;
+
+        input.fill_current_quick_select(KeyCode::Null, &mut state);
+
+        assert_eq!(input.text, "capture".to_string());
+    }
+
+    #[test]
+    fn fill_current_quick_select_out_of_range() {
+        let mut panels = Panels::new();
+        let mut state = AppState::new();
+        state.init(&mut panels);
+        state.handle_changes(
+            vec![StateChangeRequest::Input(
+                "Test".to_string(),
+                Some(Box::new(TestCompleter {})),
+            )],
+            &mut panels,
+        );
+
+        let mut input = InputPanel::new();
+        input.text = "ca".to_string();
+        input.quick_select = 9;
+
+        input.fill_current_quick_select(KeyCode::Null, &mut state);
+
+        assert_eq!(input.text, "ca".to_string());
+        assert_eq!(input.quick_select, 0);
     }
 }
