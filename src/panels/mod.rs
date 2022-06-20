@@ -39,7 +39,7 @@ pub trait Panel {
     fn get_length(&self, _state: &AppState) -> u16 {
         0
     }
-    fn receive_key(&mut self, _event: KeyEvent) -> (bool, Vec<StateChangeRequest>) {
+    fn receive_key(&mut self, _event: KeyEvent, _state: &mut AppState) -> (bool, Vec<StateChangeRequest>) {
         (false, vec![])
     }
     fn receive_input(&mut self, _input: String) -> Vec<StateChangeRequest> {

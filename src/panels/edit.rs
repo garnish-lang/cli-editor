@@ -161,7 +161,7 @@ impl Panel for TextEditPanel {
         vec![Span::raw(self.title.clone())]
     }
 
-    fn receive_key(&mut self, event: KeyEvent) -> (bool, Vec<StateChangeRequest>) {
+    fn receive_key(&mut self, event: KeyEvent, _state: &mut AppState) -> (bool, Vec<StateChangeRequest>) {
         let (end, action) = self
             .commands
             .advance(CommandKeyId::new(event.code, event.modifiers));

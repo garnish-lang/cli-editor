@@ -1,7 +1,7 @@
 use std::io;
 use std::io::Stdout;
 
-use crossterm::event::{read, DisableMouseCapture, Event, KeyCode, KeyEvent};
+use crossterm::event::{read, DisableMouseCapture, Event, KeyCode};
 use crossterm::execute;
 use crossterm::style::Print;
 use crossterm::terminal::{
@@ -63,7 +63,7 @@ fn main() -> Result<(), String> {
                 } else {
                     let (handled, changes) = match app_state.get_active_panel_mut() {
                         Some(lp) => match panels.get_mut(lp.panel_index()) {
-                            Some(panel) => panel.receive_key(event),
+                            Some(panel) => panel.receive_key(event, &mut app_state),
                             None => (false, vec![])
                         }
                         None => (false, vec![]), // error?

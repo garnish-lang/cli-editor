@@ -5,7 +5,7 @@ use tui::layout::Direction;
 
 use crate::autocomplete::{AutoCompleter, PanelAutoCompleter};
 use crate::commands::ctrl_alt_key;
-use crate::panels::{NullPanel, PanelFactory, NULL_PANEL_TYPE_ID};
+use crate::panels::{PanelFactory, NULL_PANEL_TYPE_ID};
 use crate::{
     catch_all, ctrl_key, key, CommandDetails, Commands, InputPanel, Panel, PanelSplit, Panels,
     TextEditPanel, UserSplits,
@@ -141,7 +141,7 @@ const PROMPT_PANEL_ID: char = '$';
 
 impl AppState {
     pub fn new() -> Self {
-        let mut app = AppState {
+        AppState {
             panels: vec![],
             splits: vec![],
             active_panel: 0,
@@ -150,9 +150,7 @@ impl AppState {
             messages: vec![],
             input_request: None,
             state: State::Normal,
-        };
-
-        app
+        }
     }
 
     pub fn init(&mut self, panels: &mut Panels) {
@@ -804,8 +802,8 @@ mod tests {
     use crossterm::event::KeyCode;
 
     use crate::app::{InputRequest, LayoutPanel, Message, MessageChannel, State, TOP_REQUESTOR_ID};
-    use crate::panels::{NullPanel, PanelFactory, NULL_PANEL_TYPE_ID};
-    use crate::{AppState, Panels, TextEditPanel, UserSplits};
+    use crate::panels::{PanelFactory, NULL_PANEL_TYPE_ID};
+    use crate::{AppState, Panels, UserSplits};
 
     fn assert_is_default(app: &AppState) {
         assert_eq!(app.panels.len(), 2, "Panels not set");
