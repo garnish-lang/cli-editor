@@ -132,6 +132,30 @@ impl InputPanel {
 
         (false, vec![])
     }
+
+    pub fn fill_quick_select(&mut self, code: KeyCode, state: &mut AppState) -> (bool, Vec<StateChangeRequest>) {
+        match state.input_request().and_then(|r| r.completer()) {
+            None => (),
+            Some(completer) => {
+                let options = completer.get_options(self.text.as_str());
+                let input = match code {
+                    KeyCode::Char(c) => if ('1'..'9').contains(&c) {
+                        c as usize - '1' as usize
+                    } else {
+                        return (false, vec![])
+                    }
+                    _ => return (false, vec![])
+                };
+
+                match options.get(input) {
+                    Some(selection) => self.text = selection.clone(),
+                    None => return (false, vec![])
+                }
+            }
+        }
+
+        (false, vec![])
+    }
 }
 
 impl Panel for InputPanel {
@@ -273,7 +297,7 @@ pub fn make_commands() -> Result<Commands<InputCommand>, String> {
 mod tests {
     use crossterm::event::KeyCode;
 
-    use crate::app::StateChangeRequest;
+    use crate::app::{MessageChannel, StateChangeRequest};
     use crate::autocomplete::AutoCompleter;
     use crate::{AppState, InputPanel, Panels};
 
@@ -281,7 +305,7 @@ mod tests {
 
     impl AutoCompleter for TestCompleter {
         fn get_options(&self, s: &str) -> Vec<String> {
-            ["abcd", "abc", "ab", "a"]
+            ["shout", "shells", "sell", "cats", "capture"]
                 .iter()
                 .filter(|o| o.starts_with(s))
                 .map(|s| s.to_string())
@@ -323,7 +347,7 @@ mod tests {
         );
 
         let mut input = InputPanel::new();
-        input.quick_select = 3;
+        input.quick_select = 4;
 
         input.next_quick_select(KeyCode::Null, &mut state);
 
@@ -368,6 +392,90 @@ mod tests {
 
         input.previous_quick_select(KeyCode::Null, &mut state);
 
-        assert_eq!(input.quick_select, 3);
+        assert_eq!(input.quick_select, 4);
+    }
+
+    #[test]
+    fn fill_quick_select() {
+        let mut panels = Panels::new();
+        let mut state = AppState::new();
+        state.init(&mut panels);
+        state.handle_changes(
+            vec![StateChangeRequest::Input(
+                "Test".to_string(),
+                Some(Box::new(TestCompleter {})),
+            )],
+            &mut panels,
+        );
+
+        let mut input = InputPanel::new();
+        input.text = "se".to_string();
+
+        input.fill_quick_select(KeyCode::Char('1'), &mut state);
+
+        assert_eq!(input.text, "sell".to_string());
+    }
+
+    #[test]
+    fn fill_quick_select_invalid_selection() {
+        let mut panels = Panels::new();
+        let mut state = AppState::new();
+        state.init(&mut panels);
+        state.handle_changes(
+            vec![StateChangeRequest::Input(
+                "Test".to_string(),
+                Some(Box::new(TestCompleter {})),
+            )],
+            &mut panels,
+        );
+
+        let mut input = InputPanel::new();
+        input.text = "se".to_string();
+
+        input.fill_quick_select(KeyCode::Char('0'), &mut state);
+
+        assert_eq!(input.text, "se".to_string());
+    }
+
+    #[test]
+    fn fill_quick_select_invalid_code() {
+        let mut panels = Panels::new();
+        let mut state = AppState::new();
+        state.init(&mut panels);
+        state.handle_changes(
+            vec![StateChangeRequest::Input(
+                "Test".to_string(),
+                Some(Box::new(TestCompleter {})),
+            )],
+            &mut panels,
+        );
+
+        let mut input = InputPanel::new();
+        input.text = "se".to_string();
+
+        input.fill_quick_select(KeyCode::Enter, &mut state);
+
+        assert_eq!(input.text, "se".to_string());
+    }
+
+    #[test]
+    fn fill_quick_select_out_of_option_range() {
+        let mut panels = Panels::new();
+        let mut state = AppState::new();
+        state.init(&mut panels);
+        state.handle_changes(
+            vec![StateChangeRequest::Input(
+                "Test".to_string(),
+                Some(Box::new(TestCompleter {})),
+            )],
+            &mut panels,
+        );
+
+        let mut input = InputPanel::new();
+        input.text = "se".to_string();
+
+        input.fill_quick_select(KeyCode::Char('9'), &mut state);
+
+        assert_eq!(input.text, "se".to_string());
     }
 }
