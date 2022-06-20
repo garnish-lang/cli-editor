@@ -469,7 +469,7 @@ impl AppState {
     }
 
     pub fn delete_active_panel(&mut self, _code: KeyCode, panels: &mut Panels) {
-        let (next_active_panel, active_split, active_panel_id) =
+        let (next_active_panel, active_split, active_panel_id, active_panel_index) =
             match (self.next_panel_index(panels), self.get_active_panel()) {
                 (Err(e), None) | (Err(e), _) => {
                     self.reset(panels);
@@ -482,7 +482,7 @@ impl AppState {
                         .push(Message::error("No active panel. Setting to be last panel."));
                     return;
                 }
-                (Ok(next), Some(lp)) => (next, lp.split_index, lp.id),
+                (Ok(next), Some(lp)) => (next, lp.split_index, lp.id, lp.panel_index),
             };
 
         if self.static_panels().contains(&active_panel_id) {
@@ -492,7 +492,7 @@ impl AppState {
         }
 
         // find active's index in split
-        let active_panel_index = self.active_panel();
+        let local_current_panel = self.active_panel();
 
         let remove_split = match self.splits.get_mut(active_split) {
             None => {
@@ -504,7 +504,7 @@ impl AppState {
             }
             Some(split) => {
                 let index = match split.panels.iter().enumerate().find(|(_, s)| match s {
-                    UserSplits::Panel(index) => *index == active_panel_index,
+                    UserSplits::Panel(index) => *index == local_current_panel,
                     UserSplits::Split(..) => false,
                 }) {
                     Some(i) => i.0,
@@ -573,6 +573,7 @@ impl AppState {
         }
 
         // verified that it exists from first check getting active panel
+        // self.panels.remove(local_current_panel);
         panels.remove(active_panel_index);
 
         let active_count = self
@@ -810,7 +811,7 @@ mod tests {
     use crate::{AppState, Panels, UserSplits};
 
     fn assert_is_default(app: &AppState) {
-        assert_eq!(app.panels.len(), 2, "Panels not set");
+        assert_eq!(app.panels.len(), 3, "Panels not set");
         assert_eq!(app.splits.len(), 1, "Splits not set");
         assert_eq!(app.active_panel, 1, "Active panel not set");
         assert_eq!(app.selecting_panel, false, "Selecting panel not set");
@@ -909,7 +910,7 @@ mod tests {
 
         app.add_panel_to_active_split(KeyCode::Null, &mut panels);
 
-        assert_eq!(app.panels.len(), 3);
+        assert_eq!(app.panels.len(), 4);
         assert_eq!(app.splits.len(), 1);
 
         assert_eq!(
@@ -917,7 +918,8 @@ mod tests {
             vec![
                 UserSplits::Panel(0),
                 UserSplits::Panel(1),
-                UserSplits::Panel(2)
+                UserSplits::Panel(2),
+                UserSplits::Panel(3)
             ]
         );
 
@@ -946,7 +948,7 @@ mod tests {
         app.init(&mut panels);
         app.panels
             .push(LayoutPanel::new(10, 'b', panels.push(PanelFactory::edit())));
-        app.active_panel = 2;
+        app.active_panel = 3;
 
         app.add_panel_to_active_split(KeyCode::Null, &mut panels);
 
@@ -961,16 +963,15 @@ mod tests {
 
         app.split_current_panel_horizontal(KeyCode::Null, &mut panels);
 
-        assert_eq!(app.panels.len(), 3);
+        assert_eq!(app.panels.len(), 4);
         assert_eq!(app.splits.len(), 2);
 
         assert_eq!(
             app.splits[1].panels,
-            vec![UserSplits::Panel(1), UserSplits::Panel(2)]
+            vec![UserSplits::Panel(1), UserSplits::Panel(3)]
         );
 
-        assert_eq!(app.panels[1].split_index, 1);
-        assert_eq!(app.panels[2].split_index, 1);
+        assert_eq!(app.panels[3].split_index, 1);
     }
 
     #[test]
@@ -1006,7 +1007,7 @@ mod tests {
         app.init(&mut panels);
         app.panels
             .push(LayoutPanel::new(10, 'b', panels.push(PanelFactory::edit())));
-        app.active_panel = 2;
+        app.active_panel = 3;
 
         app.split_current_panel_horizontal(KeyCode::Null, &mut panels);
 
@@ -1023,7 +1024,7 @@ mod tests {
         app.set_active_panel(0);
         app.split_current_panel_horizontal(KeyCode::Null, &mut panels);
 
-        assert_eq!(app.panels.len(), 2);
+        assert_eq!(app.panels.len(), 3);
         assert_eq!(app.splits.len(), 1);
         assert!(app
             .messages
@@ -1039,7 +1040,7 @@ mod tests {
         app.set_active_panel(0);
         app.delete_active_panel(KeyCode::Null, &mut panels);
 
-        assert_eq!(app.panels.len(), 2);
+        assert_eq!(app.panels.len(), 3);
         assert_eq!(app.splits.len(), 1);
 
         assert!(app
@@ -1059,11 +1060,11 @@ mod tests {
 
         app.delete_active_panel(KeyCode::Null, &mut panels);
 
-        assert_eq!(app.active_panel, 0);
-        assert_eq!(app.panels.len(), 3);
+        assert_eq!(app.active_panel, 2);
+        assert_eq!(app.panels.len(), 4);
         assert_eq!(app.splits.len(), 2);
 
-        assert_eq!(panels.get(2).unwrap().panel_type(), NULL_PANEL_TYPE_ID);
+        assert_eq!(panels.get(3).unwrap().panel_type(), NULL_PANEL_TYPE_ID);
     }
 
     #[test]
@@ -1082,7 +1083,7 @@ mod tests {
             None => panic!("No active panel"),
         }
 
-        assert_eq!(panels.len(), 2);
+        assert_eq!(panels.len(), 3);
         assert_eq!(app.splits.len(), 1);
     }
 
@@ -1096,18 +1097,14 @@ mod tests {
         app.split_current_panel_horizontal(KeyCode::Null, &mut panels);
         app.set_active_panel(second);
 
-        let third = app.panels.len();
-        app.split_current_panel_horizontal(KeyCode::Null, &mut panels);
-        app.set_active_panel(third);
-
         app.delete_active_panel(KeyCode::Null, &mut panels);
 
         app.set_active_panel(second);
 
         app.delete_active_panel(KeyCode::Null, &mut panels);
 
-        assert_eq!(app.panels.len(), 4);
-        assert_eq!(app.splits.len(), 2);
+        assert_eq!(app.panels.len(), 3);
+        assert_eq!(app.splits.len(), 1);
     }
 
     #[test]
@@ -1130,7 +1127,7 @@ mod tests {
         app.init(&mut panels);
         app.panels
             .push(LayoutPanel::new(10, 'b', panels.push(PanelFactory::edit())));
-        app.active_panel = 2;
+        app.active_panel = 3;
 
         app.delete_active_panel(KeyCode::Null, &mut panels);
 
@@ -1206,21 +1203,19 @@ mod tests {
 
     #[test]
     fn activate_next_panel_skip_inactive() {
-        // 0 and 1
+        // 0, 1 and 2
         let mut panels = Panels::new();
         let mut app = AppState::new();
         app.init(&mut panels);
-        // 2
-        app.split_current_panel_vertical(KeyCode::Null, &mut panels);
         // 3
-        app.split_current_panel_horizontal(KeyCode::Null, &mut panels);
+        app.split_current_panel_vertical(KeyCode::Null, &mut panels);
         // 4
         app.add_panel_to_active_split(KeyCode::Null, &mut panels);
         // 5
         app.add_panel_to_active_split(KeyCode::Null, &mut panels);
         app.set_active_panel(2);
         // 6
-        app.split_current_panel_horizontal(KeyCode::Null, &mut panels);
+        app.split_current_panel_vertical(KeyCode::Null, &mut panels);
         // 7
         app.add_panel_to_active_split(KeyCode::Null, &mut panels);
         // 8
@@ -1267,31 +1262,31 @@ mod tests {
 
     #[test]
     fn activate_previous_panel() {
-        // 0 and 1
+        // 0, 1 and 2
         let mut panels = Panels::new();
         let mut app = AppState::new();
         app.init(&mut panels);
-        // 2
-        app.split_current_panel_vertical(KeyCode::Null, &mut panels);
         // 3
-        app.split_current_panel_horizontal(KeyCode::Null, &mut panels);
+        app.split_current_panel_vertical(KeyCode::Null, &mut panels);
         // 4
         app.add_panel_to_active_split(KeyCode::Null, &mut panels);
         // 5
         app.add_panel_to_active_split(KeyCode::Null, &mut panels);
         app.set_active_panel(2);
         // 6
-        app.split_current_panel_horizontal(KeyCode::Null, &mut panels);
+        app.split_current_panel_vertical(KeyCode::Null, &mut panels);
         // 7
         app.add_panel_to_active_split(KeyCode::Null, &mut panels);
         // 8
         app.add_panel_to_active_split(KeyCode::Null, &mut panels);
 
-        app.set_active_panel(7);
+        app.set_active_panel(6);
+
+        panels.remove(7);
 
         app.activate_previous_panel(KeyCode::Null, &mut panels);
 
-        assert_eq!(app.active_panel(), 6)
+        assert_eq!(app.active_panel(), 2)
     }
 
     #[test]
