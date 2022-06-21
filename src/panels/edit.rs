@@ -10,6 +10,7 @@ use tui::text::{Span, Text};
 use tui::widgets::{Block, Paragraph, Wrap};
 
 use crate::app::StateChangeRequest;
+use crate::autocomplete::FileAutoCompleter;
 use crate::commands::shift_catch_all;
 use crate::{
     catch_all, ctrl_key, AppState, CommandDetails, CommandKeyId, Commands, EditorFrame, Panel,
@@ -51,7 +52,11 @@ impl TextEditPanel {
         self.text = text;
     }
 
-    fn handle_key_stroke(&mut self, code: KeyCode, state: &mut AppState) -> (bool, Vec<StateChangeRequest>) {
+    fn handle_key_stroke(
+        &mut self,
+        code: KeyCode,
+        state: &mut AppState,
+    ) -> (bool, Vec<StateChangeRequest>) {
         match code {
             KeyCode::Backspace => {
                 match self.text.pop() {
@@ -98,11 +103,18 @@ impl TextEditPanel {
         (true, vec![])
     }
 
-    fn open_file(&mut self, _code: KeyCode, state: &mut AppState) -> (bool, Vec<StateChangeRequest>) {
+    fn open_file(
+        &mut self,
+        _code: KeyCode,
+        state: &mut AppState,
+    ) -> (bool, Vec<StateChangeRequest>) {
         state.add_info(format!("request open file"));
         (
             true,
-            vec![StateChangeRequest::input_request("File Name".to_string())],
+            vec![StateChangeRequest::input_request_with_completer(
+                "File Name".to_string(),
+                Box::new(FileAutoCompleter::new()),
+            )],
         )
     }
 
@@ -162,7 +174,11 @@ impl Panel for TextEditPanel {
         vec![Span::raw(self.title.clone())]
     }
 
-    fn receive_key(&mut self, event: KeyEvent, state: &mut AppState) -> (bool, Vec<StateChangeRequest>) {
+    fn receive_key(
+        &mut self,
+        event: KeyEvent,
+        state: &mut AppState,
+    ) -> (bool, Vec<StateChangeRequest>) {
         let (end, action) = self
             .commands
             .advance(CommandKeyId::new(event.code, event.modifiers));
@@ -221,7 +237,8 @@ impl Panel for TextEditPanel {
     }
 }
 
-type EditCommand = fn(&mut TextEditPanel, KeyCode, &mut AppState) -> (bool, Vec<StateChangeRequest>);
+type EditCommand =
+    fn(&mut TextEditPanel, KeyCode, &mut AppState) -> (bool, Vec<StateChangeRequest>);
 
 pub fn make_commands() -> Result<Commands<EditCommand>, String> {
     let mut commands = Commands::<EditCommand>::new();

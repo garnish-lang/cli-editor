@@ -67,6 +67,10 @@ impl StateChangeRequest {
         StateChangeRequest::Input(prompt, None)
     }
 
+    pub fn input_request_with_completer(prompt: String, completer: Box<dyn AutoCompleter>) -> StateChangeRequest  {
+        StateChangeRequest::Input(prompt, Some(completer))
+    }
+
     pub fn input_complete(text: String) -> StateChangeRequest {
         StateChangeRequest::InputComplete(text)
     }
