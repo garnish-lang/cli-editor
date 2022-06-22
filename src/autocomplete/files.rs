@@ -13,13 +13,8 @@ impl FileAutoCompleter {
 
 impl AutoCompleter for FileAutoCompleter {
     fn get_options(&self, s: &str) -> Vec<Completion> {
-        let mut abs_path = if s == "/" {
-            PathBuf::from("/")
-        } else {
-            let mut p = env::current_dir().unwrap_or(PathBuf::new());
-            p.push(s);
-            p
-        };
+        let mut abs_path = env::current_dir().unwrap_or(PathBuf::new());
+        abs_path.push(s);
 
         // get directory
         // get file name
