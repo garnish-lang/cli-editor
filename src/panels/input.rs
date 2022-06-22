@@ -1,11 +1,11 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use tui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Style};
-use tui::text::{Span, Spans};
+use tui::text::{Span, Spans, Text};
 use tui::widgets::{Block, Paragraph};
 
 use crate::app::StateChangeRequest;
-use crate::commands::{code, alt_catch_all, shift_catch_all};
+use crate::commands::{alt_catch_all, code, shift_catch_all};
 use crate::{catch_all, AppState, CommandDetails, CommandKeyId, Commands, EditorFrame, Panel};
 
 pub const INPUT_PANEL_TYPE_ID: &str = "Input";
@@ -19,6 +19,7 @@ pub struct InputPanel {
     commands: Commands<InputCommand>,
     visible: bool,
     quick_select: usize,
+    continuation_marker: String,
 }
 
 impl InputPanel {
@@ -32,6 +33,7 @@ impl InputPanel {
             commands: Commands::<InputCommand>::new(),
             visible: false,
             quick_select: 0,
+            continuation_marker: "... ".to_string(),
         }
     }
 
@@ -161,7 +163,7 @@ impl InputPanel {
                     Some(selection) => {
                         self.text.extend(selection.remaining().chars());
                         self.cursor_x += selection.remaining().len().try_into().unwrap_or(u16::MAX);
-                    },
+                    }
                     None => return (false, vec![]),
                 }
             }
@@ -216,61 +218,85 @@ impl Panel for InputPanel {
     ) {
         let inner_block = block.inner(rect);
 
-        let para_text = Span::from(self.text.clone());
-        let para = Paragraph::new(para_text)
-            .style(Style::default().fg(Color::White).bg(Color::Black))
-            .alignment(Alignment::Left);
+        // minus 2 because of borders
+        let max_text_length = inner_block.width as usize;
+
+        let continuation_length =
+            max_text_length - self.continuation_marker.len().try_into().unwrap_or(0);
+        let mut lines = if self.text.len() < max_text_length {
+            vec![Span::from(self.text.as_str())]
+        } else {
+            let (mut current, mut next) = self.text.split_at(max_text_length);
+            let mut lines = vec![Span::from(format!("{}", current))];
+
+            while next.len() > continuation_length {
+                (current, next) = next.split_at(continuation_length);
+
+                lines.push(Span::from(format!(
+                    "{}{}",
+                    self.continuation_marker,
+                    current
+                )));
+            }
+
+            lines.push(Span::from(format!(
+                "{}{}",
+                self.continuation_marker,
+                next
+            )));
+
+            lines
+        }.iter().map(|s| Paragraph::new(Text::from(s.clone()))).collect::<Vec<Paragraph>>();
 
         let divider = Paragraph::new(Span::from("-".repeat(inner_block.width as usize)))
             .alignment(Alignment::Center);
 
-        let (complete_text, has_completer) =
-            match state.input_request().and_then(|r| r.completer()) {
-                Some(completer) => (
-                    completer
-                        .get_options(self.text.as_str())
-                        .iter()
-                        .take(9)
-                        .enumerate()
-                        .map(|(i, option)| {
-                            vec![
-                                Span::styled(
-                                    format!("{} {}", i + 1, option.option()),
-                                    Style::default()
-                                        .fg(match i % 2 {
-                                            0 => Color::Cyan,
-                                            1 => Color::Magenta,
-                                            _ => Color::White,
-                                        })
-                                        .bg(match self.quick_select == i {
-                                            true => Color::Gray,
-                                            false => Color::Black,
-                                        }),
-                                ),
-                                Span::raw(" "),
-                            ]
-                        })
-                        .flatten()
-                        .collect::<Vec<Span>>(),
-                    true,
-                ),
-                None => (vec![], false),
-            };
+        let (complete_text, has_completer) = match state.input_request().and_then(|r| r.completer())
+        {
+            Some(completer) => (
+                completer
+                    .get_options(self.text.as_str())
+                    .iter()
+                    .take(9)
+                    .enumerate()
+                    .map(|(i, option)| {
+                        vec![
+                            Span::styled(
+                                format!("{} {}", i + 1, option.option()),
+                                Style::default()
+                                    .fg(match i % 2 {
+                                        0 => Color::Cyan,
+                                        1 => Color::Magenta,
+                                        _ => Color::White,
+                                    })
+                                    .bg(match self.quick_select == i {
+                                        true => Color::Gray,
+                                        false => Color::Black,
+                                    }),
+                            ),
+                            Span::raw(" "),
+                        ]
+                    })
+                    .flatten()
+                    .collect::<Vec<Span>>(),
+                true,
+            ),
+            None => (vec![], false),
+        };
 
         let complete_para = Paragraph::new(Spans::from(complete_text))
             .style(Style::default().fg(Color::White).bg(Color::Black))
             .alignment(Alignment::Left);
 
-        let paras = if has_completer {
-            vec![para, divider, complete_para]
-        } else {
-            vec![para]
-        };
+        if has_completer {
+            lines.push(divider);
+            lines.push(complete_para);
+        }
 
         let layout = Layout::default()
             .direction(Direction::Vertical)
             .constraints(
-                paras
+                lines
                     .iter()
                     .map(|_| Constraint::Length(1))
                     .collect::<Vec<Constraint>>(),
@@ -278,7 +304,8 @@ impl Panel for InputPanel {
             .split(inner_block);
 
         frame.render_widget(block, rect);
-        for (i, p) in paras.iter().enumerate() {
+
+        for (i, p) in lines.iter().enumerate() {
             frame.render_widget(p.clone(), layout[i])
         }
     }
@@ -296,14 +323,36 @@ impl Panel for InputPanel {
         }
     }
 
-    fn get_length(&self, state: &AppState) -> u16 {
-        match state.input_request() {
-            Some(request) => match request.completer() {
-                Some(_) => 5,
-                None => 3,
-            },
-            None => 3,
-        }
+    fn get_length(
+        &self,
+        fixed_length: u16,
+        _flex_length: u16,
+        _direction: Direction,
+        state: &AppState,
+    ) -> u16 {
+        // minus 2 because of borders
+        let max_text_length = fixed_length - 2;
+        let continuation_length =
+            max_text_length - self.continuation_marker.len().try_into().unwrap_or(0);
+        let continuation_lines = if self.text.len() >= max_text_length.into() {
+            let remaining_length = self.text.len() as u16 - max_text_length;
+            // remaining length will be 0 or more
+            // need at least one line to display cursor on next line if current is full
+            // remaining line count will be number of continuation lines - 1 (due to integer division)
+            1 + remaining_length / continuation_length
+        } else {
+            0
+        };
+
+        // base is 1 line plus 2 for borders
+        // plus additional 2 if completion will be showing, 1 for border and 1 for completion text
+
+        state
+            .input_request()
+            .and_then(|r| r.completer())
+            .map(|_| 5)
+            .unwrap_or(3)
+            + continuation_lines
     }
 
     fn receive_key(
@@ -318,8 +367,6 @@ impl Panel for InputPanel {
         if end {
             self.commands.reset();
         }
-
-
 
         match action {
             Some(a) => a(self, event.code, state),

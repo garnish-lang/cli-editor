@@ -1,5 +1,5 @@
 use crossterm::event::KeyEvent;
-use tui::layout::Rect;
+use tui::layout::{Direction, Rect};
 use tui::text::Span;
 use tui::widgets::Block;
 
@@ -36,7 +36,7 @@ pub trait Panel {
     fn make_title(&self, _state: &AppState) -> Vec<Span> {
         vec![]
     }
-    fn get_length(&self, _state: &AppState) -> u16 {
+    fn get_length(&self, _fixed_length: u16, _flex_length: u16, _direction: Direction, _state: &AppState) -> u16 {
         0
     }
     fn receive_key(&mut self, _event: KeyEvent, _state: &mut AppState) -> (bool, Vec<StateChangeRequest>) {

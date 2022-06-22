@@ -10,14 +10,14 @@ use crate::splits::UserSplits;
 pub fn render_split(split: usize, app: &AppState, panels: &Panels, frame: &mut EditorFrame, chunk: Rect) {
     match app.get_split(split) {
         None => (), // error
-        Some(split) => {
+        Some(top_split) => {
             // calculate child width
-            let total = match split.direction {
-                Direction::Horizontal => chunk.width,
-                Direction::Vertical => chunk.height,
+            let (flex_length, fixed_length) = match top_split.direction {
+                Direction::Horizontal => (chunk.width, chunk.height),
+                Direction::Vertical => (chunk.height, chunk.width),
             };
 
-            let active_panels = split
+            let active_panels = top_split
                 .panels
                 .iter()
                 .filter(|split| match split {
@@ -39,7 +39,7 @@ pub fn render_split(split: usize, app: &AppState, panels: &Panels, frame: &mut E
                         UserSplits::Split(_) => (0, 0),
                         UserSplits::Panel(panel_index) => match app.get_panel(*panel_index) {
                             Some(lp) => match panels.get(lp.panel_index()) {
-                                Some(panel) => match panel.get_length(app) {
+                                Some(panel) => match panel.get_length(fixed_length, flex_length, top_split.direction.clone(), app) {
                                     0 => (0, 0),
                                     n => (1, n),
                                 }
@@ -55,7 +55,7 @@ pub fn render_split(split: usize, app: &AppState, panels: &Panels, frame: &mut E
                 };
 
                 let dynamic_count = active_panels.len() - fixed_count;
-                let mut remaining = total - fixed_total;
+                let mut remaining = flex_length - fixed_total;
                 let part_size = if dynamic_count == 0 {
                     remaining
                 } else {
@@ -70,10 +70,10 @@ pub fn render_split(split: usize, app: &AppState, panels: &Panels, frame: &mut E
                             UserSplits::Panel(index) => match app.get_panel(*index) {
                                 Some(lp) => match panels.get(lp.panel_index()) {
                                     Some(panel) => {
-                                        if panel.get_length(app) == 0 {
+                                        if panel.get_length(fixed_length, flex_length, top_split.direction.clone(), app) == 0 {
                                             part_size
                                         } else {
-                                            panel.get_length(app)
+                                            panel.get_length(fixed_length, flex_length, top_split.direction.clone(), app)
                                         }
                                     }
                                     None => part_size
@@ -96,7 +96,7 @@ pub fn render_split(split: usize, app: &AppState, panels: &Panels, frame: &mut E
             };
 
             let chunks = Layout::default()
-                .direction(split.direction.clone())
+                .direction(top_split.direction.clone())
                 .constraints(lengths)
                 .split(chunk);
 
