@@ -159,7 +159,10 @@ impl InputPanel {
                 };
 
                 match options.get(input) {
-                    Some(selection) => self.text = selection.clone(),
+                    Some(selection) => {
+                        self.text.extend(selection.remaining().chars());
+                        self.cursor_x += selection.remaining().len().try_into().unwrap_or(u16::MAX);
+                    },
                     None => return (false, vec![]),
                 }
             }
@@ -180,7 +183,10 @@ impl InputPanel {
                 match options.get(self.quick_select) {
                     // reset quick select to start
                     None => self.quick_select = 0,
-                    Some(selection) => self.text = selection.clone(),
+                    Some(selection) => {
+                        self.text.extend(selection.remaining().chars());
+                        self.cursor_x += selection.remaining().len().try_into().unwrap_or(u16::MAX);
+                    }
                 }
             }
         }
@@ -230,7 +236,7 @@ impl Panel for InputPanel {
                         .map(|(i, option)| {
                             vec![
                                 Span::styled(
-                                    format!("{} {}", i + 1, option),
+                                    format!("{} {}", i + 1, option.option()),
                                     Style::default()
                                         .fg(match i % 2 {
                                             0 => Color::Cyan,

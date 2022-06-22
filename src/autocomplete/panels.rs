@@ -1,9 +1,7 @@
-use crate::autocomplete::AutoCompleter;
-use crate::panels::{EDIT_PANEL_TYPE_ID, MESSAGE_PANEL_TYPE_ID, PanelFactory};
+use crate::autocomplete::{AutoCompleter, Completion};
+use crate::panels::{PanelFactory, EDIT_PANEL_TYPE_ID, MESSAGE_PANEL_TYPE_ID};
 
-pub struct PanelAutoCompleter {
-
-}
+pub struct PanelAutoCompleter {}
 
 impl PanelAutoCompleter {
     pub fn new() -> Self {
@@ -11,23 +9,24 @@ impl PanelAutoCompleter {
     }
 
     fn options() -> Vec<&'static str> {
-        vec![
-            EDIT_PANEL_TYPE_ID,
-            MESSAGE_PANEL_TYPE_ID,
-        ]
+        vec![EDIT_PANEL_TYPE_ID, MESSAGE_PANEL_TYPE_ID]
     }
 }
 
 impl AutoCompleter for PanelAutoCompleter {
-    fn get_options(&self, s: &str) -> Vec<String> {
-        PanelAutoCompleter::options().iter().filter(|o| o.starts_with(s)).map(|s| s.to_string()).collect()
+    fn get_options(&self, s: &str) -> Vec<Completion> {
+        PanelAutoCompleter::options()
+            .iter()
+            .filter(|o| o.starts_with(s))
+            .map(|o| Completion::new(o.to_string(), String::from(&o[s.len()..])))
+            .collect()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::autocomplete::AutoCompleter;
     use crate::autocomplete::panels::PanelAutoCompleter;
+    use crate::autocomplete::AutoCompleter;
 
     #[test]
     fn empty_input_returns_all() {

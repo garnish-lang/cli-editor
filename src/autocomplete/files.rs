@@ -1,10 +1,9 @@
-use crate::autocomplete::AutoCompleter;
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-pub struct FileAutoCompleter {
+use crate::autocomplete::{AutoCompleter, Completion};
 
-}
+pub struct FileAutoCompleter {}
 
 impl FileAutoCompleter {
     pub fn new() -> Self {
@@ -13,44 +12,63 @@ impl FileAutoCompleter {
 }
 
 impl AutoCompleter for FileAutoCompleter {
-    fn get_options(&self, s: &str) -> Vec<String> {
-        let mut abs_path = env::current_dir().unwrap_or(PathBuf::new());
-        abs_path.push(s);
+    fn get_options(&self, s: &str) -> Vec<Completion> {
+        let mut abs_path = if s == "/" {
+            PathBuf::from("/")
+        } else {
+            let mut p = env::current_dir().unwrap_or(PathBuf::new());
+            p.push(s);
+            p
+        };
 
         // get directory
         // get file name
         // list directory
-        // perform match for each item in directory agains file name
-        match (abs_path.file_name(), abs_path.parent()) {
+        // perform match for each item in directory against file name
+        let (current_input, parent) = match (abs_path.file_name(), abs_path.parent()) {
+            (None, None) => {
+                // currently only getting here when inputting root directory
+                // i.e. s == "/"
+                // manually make
+                (String::new(), PathBuf::from("/"))
+            }
             (Some(file_name), Some(parent)) => {
-                let (file_name, parent) = if s.is_empty() || s.ends_with('/') {
+                if s.is_empty() || s.ends_with('/') {
                     // without this check
                     // we would list the current directory name when initially typing or remain in current directory
                     // instead of listing contents of the directory
                     (String::new(), abs_path)
                 } else {
-                    (file_name.to_string_lossy().to_string(), parent.to_path_buf())
-                };
-
-                match parent.read_dir() {
-                    Ok(dir) => {
-                        let mut options = vec![];
-
-                        for d in dir {
-                            if let Ok(entry) = d {
-                                let entry_name = entry.file_name().to_string_lossy().to_string();
-                                if entry_name.starts_with(file_name.as_str()) {
-                                    options.push(entry_name);
-                                }
-                            }
-                        }
-
-                        options
-                    }
-                    Err(_) => vec![]
+                    (
+                        file_name.to_string_lossy().to_string(),
+                        parent.to_path_buf(),
+                    )
                 }
             }
-            _ => vec![]
+            // unknown how we get here, just return no options for now
+            _ => return vec![],
+        };
+
+        match parent.read_dir() {
+            Ok(dir) => {
+                let mut options = vec![];
+
+                for d in dir {
+                    if let Ok(entry) = d {
+                        let entry_name = entry.file_name().to_string_lossy().to_string();
+                        if entry_name.starts_with(current_input.as_str()) {
+                            let remaining = String::from(&entry_name[current_input.len()..]);
+                            options.push(Completion::new(
+                                entry_name,
+                                remaining,
+                            ));
+                        }
+                    }
+                }
+
+                options
+            }
+            Err(_) => vec![],
         }
     }
 }
