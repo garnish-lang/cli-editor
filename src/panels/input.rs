@@ -7,7 +7,6 @@ use tui::widgets::{Block, Paragraph};
 use crate::app::StateChangeRequest;
 use crate::commands::{code, alt_catch_all, shift_catch_all};
 use crate::{catch_all, AppState, CommandDetails, CommandKeyId, Commands, EditorFrame, Panel};
-use crate::app::StateChangeRequest::Message;
 
 pub const INPUT_PANEL_TYPE_ID: &str = "Input";
 

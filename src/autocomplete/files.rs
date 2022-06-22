@@ -1,5 +1,5 @@
 use std::env;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use crate::autocomplete::{AutoCompleter, Completion};
 
@@ -53,10 +53,7 @@ impl AutoCompleter for FileAutoCompleter {
                         let entry_name = entry.file_name().to_string_lossy().to_string();
                         if entry_name.starts_with(current_input.as_str()) {
                             let remaining = String::from(&entry_name[current_input.len()..]);
-                            options.push(Completion::new(
-                                entry_name,
-                                remaining,
-                            ));
+                            options.push(Completion::new(entry_name, remaining));
                         }
                     }
                 }

@@ -1,5 +1,5 @@
 use crate::autocomplete::{AutoCompleter, Completion};
-use crate::panels::{PanelFactory, EDIT_PANEL_TYPE_ID, MESSAGE_PANEL_TYPE_ID};
+use crate::panels::{EDIT_PANEL_TYPE_ID, MESSAGE_PANEL_TYPE_ID};
 
 pub struct PanelAutoCompleter {}
 

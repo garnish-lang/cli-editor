@@ -7,8 +7,8 @@ use crate::autocomplete::{AutoCompleter, PanelAutoCompleter};
 use crate::commands::ctrl_alt_key;
 use crate::panels::{PanelFactory, NULL_PANEL_TYPE_ID};
 use crate::{
-    catch_all, ctrl_key, key, CommandDetails, Commands, InputPanel, Panel, PanelSplit, Panels,
-    TextEditPanel, UserSplits,
+    catch_all, ctrl_key, key, CommandDetails, Commands, PanelSplit, Panels,
+    UserSplits,
 };
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
@@ -63,11 +63,10 @@ pub enum StateChangeRequest {
 }
 
 impl StateChangeRequest {
-    pub fn input_request(prompt: String) -> StateChangeRequest {
-        StateChangeRequest::Input(prompt, None)
-    }
-
-    pub fn input_request_with_completer(prompt: String, completer: Box<dyn AutoCompleter>) -> StateChangeRequest  {
+    pub fn input_request_with_completer(
+        prompt: String,
+        completer: Box<dyn AutoCompleter>,
+    ) -> StateChangeRequest {
         StateChangeRequest::Input(prompt, Some(completer))
     }
 
@@ -172,7 +171,11 @@ impl AppState {
     pub fn reset(&mut self, panels: &mut Panels) {
         self.splits = vec![PanelSplit::new(
             Direction::Vertical,
-            vec![UserSplits::Panel(0), UserSplits::Panel(1), UserSplits::Panel(2)],
+            vec![
+                UserSplits::Panel(0),
+                UserSplits::Panel(1),
+                UserSplits::Panel(2),
+            ],
         )];
 
         let mut input = PanelFactory::input();

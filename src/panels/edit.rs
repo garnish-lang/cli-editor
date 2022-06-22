@@ -55,7 +55,7 @@ impl TextEditPanel {
     fn handle_key_stroke(
         &mut self,
         code: KeyCode,
-        state: &mut AppState,
+        _state: &mut AppState,
     ) -> (bool, Vec<StateChangeRequest>) {
         match code {
             KeyCode::Backspace => {
