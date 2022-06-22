@@ -25,10 +25,10 @@ impl AutoCompleter for FileAutoCompleter {
                 // currently only getting here when inputting root directory
                 // i.e. s == "/"
                 // manually make
-                (String::new(), PathBuf::from("/"))
+                (String::new(), abs_path)
             }
             (Some(file_name), Some(parent)) => {
-                if s.is_empty() || s.ends_with('/') {
+                if s.is_empty() || s.ends_with(std::path::MAIN_SEPARATOR) {
                     // without this check
                     // we would list the current directory name when initially typing or remain in current directory
                     // instead of listing contents of the directory
