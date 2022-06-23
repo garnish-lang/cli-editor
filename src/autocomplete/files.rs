@@ -29,8 +29,8 @@ impl AutoCompleter for FileAutoCompleter {
                 },
                 Component::Normal(s) => match s.to_string_lossy().to_string().as_str() {
                     "~" => {
-                        // replaces entire path, since home dir is expected to be absolute
                         // home dir in rust std is deprecated, handle manually here
+                        // replaces entire path, since home dir is expected to be absolute
                         // check $HOME var
                         // if not there, replace with root
                         path_selection = PathBuf::from(match env::var("HOME") {
