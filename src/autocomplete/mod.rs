@@ -8,6 +8,7 @@ pub trait AutoCompleter {
     fn get_options(&self, s: &str) -> Vec<Completion>;
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Completion {
     option: String,
     remaining: String,

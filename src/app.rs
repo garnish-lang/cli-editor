@@ -6,10 +6,7 @@ use tui::layout::Direction;
 use crate::autocomplete::{AutoCompleter, PanelAutoCompleter};
 use crate::commands::ctrl_alt_key;
 use crate::panels::{PanelFactory, NULL_PANEL_TYPE_ID};
-use crate::{
-    catch_all, ctrl_key, key, CommandDetails, Commands, PanelSplit, Panels,
-    UserSplits,
-};
+use crate::{catch_all, ctrl_key, key, CommandDetails, Commands, PanelSplit, Panels, UserSplits};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub enum MessageChannel {
@@ -1366,12 +1363,12 @@ mod tests {
 #[cfg(test)]
 mod state_changes {
     use crossterm::event::KeyCode;
-    use tui::text::Span;
 
     use crate::app::StateChangeRequest::InputComplete;
     use crate::app::{
         InputRequest, LayoutPanel, MessageChannel, State, StateChangeRequest, TOP_REQUESTOR_ID,
     };
+    use crate::autocomplete::PanelAutoCompleter;
     use crate::panels::MESSAGE_PANEL_TYPE_ID;
     use crate::{AppState, Panel, Panels};
 
@@ -1384,10 +1381,6 @@ mod state_changes {
     impl Panel for TestPanel {
         fn panel_type(&self) -> &str {
             "Test"
-        }
-
-        fn make_title(&self, _app: &AppState) -> Vec<Span> {
-            vec![Span::raw(&self.actual_input)]
         }
 
         fn receive_input(&mut self, input: String) -> Vec<StateChangeRequest> {
@@ -1403,14 +1396,17 @@ mod state_changes {
         app.init(&mut panels);
 
         app.handle_changes(
-            vec![StateChangeRequest::input_request("Test Input".to_string())],
+            vec![StateChangeRequest::input_request_with_completer(
+                "Test Input".to_string(),
+                Box::new(PanelAutoCompleter::new()),
+            )],
             &mut panels,
         );
 
         let request = app.input_request().unwrap();
         assert_eq!(request.prompt, "Test Input".to_string());
         assert_eq!(request.requestor_id, 1);
-        assert!(request.auto_completer.is_none());
+        assert!(request.auto_completer.is_some());
         assert_eq!(app.active_panel, 0);
     }
 
@@ -1422,7 +1418,10 @@ mod state_changes {
         app.active_panel = 100;
 
         app.handle_changes(
-            vec![StateChangeRequest::input_request("Test Input".to_string())],
+            vec![StateChangeRequest::input_request_with_completer(
+                "Test Input".to_string(),
+                Box::new(PanelAutoCompleter::new()),
+            )],
             &mut panels,
         );
 
@@ -1437,7 +1436,10 @@ mod state_changes {
         app.active_panel = 0;
 
         app.handle_changes(
-            vec![StateChangeRequest::input_request("Test Input".to_string())],
+            vec![StateChangeRequest::input_request_with_completer(
+                "Test Input".to_string(),
+                Box::new(PanelAutoCompleter::new()),
+            )],
             &mut panels,
         );
 

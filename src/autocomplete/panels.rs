@@ -26,23 +26,23 @@ impl AutoCompleter for PanelAutoCompleter {
 #[cfg(test)]
 mod tests {
     use crate::autocomplete::panels::PanelAutoCompleter;
-    use crate::autocomplete::AutoCompleter;
+    use crate::autocomplete::{AutoCompleter, Completion};
 
     #[test]
     fn empty_input_returns_all() {
         let completer = PanelAutoCompleter::new();
 
-        assert_eq!(completer.get_options(""), PanelAutoCompleter::options());
+        assert_eq!(completer.get_options("").len(), PanelAutoCompleter::options().len());
     }
 
     #[test]
     fn finds_match() {
         let completer = PanelAutoCompleter::new();
 
-        assert_eq!(completer.get_options("E"), vec!["Edit"]);
-        assert_eq!(completer.get_options("Ed"), vec!["Edit"]);
-        assert_eq!(completer.get_options("Edi"), vec!["Edit"]);
-        assert_eq!(completer.get_options("Edit"), vec!["Edit"]);
-        assert_eq!(completer.get_options("Edits"), Vec::<String>::new());
+        assert_eq!(completer.get_options("E"), vec![Completion::new("Edit".to_string(), "dit".to_string())]);
+        assert_eq!(completer.get_options("Ed"), vec![Completion::new("Edit".to_string(), "it".to_string())]);
+        assert_eq!(completer.get_options("Edi"), vec![Completion::new("Edit".to_string(), "t".to_string())]);
+        assert_eq!(completer.get_options("Edit"), vec![Completion::new("Edit".to_string(), "".to_string())]);
+        assert_eq!(completer.get_options("Edits"), Vec::<Completion>::new());
     }
 }

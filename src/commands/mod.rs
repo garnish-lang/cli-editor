@@ -444,8 +444,8 @@ impl<T> CommandSequenceBuilder<T> {
 mod tests {
     use crossterm::event::{KeyCode, KeyModifiers};
 
-    use crate::commands::{code, key, shift_catch_all, CommandDetails, CommandKey, CommandKeyId};
-    use crate::{catch_all, AppState, Commands};
+    use crate::commands::{code, key, CommandDetails, CommandKey, CommandKeyId};
+    use crate::{AppState, Commands};
 
     fn no_op(state: &mut AppState, _: KeyCode) {
         state.set_active_panel(100)

@@ -420,17 +420,17 @@ mod tests {
     use crossterm::event::KeyCode;
 
     use crate::app::StateChangeRequest;
-    use crate::autocomplete::AutoCompleter;
+    use crate::autocomplete::{AutoCompleter, Completion};
     use crate::{AppState, InputPanel, Panels};
 
     pub struct TestCompleter {}
 
     impl AutoCompleter for TestCompleter {
-        fn get_options(&self, s: &str) -> Vec<String> {
+        fn get_options(&self, s: &str) -> Vec<Completion> {
             ["shout", "shells", "sell", "cats", "capture"]
                 .iter()
                 .filter(|o| o.starts_with(s))
-                .map(|s| s.to_string())
+                .map(|o| Completion::new(o.to_string(), o[s.len()..].to_string()))
                 .collect()
         }
     }
