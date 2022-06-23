@@ -12,10 +12,6 @@ use crate::{catch_all, AppState, CommandDetails, CommandKeyId, Commands, EditorF
 pub const INPUT_PANEL_TYPE_ID: &str = "Input";
 
 pub struct InputPanel {
-    min_x: u16,
-    min_y: u16,
-    cursor_x: u16,
-    cursor_y: u16,
     cursor_index: usize,
     text: String,
     commands: Commands<InputCommand>,
@@ -27,11 +23,7 @@ pub struct InputPanel {
 impl InputPanel {
     pub fn new() -> Self {
         InputPanel {
-            cursor_x: 1,
-            cursor_y: 1,
             cursor_index: 0,
-            min_x: 1,
-            min_y: 1,
             text: String::new(),
             commands: Commands::<InputCommand>::new(),
             visible: false,
@@ -55,29 +47,10 @@ impl InputPanel {
             KeyCode::Backspace => {
                 match self.text.pop() {
                     None => {
-                        self.cursor_x = self.min_x;
-                        self.cursor_y = self.min_y;
                         self.cursor_index = 0;
                     }
-                    Some(c) => {
+                    Some(_) => {
                         self.cursor_index -= 1;
-                        match c {
-                            '\n' => {
-                                self.cursor_y -= 1;
-                                self.cursor_x = self.min_x;
-
-                                // count from back until a newline is reached
-                                for c in self.text.chars().rev() {
-                                    if c == '\n' {
-                                        break;
-                                    }
-                                    self.cursor_x += 1;
-                                }
-                            }
-                            _ => {
-                                self.cursor_x -= 1;
-                            }
-                        }
                     }
                 }
             }
@@ -88,15 +61,9 @@ impl InputPanel {
                 requests.push(StateChangeRequest::input_complete(self.text.clone()));
                 self.text = String::new();
                 self.cursor_index = 0;
-                self.cursor_x = self.min_x;
-                self.cursor_y = self.min_y;
-                // self.text.push('\n');
-                // self.cursor_y += 1;
-                // self.cursor_x = 1;
             }
             KeyCode::Char(c) => {
                 self.cursor_index += 1;
-                self.cursor_x += 1;
                 self.text.push(c);
             }
             _ => return (false, vec![]),
