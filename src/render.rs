@@ -145,7 +145,7 @@ pub fn render_split(
                                     ));
                                 }
 
-                                let mut block = Block::default()
+                                let block = Block::default()
                                     .borders(Borders::ALL)
                                     .border_style(Style::default().fg(match is_active {
                                         true => Color::Green,

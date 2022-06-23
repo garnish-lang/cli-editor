@@ -1,7 +1,7 @@
 use tui::layout::Rect;
 use tui::style::{Color, Style};
 use tui::text::{Span, Text};
-use tui::widgets::{Block, List, ListItem};
+use tui::widgets::{List, ListItem};
 
 use crate::app::MessageChannel;
 use crate::{AppState, EditorFrame, Panel};

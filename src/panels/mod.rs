@@ -1,7 +1,6 @@
 use crossterm::event::KeyEvent;
 use tui::layout::{Direction, Rect};
 use tui::text::Span;
-use tui::widgets::Block;
 
 pub use edit::TextEditPanel;
 pub use factory::*;

@@ -7,7 +7,7 @@ use crossterm::event::{KeyCode, KeyEvent};
 use tui::layout::{Alignment, Rect};
 use tui::style::{Color, Style};
 use tui::text::{Span, Text};
-use tui::widgets::{Block, Paragraph, Wrap};
+use tui::widgets::{Paragraph, Wrap};
 
 use crate::app::StateChangeRequest;
 use crate::autocomplete::FileAutoCompleter;
