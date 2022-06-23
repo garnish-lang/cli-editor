@@ -3,11 +3,17 @@ use tui::style::{Color, Modifier, Style};
 use tui::text::{Span, Spans};
 use tui::widgets::{Block, Borders};
 
-use crate::{AppState, EditorFrame, Panels};
 use crate::panels::NULL_PANEL_TYPE_ID;
 use crate::splits::UserSplits;
+use crate::{AppState, EditorFrame, Panels};
 
-pub fn render_split(split: usize, app: &AppState, panels: &Panels, frame: &mut EditorFrame, chunk: Rect) {
+pub fn render_split(
+    split: usize,
+    app: &AppState,
+    panels: &Panels,
+    frame: &mut EditorFrame,
+    chunk: Rect,
+) {
     match app.get_split(split) {
         None => (), // error
         Some(top_split) => {
@@ -24,9 +30,11 @@ pub fn render_split(split: usize, app: &AppState, panels: &Panels, frame: &mut E
                     UserSplits::Split(_) => true,
                     UserSplits::Panel(panel_index) => match app.get_panel(*panel_index) {
                         Some(lp) => match panels.get(lp.panel_index()) {
-                            Some(panel) => panel.visible() && panel.panel_type() != NULL_PANEL_TYPE_ID,
-                            None => false
-                        }
+                            Some(panel) => {
+                                panel.visible() && panel.panel_type() != NULL_PANEL_TYPE_ID
+                            }
+                            None => false,
+                        },
                         None => false,
                     },
                 })
@@ -39,12 +47,17 @@ pub fn render_split(split: usize, app: &AppState, panels: &Panels, frame: &mut E
                         UserSplits::Split(_) => (0, 0),
                         UserSplits::Panel(panel_index) => match app.get_panel(*panel_index) {
                             Some(lp) => match panels.get(lp.panel_index()) {
-                                Some(panel) => match panel.get_length(fixed_length, flex_length, top_split.direction.clone(), app) {
+                                Some(panel) => match panel.get_length(
+                                    fixed_length,
+                                    flex_length,
+                                    top_split.direction.clone(),
+                                    app,
+                                ) {
                                     0 => (0, 0),
                                     n => (1, n),
-                                }
-                                None => (0, 0)
-                            }
+                                },
+                                None => (0, 0),
+                            },
                             None => (0, 0),
                         },
                     })
@@ -70,14 +83,25 @@ pub fn render_split(split: usize, app: &AppState, panels: &Panels, frame: &mut E
                             UserSplits::Panel(index) => match app.get_panel(*index) {
                                 Some(lp) => match panels.get(lp.panel_index()) {
                                     Some(panel) => {
-                                        if panel.get_length(fixed_length, flex_length, top_split.direction.clone(), app) == 0 {
+                                        if panel.get_length(
+                                            fixed_length,
+                                            flex_length,
+                                            top_split.direction.clone(),
+                                            app,
+                                        ) == 0
+                                        {
                                             part_size
                                         } else {
-                                            panel.get_length(fixed_length, flex_length, top_split.direction.clone(), app)
+                                            panel.get_length(
+                                                fixed_length,
+                                                flex_length,
+                                                top_split.direction.clone(),
+                                                app,
+                                            )
                                         }
                                     }
-                                    None => part_size
-                                }
+                                    None => part_size,
+                                },
                                 None => part_size,
                             },
                             UserSplits::Split(_) => part_size,
@@ -112,35 +136,41 @@ pub fn render_split(split: usize, app: &AppState, panels: &Panels, frame: &mut E
                                 let mut title = vec![];
 
                                 if app.selecting_panel() {
-                                    title.push(
-                                        Span::styled(
-                                            format!(" {} ", lp.id()),
-                                            Style::default()
-                                                .fg(Color::Green)
-                                                .bg(Color::White)
-                                                .add_modifier(Modifier::BOLD),
-                                        )
-                                    );
+                                    title.push(Span::styled(
+                                        format!(" {} ", lp.id()),
+                                        Style::default()
+                                            .fg(Color::Green)
+                                            .bg(Color::White)
+                                            .add_modifier(Modifier::BOLD),
+                                    ));
                                 }
 
-                                title.extend(panel.make_title(&app));
-
-                                let block = Block::default()
-                                    .title(Spans::from(title))
+                                let mut block = Block::default()
                                     .borders(Borders::ALL)
                                     .border_style(Style::default().fg(match is_active {
                                         true => Color::Green,
                                         false => Color::White,
                                     }));
 
-                                let render_details = panel.make_widget(app, frame, chunk, is_active, block);
+                                let render_details =
+                                    panel.make_widget(app, frame, block.inner(chunk), is_active);
+
+                                title.extend(render_details.title);
+
+                                frame.render_widget(
+                                    block.title(Spans::from(title)),
+                                    chunk,
+                                );
 
                                 if is_active {
-                                    frame.set_cursor(render_details.cursor.0, render_details.cursor.1);
+                                    frame.set_cursor(
+                                        render_details.cursor.0,
+                                        render_details.cursor.1,
+                                    );
                                 }
                             }
                             None => (),
-                        }
+                        },
                     },
                     UserSplits::Split(split_index) => {
                         match app.get_split(*split_index) {

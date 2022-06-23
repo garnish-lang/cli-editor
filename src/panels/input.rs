@@ -6,8 +6,8 @@ use tui::widgets::{Block, Paragraph};
 
 use crate::app::StateChangeRequest;
 use crate::commands::{alt_catch_all, code, shift_catch_all};
-use crate::{catch_all, AppState, CommandDetails, CommandKeyId, Commands, EditorFrame, Panel};
 use crate::panels::RenderDetails;
+use crate::{catch_all, AppState, CommandDetails, CommandKeyId, Commands, EditorFrame, Panel};
 
 pub const INPUT_PANEL_TYPE_ID: &str = "Input";
 
@@ -169,7 +169,7 @@ impl InputPanel {
                 match options.get(input) {
                     Some(selection) => {
                         self.text.extend(selection.remaining().chars());
-                        self.cursor_x += selection.remaining().len().try_into().unwrap_or(u16::MAX);
+                        self.cursor_index += selection.remaining().len();
                     }
                     None => return (false, vec![]),
                 }
@@ -193,13 +193,22 @@ impl InputPanel {
                     None => self.quick_select = 0,
                     Some(selection) => {
                         self.text.extend(selection.remaining().chars());
-                        self.cursor_x += selection.remaining().len().try_into().unwrap_or(u16::MAX);
+                        self.cursor_index += selection.remaining().len();
                     }
                 }
             }
         }
 
         (false, vec![])
+    }
+
+    pub fn make_title(&self, state: &AppState) -> Vec<Span> {
+        match state.input_request() {
+            Some(request) => {
+                vec![Span::raw(request.prompt().clone())]
+            }
+            None => vec![],
+        }
     }
 }
 
@@ -221,12 +230,9 @@ impl Panel for InputPanel {
         frame: &mut EditorFrame,
         rect: Rect,
         _is_active: bool,
-        block: Block,
     ) -> RenderDetails {
-        let inner_block = block.inner(rect);
-
         // minus 2 because of borders
-        let max_text_length = inner_block.width as usize;
+        let max_text_length = rect.width as usize;
 
         let (mut cursor_x, mut cursor_y) = (1u16, 1u16);
 
@@ -243,7 +249,8 @@ impl Panel for InputPanel {
 
             while next.len() >= continuation_length {
                 if (line_start_index..line_end_index).contains(&self.cursor_index) {
-                    cursor_x = (1 + self.cursor_index - line_start_index + self.continuation_marker.len()) as u16;
+                    cursor_x = (1 + self.cursor_index - line_start_index
+                        + self.continuation_marker.len()) as u16;
                     cursor_y = (1 + lines.len()) as u16;
                 }
 
@@ -254,8 +261,7 @@ impl Panel for InputPanel {
 
                 lines.push(Span::from(format!(
                     "{}{}",
-                    self.continuation_marker,
-                    current
+                    self.continuation_marker, current
                 )));
             }
 
@@ -263,20 +269,20 @@ impl Panel for InputPanel {
             line_end_index += current.len();
 
             if (line_start_index..line_end_index).contains(&self.cursor_index) {
-                cursor_x = (1 + self.cursor_index - line_start_index + self.continuation_marker.len()) as u16;
+                cursor_x = (1 + self.cursor_index - line_start_index
+                    + self.continuation_marker.len()) as u16;
                 cursor_y = (1 + lines.len()) as u16;
             }
 
-            lines.push(Span::from(format!(
-                "{}{}",
-                self.continuation_marker,
-                next
-            )));
+            lines.push(Span::from(format!("{}{}", self.continuation_marker, next)));
 
             lines
-        }.iter().map(|s| Paragraph::new(Text::from(s.clone()))).collect::<Vec<Paragraph>>();
+        }
+        .iter()
+        .map(|s| Paragraph::new(Text::from(s.clone())))
+        .collect::<Vec<Paragraph>>();
 
-        let divider = Paragraph::new(Span::from("-".repeat(inner_block.width as usize)))
+        let divider = Paragraph::new(Span::from("-".repeat(rect.width as usize)))
             .alignment(Alignment::Center);
 
         let (complete_text, has_completer) = match state.input_request().and_then(|r| r.completer())
@@ -329,28 +335,13 @@ impl Panel for InputPanel {
                     .map(|_| Constraint::Length(1))
                     .collect::<Vec<Constraint>>(),
             )
-            .split(inner_block);
-
-        frame.render_widget(block, rect);
+            .split(rect);
 
         for (i, p) in lines.iter().enumerate() {
             frame.render_widget(p.clone(), layout[i])
         }
 
         RenderDetails::new(self.make_title(&state), (cursor_x, cursor_y))
-    }
-
-    fn get_cursor(&self) -> (u16, u16) {
-        (self.cursor_x, self.cursor_y)
-    }
-
-    fn make_title(&self, state: &AppState) -> Vec<Span> {
-        match state.input_request() {
-            Some(request) => {
-                vec![Span::raw(request.prompt().clone())]
-            }
-            None => vec![],
-        }
     }
 
     fn get_length(

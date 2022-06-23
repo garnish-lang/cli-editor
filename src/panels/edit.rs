@@ -155,26 +155,16 @@ impl Panel for TextEditPanel {
         frame: &mut EditorFrame,
         rect: Rect,
         _is_active: bool,
-        block: Block,
     ) -> RenderDetails {
         let para_text = Text::from(self.text.clone());
         let para = Paragraph::new(para_text)
-            .block(block)
             .style(Style::default().fg(Color::White).bg(Color::Black))
             .alignment(Alignment::Left)
             .wrap(Wrap { trim: true });
 
         frame.render_widget(para, rect);
 
-        RenderDetails::new(vec![], (self.cursor_x, self.cursor_y))
-    }
-
-    fn get_cursor(&self) -> (u16, u16) {
-        (self.cursor_x, self.cursor_y)
-    }
-
-    fn make_title(&self, _state: &AppState) -> Vec<Span> {
-        vec![Span::raw(self.title.clone())]
+        RenderDetails::new(vec![Span::raw(self.title.clone())], (self.cursor_x, self.cursor_y))
     }
 
     fn receive_key(

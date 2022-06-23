@@ -28,7 +28,6 @@ impl Panel for MessagesPanel {
         frame: &mut EditorFrame,
         rect: Rect,
         _is_active: bool,
-        block: Block,
     ) -> RenderDetails {
         let spans: Vec<ListItem> = app
             .get_messages()
@@ -49,19 +48,10 @@ impl Panel for MessagesPanel {
             .collect();
 
         let list = List::new(spans)
-            .block(block)
             .style(Style::default().fg(Color::White).bg(Color::Black));
 
         frame.render_widget(list, rect);
 
-        RenderDetails::new(vec![], (1, 1))
-    }
-
-    fn make_title(&self, _state: &AppState) -> Vec<Span> {
-        vec![Span::raw("Messages")]
-    }
-
-    fn get_cursor(&self) -> (u16, u16) {
-        (1, 1)
+        RenderDetails::new(vec![Span::raw("Messages")], (1, 1))
     }
 }

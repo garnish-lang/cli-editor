@@ -38,18 +38,11 @@ pub trait Panel {
         _frame: &mut EditorFrame,
         _rect: Rect,
         _is_active: bool,
-        _block: Block,
     ) -> RenderDetails {
         RenderDetails {
             title: vec![],
             cursor: (0, 0),
         }
-    }
-    fn get_cursor(&self) -> (u16, u16) {
-        (0, 0)
-    }
-    fn make_title(&self, _state: &AppState) -> Vec<Span> {
-        vec![]
     }
     fn get_length(
         &self,
