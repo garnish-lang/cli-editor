@@ -4,18 +4,18 @@ use std::io::Read;
 use std::path::PathBuf;
 
 use crossterm::event::{KeyCode, KeyEvent};
-use tui::layout::{Alignment, Rect};
+use tui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Style};
-use tui::text::{Span, Text};
+use tui::text::{Span, Spans, Text};
 use tui::widgets::{Paragraph, Wrap};
 
 use crate::app::StateChangeRequest;
 use crate::autocomplete::FileAutoCompleter;
 use crate::commands::shift_catch_all;
+use crate::panels::RenderDetails;
 use crate::{
     catch_all, ctrl_key, AppState, CommandDetails, CommandKeyId, Commands, EditorFrame, Panel,
 };
-use crate::panels::RenderDetails;
 
 pub const EDIT_PANEL_TYPE_ID: &str = "Edit";
 
@@ -158,9 +158,7 @@ impl Panel for TextEditPanel {
     ) -> RenderDetails {
         let para_text = Text::from(self.text.clone());
         let para = Paragraph::new(para_text)
-            .style(Style::default().fg(Color::White).bg(Color::Black))
-            .alignment(Alignment::Left)
-            .wrap(Wrap { trim: true });
+            .style(Style::default().fg(Color::White).bg(Color::Black));
 
         frame.render_widget(para, rect);
 
