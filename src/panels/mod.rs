@@ -18,6 +18,17 @@ mod input;
 mod messages;
 mod null;
 
+pub struct RenderDetails<'a> {
+    pub title: Vec<Span<'a>>,
+    pub cursor: (u16, u16),
+}
+
+impl<'a> RenderDetails<'a> {
+    pub fn new(title: Vec<Span<'a>>, cursor: (u16, u16)) -> Self {
+        Self { title, cursor }
+    }
+}
+
 pub trait Panel {
     fn panel_type(&self) -> &str;
     fn init(&mut self, _state: &mut AppState) {}
@@ -28,7 +39,11 @@ pub trait Panel {
         _rect: Rect,
         _is_active: bool,
         _block: Block,
-    ) {
+    ) -> RenderDetails {
+        RenderDetails {
+            title: vec![],
+            cursor: (0, 0),
+        }
     }
     fn get_cursor(&self) -> (u16, u16) {
         (0, 0)
@@ -36,10 +51,20 @@ pub trait Panel {
     fn make_title(&self, _state: &AppState) -> Vec<Span> {
         vec![]
     }
-    fn get_length(&self, _fixed_length: u16, _flex_length: u16, _direction: Direction, _state: &AppState) -> u16 {
+    fn get_length(
+        &self,
+        _fixed_length: u16,
+        _flex_length: u16,
+        _direction: Direction,
+        _state: &AppState,
+    ) -> u16 {
         0
     }
-    fn receive_key(&mut self, _event: KeyEvent, _state: &mut AppState) -> (bool, Vec<StateChangeRequest>) {
+    fn receive_key(
+        &mut self,
+        _event: KeyEvent,
+        _state: &mut AppState,
+    ) -> (bool, Vec<StateChangeRequest>) {
         (false, vec![])
     }
     fn receive_input(&mut self, _input: String) -> Vec<StateChangeRequest> {

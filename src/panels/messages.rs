@@ -5,6 +5,7 @@ use tui::widgets::{Block, List, ListItem};
 
 use crate::app::MessageChannel;
 use crate::{AppState, EditorFrame, Panel};
+use crate::panels::RenderDetails;
 
 pub const MESSAGE_PANEL_TYPE_ID: &str = "Messages";
 
@@ -28,7 +29,7 @@ impl Panel for MessagesPanel {
         rect: Rect,
         _is_active: bool,
         block: Block,
-    ) {
+    ) -> RenderDetails {
         let spans: Vec<ListItem> = app
             .get_messages()
             .iter()
@@ -52,6 +53,8 @@ impl Panel for MessagesPanel {
             .style(Style::default().fg(Color::White).bg(Color::Black));
 
         frame.render_widget(list, rect);
+
+        RenderDetails::new(vec![], (1, 1))
     }
 
     fn make_title(&self, _state: &AppState) -> Vec<Span> {

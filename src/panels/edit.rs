@@ -15,6 +15,7 @@ use crate::commands::shift_catch_all;
 use crate::{
     catch_all, ctrl_key, AppState, CommandDetails, CommandKeyId, Commands, EditorFrame, Panel,
 };
+use crate::panels::RenderDetails;
 
 pub const EDIT_PANEL_TYPE_ID: &str = "Edit";
 
@@ -155,7 +156,7 @@ impl Panel for TextEditPanel {
         rect: Rect,
         _is_active: bool,
         block: Block,
-    ) {
+    ) -> RenderDetails {
         let para_text = Text::from(self.text.clone());
         let para = Paragraph::new(para_text)
             .block(block)
@@ -164,6 +165,8 @@ impl Panel for TextEditPanel {
             .wrap(Wrap { trim: true });
 
         frame.render_widget(para, rect);
+
+        RenderDetails::new(vec![], (self.cursor_x, self.cursor_y))
     }
 
     fn get_cursor(&self) -> (u16, u16) {

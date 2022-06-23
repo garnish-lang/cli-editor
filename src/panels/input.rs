@@ -7,6 +7,7 @@ use tui::widgets::{Block, Paragraph};
 use crate::app::StateChangeRequest;
 use crate::commands::{alt_catch_all, code, shift_catch_all};
 use crate::{catch_all, AppState, CommandDetails, CommandKeyId, Commands, EditorFrame, Panel};
+use crate::panels::RenderDetails;
 
 pub const INPUT_PANEL_TYPE_ID: &str = "Input";
 
@@ -15,6 +16,7 @@ pub struct InputPanel {
     min_y: u16,
     cursor_x: u16,
     cursor_y: u16,
+    cursor_index: usize,
     text: String,
     commands: Commands<InputCommand>,
     visible: bool,
@@ -27,6 +29,7 @@ impl InputPanel {
         InputPanel {
             cursor_x: 1,
             cursor_y: 1,
+            cursor_index: 0,
             min_x: 1,
             min_y: 1,
             text: String::new(),
@@ -54,8 +57,10 @@ impl InputPanel {
                     None => {
                         self.cursor_x = self.min_x;
                         self.cursor_y = self.min_y;
+                        self.cursor_index = 0;
                     }
                     Some(c) => {
+                        self.cursor_index -= 1;
                         match c {
                             '\n' => {
                                 self.cursor_y -= 1;
@@ -82,6 +87,7 @@ impl InputPanel {
             KeyCode::Enter => {
                 requests.push(StateChangeRequest::input_complete(self.text.clone()));
                 self.text = String::new();
+                self.cursor_index = 0;
                 self.cursor_x = self.min_x;
                 self.cursor_y = self.min_y;
                 // self.text.push('\n');
@@ -89,6 +95,7 @@ impl InputPanel {
                 // self.cursor_x = 1;
             }
             KeyCode::Char(c) => {
+                self.cursor_index += 1;
                 self.cursor_x += 1;
                 self.text.push(c);
             }
@@ -215,29 +222,52 @@ impl Panel for InputPanel {
         rect: Rect,
         _is_active: bool,
         block: Block,
-    ) {
+    ) -> RenderDetails {
         let inner_block = block.inner(rect);
 
         // minus 2 because of borders
         let max_text_length = inner_block.width as usize;
 
+        let (mut cursor_x, mut cursor_y) = (1u16, 1u16);
+
         let continuation_length =
             max_text_length - self.continuation_marker.len().try_into().unwrap_or(0);
         let mut lines = if self.text.len() < max_text_length {
+            cursor_x += self.cursor_index as u16;
             vec![Span::from(self.text.as_str())]
         } else {
             let (mut current, mut next) = self.text.split_at(max_text_length);
+            let mut line_start_index = 0;
+            let mut line_end_index = current.len();
             let mut lines = vec![Span::from(format!("{}", current))];
 
-            while next.len() > continuation_length {
+            while next.len() >= continuation_length {
+                if (line_start_index..line_end_index).contains(&self.cursor_index) {
+                    cursor_x = (1 + self.cursor_index - line_start_index + self.continuation_marker.len()) as u16;
+                }
+
                 (current, next) = next.split_at(continuation_length);
+
+                line_start_index = line_end_index;
+                line_end_index += current.len();
 
                 lines.push(Span::from(format!(
                     "{}{}",
                     self.continuation_marker,
                     current
                 )));
+
+                cursor_y += 1;
             }
+
+            line_start_index += current.len();
+            line_end_index += current.len();
+
+            if (line_start_index..line_end_index).contains(&self.cursor_index) {
+                cursor_x = (1 + self.cursor_index - line_start_index + self.continuation_marker.len()) as u16;
+            }
+
+            cursor_y += 1;
 
             lines.push(Span::from(format!(
                 "{}{}",
@@ -308,6 +338,8 @@ impl Panel for InputPanel {
         for (i, p) in lines.iter().enumerate() {
             frame.render_widget(p.clone(), layout[i])
         }
+
+        RenderDetails::new(self.make_title(&state), (cursor_x, cursor_y))
     }
 
     fn get_cursor(&self) -> (u16, u16) {

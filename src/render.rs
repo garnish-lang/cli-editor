@@ -108,10 +108,6 @@ pub fn render_split(split: usize, app: &AppState, panels: &Panels, frame: &mut E
                         Some(lp) => match panels.get(lp.panel_index()) {
                             Some(panel) => {
                                 let is_active = *panel_i == app.active_panel();
-                                if is_active {
-                                    let (x, y) = panel.get_cursor();
-                                    frame.set_cursor(chunk.x + x, chunk.y + y);
-                                }
 
                                 let mut title = vec![];
 
@@ -137,7 +133,11 @@ pub fn render_split(split: usize, app: &AppState, panels: &Panels, frame: &mut E
                                         false => Color::White,
                                     }));
 
-                                panel.make_widget(app, frame, chunk, is_active, block);
+                                let render_details = panel.make_widget(app, frame, chunk, is_active, block);
+
+                                if is_active {
+                                    frame.set_cursor(render_details.cursor.0, render_details.cursor.1);
+                                }
                             }
                             None => (),
                         }
