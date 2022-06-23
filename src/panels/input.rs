@@ -244,6 +244,7 @@ impl Panel for InputPanel {
             while next.len() >= continuation_length {
                 if (line_start_index..line_end_index).contains(&self.cursor_index) {
                     cursor_x = (1 + self.cursor_index - line_start_index + self.continuation_marker.len()) as u16;
+                    cursor_y = (1 + lines.len()) as u16;
                 }
 
                 (current, next) = next.split_at(continuation_length);
@@ -256,8 +257,6 @@ impl Panel for InputPanel {
                     self.continuation_marker,
                     current
                 )));
-
-                cursor_y += 1;
             }
 
             line_start_index += current.len();
@@ -265,9 +264,8 @@ impl Panel for InputPanel {
 
             if (line_start_index..line_end_index).contains(&self.cursor_index) {
                 cursor_x = (1 + self.cursor_index - line_start_index + self.continuation_marker.len()) as u16;
+                cursor_y = (1 + lines.len()) as u16;
             }
-
-            cursor_y += 1;
 
             lines.push(Span::from(format!(
                 "{}{}",
