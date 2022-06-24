@@ -7,7 +7,7 @@ use crossterm::event::{KeyCode, KeyEvent};
 use tui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Style};
 use tui::text::{Span, Spans, Text};
-use tui::widgets::{Block, Paragraph, Wrap};
+use tui::widgets::{Block, Paragraph};
 
 use crate::app::StateChangeRequest;
 use crate::autocomplete::FileAutoCompleter;
@@ -159,13 +159,24 @@ impl Panel for TextEditPanel {
         _is_active: bool,
     ) -> RenderDetails {
         if !self.text.is_empty() {
-            let para_text = Text::from(self.text.clone());
-            let line_count = self.text.chars().fold(0, |accm, c| {
-                accm + match c {
-                    '\n' => 1,
-                    _ => 0,
-                }
-            });
+            let line_count = self.text.lines().count();
+
+            let para_text = Text::from(
+                self.text
+                    .lines()
+                    .take(rect.height as usize)
+                    .enumerate()
+                    .map(|(i, line)| {
+                        Spans::from(Span::styled(
+                            line,
+                            Style::default().fg(match i % 2 == 0 {
+                                true => Color::Blue,
+                                false => Color::LightBlue,
+                            }),
+                        ))
+                    })
+                    .collect::<Vec<Spans>>(),
+            );
 
             let line_count_size = line_count.to_string().len().min(u16::MAX as usize) as u16;
 
