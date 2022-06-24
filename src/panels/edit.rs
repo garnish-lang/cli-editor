@@ -7,7 +7,7 @@ use crossterm::event::{KeyCode, KeyEvent};
 use tui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Style};
 use tui::text::{Span, Spans, Text};
-use tui::widgets::{Paragraph, Wrap};
+use tui::widgets::{Block, Paragraph, Wrap};
 
 use crate::app::StateChangeRequest;
 use crate::autocomplete::FileAutoCompleter;
@@ -28,6 +28,7 @@ pub struct TextEditPanel {
     title: String,
     commands: Commands<EditCommand>,
     file_path: PathBuf,
+    gutter_size: u16,
 }
 
 #[allow(dead_code)]
@@ -38,6 +39,7 @@ impl TextEditPanel {
             cursor_y: 1,
             min_x: 1,
             min_y: 1,
+            gutter_size: 5,
             text: String::new(),
             title: "Buffer".to_string(),
             commands: Commands::<EditCommand>::new(),
@@ -156,13 +158,59 @@ impl Panel for TextEditPanel {
         rect: Rect,
         _is_active: bool,
     ) -> RenderDetails {
-        let para_text = Text::from(self.text.clone());
-        let para = Paragraph::new(para_text)
-            .style(Style::default().fg(Color::White).bg(Color::Black));
+        if !self.text.is_empty() {
+            let para_text = Text::from(self.text.clone());
+            let line_count = self.text.chars().fold(0, |accm, c| {
+                accm + match c {
+                    '\n' => 1,
+                    _ => 0,
+                }
+            });
 
-        frame.render_widget(para, rect);
+            let line_count_size = line_count.to_string().len().min(u16::MAX as usize) as u16;
 
-        RenderDetails::new(vec![Span::raw(self.title.clone())], (self.cursor_x, self.cursor_y))
+            let layout = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints(vec![
+                    Constraint::Length(line_count_size),
+                    Constraint::Length(self.gutter_size),
+                    Constraint::Length(rect.width - line_count_size - self.gutter_size),
+                ])
+                .split(rect);
+
+            let line_numbers = (1..rect.height + 1)
+                .map(|i| i.to_string())
+                .collect::<Vec<String>>()
+                .join("\n");
+
+            let line_numbers_para =
+                Paragraph::new(Text::from(line_numbers)).alignment(Alignment::Right);
+
+            frame.render_widget(line_numbers_para, layout[0]);
+
+            let gutter_layout = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints(vec![
+                    Constraint::Length(1),
+                    Constraint::Length(self.gutter_size - 2),
+                    Constraint::Length(1),
+                ])
+                .split(layout[1]);
+
+            let gutter = Block::default().style(Style::default().bg(Color::DarkGray));
+
+            frame.render_widget(gutter, gutter_layout[1]);
+
+            let para =
+                Paragraph::new(para_text).style(Style::default().fg(Color::White).bg(Color::Black));
+
+            frame.render_widget(para, layout[2]);
+        }
+
+        RenderDetails::new(
+            vec![Span::raw(self.title.clone())],
+            (self.cursor_x, self.cursor_y),
+        )
     }
 
     fn receive_key(
