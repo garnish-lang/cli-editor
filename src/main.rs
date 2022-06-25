@@ -107,11 +107,7 @@ fn main() -> Result<(), String> {
                 }
             }
             Event::Mouse(_event) => (), // println!("{:?}", event),
-            Event::Resize(width, height) => execute!(
-                terminal.backend_mut(),
-                Print(format!("New size {}x{}", width, height))
-            )
-            .or_else(|err| Err(err.to_string()))?,
+            Event::Resize(_, _) => (),
         }
     }
 
