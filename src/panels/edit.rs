@@ -125,10 +125,10 @@ impl TextEditPanel {
                 if (line_start_index..(line_start_index + true_len + 1)).contains(&self.cursor_index) {
                     if self.text.chars().nth(self.cursor_index - 1).unwrap() == '\n' {
                         cursor_x = text_content_box.x;
-                        cursor_y += lines.len() as u16 + 1;
+                        cursor_y += lines.len() as u16;
                     } else {
                         cursor_x += (self.cursor_index - line_start_index) as u16;
-                        cursor_y += lines.len() as u16;
+                        cursor_y += lines.len() as u16 - 1;
                     }
                 }
 

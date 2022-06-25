@@ -1,7 +1,7 @@
 extern crate core;
 
 use std::io;
-use std::io::Stdout;
+use std::io::{Cursor, Stdout};
 
 use crossterm::event::{read, DisableMouseCapture, Event, KeyCode};
 use crossterm::execute;
@@ -15,7 +15,7 @@ use tui::{Frame, Terminal};
 use crate::app::{global_commands, AppState};
 use crate::commands::{catch_all, ctrl_key, key, CommandDetails, CommandKeyId, Commands};
 use crate::panels::{InputPanel, Panel, Panels, TextEditPanel};
-use crate::render::render_split;
+use crate::render::{CURSOR_MAX, render_split};
 use crate::splits::{PanelSplit, UserSplits};
 
 mod app;
@@ -47,6 +47,13 @@ fn main() -> Result<(), String> {
         terminal
             .draw(|frame| render_split(0, &app_state, &panels, frame, frame.size()))
             .or_else(|err| Err(err.to_string()))?;
+
+        // hide cursor if at max
+        if terminal.get_cursor().unwrap_or_default() == CURSOR_MAX {
+            terminal.hide_cursor().unwrap_or_default();
+        } else {
+            terminal.show_cursor().unwrap_or_default();
+        }
 
         match read().or_else(|err| Err(err.to_string()))? {
             Event::Key(event) => {

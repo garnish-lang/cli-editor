@@ -3,9 +3,21 @@ use tui::style::{Color, Modifier, Style};
 use tui::text::{Span, Spans};
 use tui::widgets::{Block, Borders};
 
+use crate::{AppState, EditorFrame, Panels};
 use crate::panels::NULL_PANEL_TYPE_ID;
 use crate::splits::UserSplits;
-use crate::{AppState, EditorFrame, Panels};
+
+pub const CURSOR_MAX: (u16, u16) = (u16::MAX / 2, u16::MAX / 2);
+
+pub trait HasPoint {
+    fn has_point(&self, x: u16, y: u16) -> bool;
+}
+
+impl HasPoint for Rect {
+    fn has_point(&self, x: u16, y: u16) -> bool {
+        x >= self.x && x < self.x + self.width && y >= self.y && y < self.y + self.height
+    }
+}
 
 pub fn render_split(
     split: usize,
@@ -145,28 +157,34 @@ pub fn render_split(
                                     ));
                                 }
 
-                                let block = Block::default()
-                                    .borders(Borders::ALL)
-                                    .border_style(Style::default().fg(match is_active {
+                                let block = Block::default().borders(Borders::ALL).border_style(
+                                    Style::default().fg(match is_active {
                                         true => Color::Green,
                                         false => Color::White,
-                                    }));
+                                    }),
+                                );
+
+                                let inner_block = block.inner(chunk);
 
                                 let render_details =
-                                    panel.make_widget(app, frame, block.inner(chunk), is_active);
+                                    panel.make_widget(app, frame, inner_block, is_active);
 
                                 title.extend(render_details.title);
 
-                                frame.render_widget(
-                                    block.title(Spans::from(title)),
-                                    chunk,
-                                );
+                                frame.render_widget(block.title(Spans::from(title)), chunk);
 
                                 if is_active {
-                                    frame.set_cursor(
-                                        render_details.cursor.0,
-                                        render_details.cursor.1,
-                                    );
+                                    if inner_block
+                                        .has_point(render_details.cursor.0, render_details.cursor.1)
+                                    {
+                                        frame.set_cursor(
+                                            render_details.cursor.0,
+                                            render_details.cursor.1,
+                                        );
+                                    } else {
+                                        // set off screen
+                                        frame.set_cursor(CURSOR_MAX.0, CURSOR_MAX.1);
+                                    }
                                 }
                             }
                             None => (),
