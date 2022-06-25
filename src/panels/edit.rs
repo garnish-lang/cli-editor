@@ -100,6 +100,78 @@ impl TextEditPanel {
     fn set_cursor_to_end(&mut self) {
         self.cursor_index = self.text.len();
     }
+
+    fn make_text_content(&self, text_content_box: Rect) -> (Vec<Spans>, (u16, u16)) {
+        let max_text_length = text_content_box.width as usize;
+        let continuation_length =
+            max_text_length - self.continuation_marker.len();
+
+        let (mut cursor_x, mut cursor_y) = (text_content_box.x, 0u16);
+
+        let mut lines = vec![];
+
+        let mut line_start_index = 0;
+        for text_line in self.text.lines() {
+            // add 1 to account for newline character
+            let true_len = text_line.len() + 1;
+
+            // lines.push(Spans::from(format!("{}, {} - {} - {}", true_len, max_text_length, line_start_index, self.cursor_index)));
+            if text_line.len() < max_text_length {
+                lines.push(Spans::from(text_line));
+
+                // lines.push(Spans::from(format!("{}", (line_start_index..(line_start_index + text_line.len())).contains(&self.cursor_index))));
+
+                // plus 1 to include 1 past a newline character
+                if (line_start_index..(line_start_index + true_len + 1)).contains(&self.cursor_index) {
+                    if self.text.chars().nth(self.cursor_index - 1).unwrap() == '\n' {
+                        cursor_x = text_content_box.x;
+                        cursor_y = lines.len() as u16 + 1;
+                    } else {
+                        cursor_x += (self.cursor_index - line_start_index) as u16;
+                        cursor_y += lines.len() as u16;
+                    }
+                }
+
+                line_start_index += true_len;
+            } else {
+                let (mut current, mut next) = text_line.split_at(max_text_length);
+                lines.push(Spans::from(Span::from(current)));
+
+                while next.len() >= continuation_length {
+                    if (line_start_index..(line_start_index + current.len())).contains(&self.cursor_index) {
+                        cursor_x += (self.cursor_index - line_start_index
+                            + self.continuation_marker.len())
+                            as u16;
+                        cursor_y += (lines.len()) as u16;
+                    }
+
+                    (current, next) = next.split_at(continuation_length);
+
+                    line_start_index += current.len();
+
+                    lines.push(Spans::from(vec![
+                        Span::from(self.continuation_marker.as_str()),
+                        Span::from(current),
+                    ]));
+                }
+
+                line_start_index += current.len();
+
+                if (line_start_index..(line_start_index + current.len())).contains(&self.cursor_index) {
+                    cursor_x += (self.cursor_index - line_start_index
+                        + self.continuation_marker.len()) as u16;
+                    cursor_y += (lines.len()) as u16;
+                }
+
+                lines.push(Spans::from(vec![
+                    Span::from(self.continuation_marker.as_str()),
+                    Span::from(next),
+                ]));
+            }
+        }
+
+        (lines, (cursor_x, cursor_y))
+    }
 }
 
 impl Panel for TextEditPanel {
@@ -143,74 +215,7 @@ impl Panel for TextEditPanel {
                 ])
                 .split(layout[1]);
 
-            let text_content_box = layout[2];
-            let max_text_length = text_content_box.width as usize;
-            let continuation_length =
-                max_text_length - self.continuation_marker.len();
-
-            let (mut cursor_x, mut cursor_y) = (text_content_box.x, 0u16);
-
-            let mut lines = vec![];
-
-            let mut line_start_index = 0;
-            for text_line in self.text.lines() {
-                // add 1 to account for newline character
-                let true_len = text_line.len() + 1;
-
-                // lines.push(Spans::from(format!("{}, {} - {} - {}", true_len, max_text_length, line_start_index, self.cursor_index)));
-                if text_line.len() < max_text_length {
-                    lines.push(Spans::from(text_line));
-
-                    // lines.push(Spans::from(format!("{}", (line_start_index..(line_start_index + text_line.len())).contains(&self.cursor_index))));
-
-                    // plus 1 to include 1 past a newline character
-                    if (line_start_index..(line_start_index + true_len + 1)).contains(&self.cursor_index) {
-                        if self.text.chars().nth(self.cursor_index - 1).unwrap() == '\n' {
-                            cursor_x = text_content_box.x;
-                            cursor_y = lines.len() as u16 + 1;
-                        } else {
-                            cursor_x += (self.cursor_index - line_start_index) as u16;
-                            cursor_y += lines.len() as u16;
-                        }
-                    }
-
-                    line_start_index += true_len;
-                } else {
-                    let (mut current, mut next) = text_line.split_at(max_text_length);
-                    lines.push(Spans::from(Span::from(current)));
-
-                    while next.len() >= continuation_length {
-                        if (line_start_index..(line_start_index + current.len())).contains(&self.cursor_index) {
-                            cursor_x += (self.cursor_index - line_start_index
-                                + self.continuation_marker.len())
-                                as u16;
-                            cursor_y += (lines.len()) as u16;
-                        }
-
-                        (current, next) = next.split_at(continuation_length);
-
-                        line_start_index += current.len();
-
-                        lines.push(Spans::from(vec![
-                            Span::from(self.continuation_marker.as_str()),
-                            Span::from(current),
-                        ]));
-                    }
-
-                    line_start_index += current.len();
-
-                    if (line_start_index..(line_start_index + current.len())).contains(&self.cursor_index) {
-                        cursor_x += (self.cursor_index - line_start_index
-                            + self.continuation_marker.len()) as u16;
-                        cursor_y += (lines.len()) as u16;
-                    }
-
-                    lines.push(Spans::from(vec![
-                        Span::from(self.continuation_marker.as_str()),
-                        Span::from(next),
-                    ]));
-                }
-            }
+            let (lines, cursor) = self.make_text_content(layout[2]);
 
             let para_text = Text::from(lines);
 
@@ -233,7 +238,7 @@ impl Panel for TextEditPanel {
 
             frame.render_widget(para, layout[2]);
 
-            RenderDetails::new(vec![Span::raw(self.title.clone())], (cursor_x, cursor_y))
+            RenderDetails::new(vec![Span::raw(self.title.clone())], cursor)
         } else {
             RenderDetails::new(vec![Span::raw(self.title.clone())], (1, 1))
         }
