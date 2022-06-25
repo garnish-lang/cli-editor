@@ -344,7 +344,7 @@ mod tests {
 
         let (spans, cursor) = edit.make_text_content(Rect::new(10, 10, 20, 20));
 
-        assert_eq!(cursor, (16, 12));
+        assert_eq!(cursor, (16, 11));
     }
 
     #[test]
@@ -355,6 +355,6 @@ mod tests {
 
         let (spans, cursor) = edit.make_text_content(Rect::new(10, 10, 20, 20));
 
-        assert_eq!(cursor, (10, 13));
+        assert_eq!(cursor, (10, 12));
     }
 }
