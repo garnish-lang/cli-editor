@@ -13,7 +13,10 @@ use crate::app::StateChangeRequest;
 use crate::autocomplete::FileAutoCompleter;
 use crate::commands::shift_catch_all;
 use crate::panels::RenderDetails;
-use crate::{catch_all, ctrl_key, AppState, CommandDetails, CommandKeyId, Commands, EditorFrame, Panel, CURSOR_MAX};
+use crate::{
+    catch_all, ctrl_key, AppState, CommandDetails, CommandKeyId, Commands, EditorFrame, Panel,
+    CURSOR_MAX,
+};
 
 pub const EDIT_PANEL_TYPE_ID: &str = "Edit";
 
@@ -118,32 +121,25 @@ impl TextEditPanel {
                 // lines.push(Spans::from(format!("{}", (line_start_index..(line_start_index + text_line.len())).contains(&self.cursor_index))));
 
                 // plus 1 to include 1 past a newline character
-                if (line_start_index..(line_start_index + true_len + 1)).contains(&self.cursor_index) {
-                    if self.text.chars().nth(self.cursor_index - 1).unwrap() == '\n' {
-                        cursor_x = text_content_box.x;
-                        cursor_y = text_content_box.y + lines.len() as u16;
-                    } else {
-                        cursor_x = text_content_box.x + (self.cursor_index - line_start_index) as u16;
-                        cursor_y = text_content_box.y + lines.len() as u16 - 1;
-                    }
+                if (line_start_index..(line_start_index + true_len + 1))
+                    .contains(&self.cursor_index)
+                {
+                    cursor_x = text_content_box.x + (self.cursor_index - line_start_index) as u16;
+                    cursor_y = text_content_box.y + lines.len() as u16 - 1;
                 }
 
                 line_start_index += true_len;
             } else {
                 let (mut current, mut next) = text_line.split_at(max_text_length);
-                let continuation_length =
-                    max_text_length - self.continuation_marker.len();
+                let continuation_length = max_text_length - self.continuation_marker.len();
 
                 lines.push(Spans::from(Span::from(current)));
 
-                if (line_start_index..(line_start_index + current.len() + 1)).contains(&self.cursor_index) {
-                    if self.text.chars().nth(self.cursor_index - 1).unwrap() == '\n' {
-                        cursor_x = text_content_box.x as u16;
-                        cursor_y = text_content_box.y + lines.len() as u16;
-                    } else {
-                        cursor_x = text_content_box.x + (self.cursor_index - line_start_index) as u16;
-                        cursor_y = text_content_box.y + lines.len() as u16 - 1;
-                    }
+                if (line_start_index..(line_start_index + current.len() + 1))
+                    .contains(&self.cursor_index)
+                {
+                    cursor_x = text_content_box.x + (self.cursor_index - line_start_index) as u16;
+                    cursor_y = text_content_box.y + lines.len() as u16 - 1;
                 }
 
                 line_start_index += current.len();
@@ -156,14 +152,14 @@ impl TextEditPanel {
                         Span::from(current),
                     ]));
 
-                    if (line_start_index..(line_start_index + current.len() + 1)).contains(&self.cursor_index) {
-                        if self.text.chars().nth(self.cursor_index - 1).unwrap() == '\n' {
-                            cursor_x = text_content_box.x + self.continuation_marker.len() as u16;
-                            cursor_y = text_content_box.y + lines.len() as u16;
-                        } else {
-                            cursor_x = text_content_box.x + (self.cursor_index - line_start_index + self.continuation_marker.len()) as u16;
-                            cursor_y = text_content_box.y + lines.len() as u16 - 1;
-                        }
+                    if (line_start_index..(line_start_index + current.len() + 1))
+                        .contains(&self.cursor_index)
+                    {
+                        cursor_x = text_content_box.x
+                            + (self.cursor_index - line_start_index
+                                + self.continuation_marker.len())
+                                as u16;
+                        cursor_y = text_content_box.y + lines.len() as u16 - 1;
                     }
 
                     line_start_index += current.len();
@@ -175,17 +171,22 @@ impl TextEditPanel {
                 ]));
 
                 // plus 1 to include 1 past text length
-                if (line_start_index..(line_start_index + next.len() + 1)).contains(&self.cursor_index) {
-                    if self.text.chars().nth(self.cursor_index - 1).unwrap() == '\n' {
-                        cursor_x = text_content_box.x + self.continuation_marker.len() as u16;
-                        cursor_y = text_content_box.y + lines.len() as u16;
-                    } else {
-                        cursor_x = text_content_box.x + (self.cursor_index - line_start_index + self.continuation_marker.len()) as u16;
-                        cursor_y = text_content_box.y + lines.len() as u16 - 1;
-                    }
+                if (line_start_index..(line_start_index + next.len() + 1))
+                    .contains(&self.cursor_index)
+                {
+                    cursor_x = text_content_box.x
+                        + (self.cursor_index - line_start_index + self.continuation_marker.len())
+                            as u16;
+                    cursor_y = text_content_box.y + lines.len() as u16 - 1;
                 }
 
-                line_start_index += next.len();
+                // plus 1 to include newline character
+                line_start_index += next.len() + 1;
+            }
+
+            if self.text.chars().nth(self.cursor_index - 1).unwrap() == '\n' {
+                cursor_x = text_content_box.x;
+                cursor_y = text_content_box.y + lines.len() as u16;
             }
         }
 
@@ -353,6 +354,7 @@ pub fn make_commands() -> Result<Commands<EditCommand>, String> {
 #[cfg(test)]
 mod tests {
     use tui::layout::Rect;
+
     use crate::{AppState, TextEditPanel};
 
     #[test]
@@ -385,7 +387,13 @@ mod tests {
 
         let (spans, cursor) = edit.make_text_content(Rect::new(10, 10, 20, 20));
 
-        assert_eq!(cursor, (edit.cursor_index as u16 - 10 + edit.continuation_marker.len() as u16, 11));
+        assert_eq!(
+            cursor,
+            (
+                edit.cursor_index as u16 - 10 + edit.continuation_marker.len() as u16,
+                11
+            )
+        );
     }
 
     #[test]
@@ -396,7 +404,13 @@ mod tests {
 
         let (spans, cursor) = edit.make_text_content(Rect::new(10, 10, 20, 20));
 
-        assert_eq!(cursor, (edit.cursor_index as u16 - 10 + edit.continuation_marker.len() as u16, 11));
+        assert_eq!(
+            cursor,
+            (
+                edit.cursor_index as u16 - 10 + edit.continuation_marker.len() as u16,
+                11
+            )
+        );
     }
 
     #[test]
@@ -420,6 +434,18 @@ mod tests {
 
         let (spans, cursor) = edit.make_text_content(Rect::new(10, 10, 20, 20));
 
-        assert_eq!(cursor, (21, 13));
+        assert_eq!(cursor, (20, 13));
+    }
+
+    #[test]
+    fn newline_after_line_with_continuations() {
+        let mut edit = TextEditPanel::new();
+        //           |                   |               |
+        edit.text = "12345678901234567890123456789012345678901234567890\n".to_string();
+        edit.set_cursor_to_end();
+
+        let (spans, cursor) = edit.make_text_content(Rect::new(10, 10, 20, 20));
+
+        assert_eq!(cursor, (10, 13));
     }
 }
