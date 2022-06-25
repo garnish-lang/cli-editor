@@ -20,30 +20,26 @@ use crate::{
 pub const EDIT_PANEL_TYPE_ID: &str = "Edit";
 
 pub struct TextEditPanel {
-    min_x: u16,
-    min_y: u16,
-    cursor_x: u16,
-    cursor_y: u16,
+    cursor_index: usize,
     text: String,
     title: String,
     commands: Commands<EditCommand>,
     file_path: PathBuf,
     gutter_size: u16,
+    continuation_marker: String,
 }
 
 #[allow(dead_code)]
 impl TextEditPanel {
     pub fn new() -> Self {
         TextEditPanel {
-            cursor_x: 1,
-            cursor_y: 1,
-            min_x: 1,
-            min_y: 1,
+            cursor_index: 0,
             gutter_size: 5,
             text: String::new(),
             title: "Buffer".to_string(),
             commands: Commands::<EditCommand>::new(),
             file_path: PathBuf::new(),
+            continuation_marker: "... ".to_string(),
         }
     }
 
@@ -61,44 +57,24 @@ impl TextEditPanel {
         _state: &mut AppState,
     ) -> (bool, Vec<StateChangeRequest>) {
         match code {
-            KeyCode::Backspace => {
-                match self.text.pop() {
-                    None => {
-                        self.cursor_x = self.min_x;
-                        self.cursor_y = self.min_y;
-                    }
-                    Some(c) => {
-                        match c {
-                            '\n' => {
-                                self.cursor_y -= 1;
-                                self.cursor_x = self.min_x;
-
-                                // count from back until a newline is reached
-                                for c in self.text.chars().rev() {
-                                    if c == '\n' {
-                                        break;
-                                    }
-                                    self.cursor_x += 1;
-                                }
-                            }
-                            _ => {
-                                self.cursor_x -= 1;
-                            }
-                        }
-                    }
+            KeyCode::Backspace => match self.text.pop() {
+                None => {
+                    self.cursor_index = 0;
                 }
-            }
+                Some(_) => {
+                    self.cursor_index -= 1;
+                }
+            },
             KeyCode::Delete => {
                 // ??
             }
             KeyCode::Enter => {
                 self.text.push('\n');
-                self.cursor_y += 1;
-                self.cursor_x = 1;
+                self.cursor_index += 1;
             }
             KeyCode::Char(c) => {
-                self.cursor_x += 1;
                 self.text.push(c);
+                self.cursor_index += 1;
             }
             _ => return (false, vec![]),
         }
@@ -122,20 +98,7 @@ impl TextEditPanel {
     }
 
     fn set_cursor_to_end(&mut self) {
-        self.cursor_x = self.min_x;
-        self.cursor_y = self.min_y;
-
-        for c in self.text.chars() {
-            match c {
-                '\n' => {
-                    self.cursor_x = self.min_x;
-                    self.cursor_y += 1;
-                }
-                _ => {
-                    self.cursor_x += 1;
-                }
-            }
-        }
+        self.cursor_index = self.text.len();
     }
 }
 
@@ -160,24 +123,6 @@ impl Panel for TextEditPanel {
     ) -> RenderDetails {
         if !self.text.is_empty() {
             let line_count = self.text.lines().count();
-
-            let para_text = Text::from(
-                self.text
-                    .lines()
-                    .take(rect.height as usize)
-                    .enumerate()
-                    .map(|(i, line)| {
-                        Spans::from(Span::styled(
-                            line,
-                            Style::default().fg(match i % 2 == 0 {
-                                true => Color::Blue,
-                                false => Color::LightBlue,
-                            }),
-                        ))
-                    })
-                    .collect::<Vec<Spans>>(),
-            );
-
             let line_count_size = line_count.to_string().len().min(u16::MAX as usize) as u16;
 
             let layout = Layout::default()
@@ -189,6 +134,86 @@ impl Panel for TextEditPanel {
                 ])
                 .split(rect);
 
+            let gutter_layout = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints(vec![
+                    Constraint::Length(1),
+                    Constraint::Length(self.gutter_size - 2),
+                    Constraint::Length(1),
+                ])
+                .split(layout[1]);
+
+            let text_content_box = layout[2];
+            let max_text_length = text_content_box.width as usize;
+            let continuation_length =
+                max_text_length - self.continuation_marker.len();
+
+            let (mut cursor_x, mut cursor_y) = (text_content_box.x, 0u16);
+
+            let mut lines = vec![];
+
+            let mut line_start_index = 0;
+            for text_line in self.text.lines() {
+                // add 1 to account for newline character
+                let true_len = text_line.len() + 1;
+
+                // lines.push(Spans::from(format!("{}, {} - {} - {}", true_len, max_text_length, line_start_index, self.cursor_index)));
+                if text_line.len() < max_text_length {
+                    lines.push(Spans::from(text_line));
+
+                    // lines.push(Spans::from(format!("{}", (line_start_index..(line_start_index + text_line.len())).contains(&self.cursor_index))));
+
+                    // plus 1 to include 1 past a newline character
+                    if (line_start_index..(line_start_index + true_len + 1)).contains(&self.cursor_index) {
+                        if self.text.chars().nth(self.cursor_index - 1).unwrap() == '\n' {
+                            cursor_x = text_content_box.x;
+                            cursor_y = lines.len() as u16 + 1;
+                        } else {
+                            cursor_x += (self.cursor_index - line_start_index) as u16;
+                            cursor_y += lines.len() as u16;
+                        }
+                    }
+
+                    line_start_index += true_len;
+                } else {
+                    let (mut current, mut next) = text_line.split_at(max_text_length);
+                    lines.push(Spans::from(Span::from(current)));
+
+                    while next.len() >= continuation_length {
+                        if (line_start_index..(line_start_index + current.len())).contains(&self.cursor_index) {
+                            cursor_x += (self.cursor_index - line_start_index
+                                + self.continuation_marker.len())
+                                as u16;
+                            cursor_y += (lines.len()) as u16;
+                        }
+
+                        (current, next) = next.split_at(continuation_length);
+
+                        line_start_index += current.len();
+
+                        lines.push(Spans::from(vec![
+                            Span::from(self.continuation_marker.as_str()),
+                            Span::from(current),
+                        ]));
+                    }
+
+                    line_start_index += current.len();
+
+                    if (line_start_index..(line_start_index + current.len())).contains(&self.cursor_index) {
+                        cursor_x += (self.cursor_index - line_start_index
+                            + self.continuation_marker.len()) as u16;
+                        cursor_y += (lines.len()) as u16;
+                    }
+
+                    lines.push(Spans::from(vec![
+                        Span::from(self.continuation_marker.as_str()),
+                        Span::from(next),
+                    ]));
+                }
+            }
+
+            let para_text = Text::from(lines);
+
             let line_numbers = (1..rect.height + 1)
                 .map(|i| i.to_string())
                 .collect::<Vec<String>>()
@@ -199,15 +224,6 @@ impl Panel for TextEditPanel {
 
             frame.render_widget(line_numbers_para, layout[0]);
 
-            let gutter_layout = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints(vec![
-                    Constraint::Length(1),
-                    Constraint::Length(self.gutter_size - 2),
-                    Constraint::Length(1),
-                ])
-                .split(layout[1]);
-
             let gutter = Block::default().style(Style::default().bg(Color::DarkGray));
 
             frame.render_widget(gutter, gutter_layout[1]);
@@ -216,12 +232,11 @@ impl Panel for TextEditPanel {
                 Paragraph::new(para_text).style(Style::default().fg(Color::White).bg(Color::Black));
 
             frame.render_widget(para, layout[2]);
-        }
 
-        RenderDetails::new(
-            vec![Span::raw(self.title.clone())],
-            (self.cursor_x, self.cursor_y),
-        )
+            RenderDetails::new(vec![Span::raw(self.title.clone())], (cursor_x, cursor_y))
+        } else {
+            RenderDetails::new(vec![Span::raw(self.title.clone())], (1, 1))
+        }
     }
 
     fn receive_key(
