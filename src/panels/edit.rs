@@ -102,21 +102,26 @@ impl TextEditPanel {
         self.cursor_index = self.text.len();
     }
 
-    fn make_text_content(&self, text_content_box: Rect) -> (Vec<Spans>, (u16, u16)) {
+    fn make_text_content(&self, text_content_box: Rect) -> (Vec<Spans>, (u16, u16), Vec<Spans>) {
         let max_text_length = text_content_box.width as usize;
 
         let (mut cursor_x, mut cursor_y) = CURSOR_MAX;
 
         let mut lines = vec![];
+        let mut gutter = vec![];
+        let mut real_line_count = 0;
 
         let mut line_start_index = 0;
-        for text_line in self.text.lines() {
+        // only take up to maximum we can display
+        for text_line in self.text.lines().take(text_content_box.height as usize) {
+            real_line_count += 1;
             // add 1 to account for newline character
             let true_len = text_line.len() + 1;
 
             // lines.push(Spans::from(format!("{}, {} - {} - {}", true_len, max_text_length, line_start_index, self.cursor_index)));
             if text_line.len() < max_text_length {
                 lines.push(Spans::from(text_line));
+                gutter.push(Spans::from(Span::from(real_line_count.to_string())));
 
                 // lines.push(Spans::from(format!("{}", (line_start_index..(line_start_index + text_line.len())).contains(&self.cursor_index))));
 
@@ -134,6 +139,7 @@ impl TextEditPanel {
                 let continuation_length = max_text_length - self.continuation_marker.len();
 
                 lines.push(Spans::from(Span::from(current)));
+                gutter.push(Spans::from(Span::from(real_line_count.to_string())));
 
                 if (line_start_index..(line_start_index + current.len() + 1))
                     .contains(&self.cursor_index)
@@ -151,6 +157,7 @@ impl TextEditPanel {
                         Span::from(self.continuation_marker.as_str()),
                         Span::from(current),
                     ]));
+                    gutter.push(Spans::from(Span::from(".")));
 
                     if (line_start_index..(line_start_index + current.len() + 1))
                         .contains(&self.cursor_index)
@@ -169,6 +176,7 @@ impl TextEditPanel {
                     Span::from(self.continuation_marker.as_str()),
                     Span::from(next),
                 ]));
+                gutter.push(Spans::from(Span::from(".")));
 
                 // plus 1 to include 1 past text length
                 if (line_start_index..(line_start_index + next.len() + 1))
@@ -190,7 +198,12 @@ impl TextEditPanel {
             }
         }
 
-        (lines, (cursor_x, cursor_y))
+        if self.text.ends_with('\n') {
+            // add additional row to numbers to indicate new line has been started
+            gutter.push(Spans::from(Span::from((real_line_count + 1).to_string())));
+        }
+
+        (lines, (cursor_x, cursor_y), gutter)
     }
 }
 
@@ -235,17 +248,12 @@ impl Panel for TextEditPanel {
                 ])
                 .split(layout[1]);
 
-            let (lines, cursor) = self.make_text_content(layout[2]);
+            let (lines, cursor, gutter) = self.make_text_content(layout[2]);
 
             let para_text = Text::from(lines);
 
-            let line_numbers = (1..rect.height + 1)
-                .map(|i| i.to_string())
-                .collect::<Vec<String>>()
-                .join("\n");
-
             let line_numbers_para =
-                Paragraph::new(Text::from(line_numbers)).alignment(Alignment::Right);
+                Paragraph::new(Text::from(gutter)).alignment(Alignment::Right);
 
             frame.render_widget(line_numbers_para, layout[0]);
 
@@ -354,6 +362,8 @@ pub fn make_commands() -> Result<Commands<EditCommand>, String> {
 #[cfg(test)]
 mod tests {
     use tui::layout::Rect;
+    use tui::style::{Color, Style};
+    use tui::text::{Span, Spans};
 
     use crate::{AppState, TextEditPanel};
 
@@ -363,7 +373,7 @@ mod tests {
         edit.text = "123456789\n123456".to_string();
         edit.set_cursor_to_end();
 
-        let (spans, cursor) = edit.make_text_content(Rect::new(10, 10, 20, 20));
+        let (spans, cursor, gutter) = edit.make_text_content(Rect::new(10, 10, 20, 20));
 
         assert_eq!(cursor, (16, 11));
     }
@@ -374,7 +384,7 @@ mod tests {
         edit.text = "123456789\n123456\n".to_string();
         edit.set_cursor_to_end();
 
-        let (spans, cursor) = edit.make_text_content(Rect::new(10, 10, 20, 20));
+        let (spans, cursor, gutter) = edit.make_text_content(Rect::new(10, 10, 20, 20));
 
         assert_eq!(cursor, (10, 12));
     }
@@ -385,7 +395,7 @@ mod tests {
         edit.text = "123456789012345678901234567890".to_string();
         edit.cursor_index = 25;
 
-        let (spans, cursor) = edit.make_text_content(Rect::new(10, 10, 20, 20));
+        let (spans, cursor, gutter) = edit.make_text_content(Rect::new(10, 10, 20, 20));
 
         assert_eq!(
             cursor,
@@ -402,7 +412,7 @@ mod tests {
         edit.text = "123456789012345678901234567890".to_string();
         edit.set_cursor_to_end();
 
-        let (spans, cursor) = edit.make_text_content(Rect::new(10, 10, 20, 20));
+        let (spans, cursor, gutter) = edit.make_text_content(Rect::new(10, 10, 20, 20));
 
         assert_eq!(
             cursor,
@@ -420,7 +430,7 @@ mod tests {
         edit.text = "12345678901234567890123456789012345678901234567890".to_string();
         edit.set_cursor_to_end();
 
-        let (spans, cursor) = edit.make_text_content(Rect::new(10, 10, 20, 20));
+        let (spans, cursor, gutter) = edit.make_text_content(Rect::new(10, 10, 20, 20));
 
         assert_eq!(cursor, (24 + edit.continuation_marker.len() as u16, 12));
     }
@@ -432,9 +442,15 @@ mod tests {
         edit.text = "12345678901234567890123456789012345678901234567890\n1234567890".to_string();
         edit.set_cursor_to_end();
 
-        let (spans, cursor) = edit.make_text_content(Rect::new(10, 10, 20, 20));
+        let (spans, cursor, gutter) = edit.make_text_content(Rect::new(10, 10, 20, 20));
 
         assert_eq!(cursor, (20, 13));
+        assert_eq!(gutter, vec![
+            Spans::from(Span::from("1")),
+            Spans::from(Span::from(".")),
+            Spans::from(Span::from(".")),
+            Spans::from(Span::from("2")),
+        ]);
     }
 
     #[test]
@@ -444,8 +460,14 @@ mod tests {
         edit.text = "12345678901234567890123456789012345678901234567890\n".to_string();
         edit.set_cursor_to_end();
 
-        let (spans, cursor) = edit.make_text_content(Rect::new(10, 10, 20, 20));
+        let (spans, cursor, gutter) = edit.make_text_content(Rect::new(10, 10, 20, 20));
 
         assert_eq!(cursor, (10, 13));
+        assert_eq!(gutter, vec![
+            Spans::from(Span::from("1")),
+            Spans::from(Span::from(".")),
+            Spans::from(Span::from(".")),
+            Spans::from(Span::from("2")),
+        ]);
     }
 }
