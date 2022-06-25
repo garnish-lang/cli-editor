@@ -106,7 +106,7 @@ impl TextEditPanel {
         let continuation_length =
             max_text_length - self.continuation_marker.len();
 
-        let (mut cursor_x, mut cursor_y) = (text_content_box.x, 0u16);
+        let (mut cursor_x, mut cursor_y) = (text_content_box.x, text_content_box.y);
 
         let mut lines = vec![];
 
@@ -125,7 +125,7 @@ impl TextEditPanel {
                 if (line_start_index..(line_start_index + true_len + 1)).contains(&self.cursor_index) {
                     if self.text.chars().nth(self.cursor_index - 1).unwrap() == '\n' {
                         cursor_x = text_content_box.x;
-                        cursor_y = lines.len() as u16 + 1;
+                        cursor_y += lines.len() as u16 + 1;
                     } else {
                         cursor_x += (self.cursor_index - line_start_index) as u16;
                         cursor_y += lines.len() as u16;
@@ -329,4 +329,32 @@ pub fn make_commands() -> Result<Commands<EditCommand>, String> {
     })?;
 
     Ok(commands)
+}
+
+#[cfg(test)]
+mod tests {
+    use tui::layout::Rect;
+    use crate::{AppState, TextEditPanel};
+
+    #[test]
+    fn cursor_is_one_past_end() {
+        let mut edit = TextEditPanel::new();
+        edit.text = "123456789\n123456".to_string();
+        edit.cursor_index = edit.text.len();
+
+        let (spans, cursor) = edit.make_text_content(Rect::new(10, 10, 20, 20));
+
+        assert_eq!(cursor, (16, 12));
+    }
+
+    #[test]
+    fn cursor_is_next_line_when_after_newline() {
+        let mut edit = TextEditPanel::new();
+        edit.text = "123456789\n123456\n".to_string();
+        edit.cursor_index = edit.text.len();
+
+        let (spans, cursor) = edit.make_text_content(Rect::new(10, 10, 20, 20));
+
+        assert_eq!(cursor, (10, 13));
+    }
 }
