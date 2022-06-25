@@ -13,9 +13,7 @@ use crate::app::StateChangeRequest;
 use crate::autocomplete::FileAutoCompleter;
 use crate::commands::shift_catch_all;
 use crate::panels::RenderDetails;
-use crate::{
-    catch_all, ctrl_key, AppState, CommandDetails, CommandKeyId, Commands, EditorFrame, Panel,
-};
+use crate::{catch_all, ctrl_key, AppState, CommandDetails, CommandKeyId, Commands, EditorFrame, Panel, CURSOR_MAX};
 
 pub const EDIT_PANEL_TYPE_ID: &str = "Edit";
 
@@ -106,7 +104,7 @@ impl TextEditPanel {
         let continuation_length =
             max_text_length - self.continuation_marker.len();
 
-        let (mut cursor_x, mut cursor_y) = (text_content_box.x, text_content_box.y);
+        let (mut cursor_x, mut cursor_y) = CURSOR_MAX;
 
         let mut lines = vec![];
 
@@ -125,10 +123,10 @@ impl TextEditPanel {
                 if (line_start_index..(line_start_index + true_len + 1)).contains(&self.cursor_index) {
                     if self.text.chars().nth(self.cursor_index - 1).unwrap() == '\n' {
                         cursor_x = text_content_box.x;
-                        cursor_y += lines.len() as u16;
+                        cursor_y = text_content_box.y + lines.len() as u16;
                     } else {
-                        cursor_x += (self.cursor_index - line_start_index) as u16;
-                        cursor_y += lines.len() as u16 - 1;
+                        cursor_x = text_content_box.x + (self.cursor_index - line_start_index) as u16;
+                        cursor_y = text_content_box.y + lines.len() as u16 - 1;
                     }
                 }
 
