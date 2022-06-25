@@ -101,8 +101,6 @@ impl TextEditPanel {
 
     fn make_text_content(&self, text_content_box: Rect) -> (Vec<Spans>, (u16, u16)) {
         let max_text_length = text_content_box.width as usize;
-        let continuation_length =
-            max_text_length - self.continuation_marker.len();
 
         let (mut cursor_x, mut cursor_y) = CURSOR_MAX;
 
@@ -133,38 +131,61 @@ impl TextEditPanel {
                 line_start_index += true_len;
             } else {
                 let (mut current, mut next) = text_line.split_at(max_text_length);
+                let continuation_length =
+                    max_text_length - self.continuation_marker.len();
+
                 lines.push(Spans::from(Span::from(current)));
 
-                while next.len() >= continuation_length {
-                    if (line_start_index..(line_start_index + current.len())).contains(&self.cursor_index) {
-                        cursor_x += (self.cursor_index - line_start_index
-                            + self.continuation_marker.len())
-                            as u16;
-                        cursor_y += (lines.len()) as u16;
+                if (line_start_index..(line_start_index + current.len() + 1)).contains(&self.cursor_index) {
+                    if self.text.chars().nth(self.cursor_index - 1).unwrap() == '\n' {
+                        cursor_x = text_content_box.x as u16;
+                        cursor_y = text_content_box.y + lines.len() as u16;
+                    } else {
+                        cursor_x = text_content_box.x + (self.cursor_index - line_start_index) as u16;
+                        cursor_y = text_content_box.y + lines.len() as u16 - 1;
                     }
+                }
 
+                line_start_index += current.len();
+
+                while next.len() >= continuation_length {
                     (current, next) = next.split_at(continuation_length);
-
-                    line_start_index += current.len();
 
                     lines.push(Spans::from(vec![
                         Span::from(self.continuation_marker.as_str()),
                         Span::from(current),
                     ]));
-                }
 
-                line_start_index += current.len();
+                    if (line_start_index..(line_start_index + current.len() + 1)).contains(&self.cursor_index) {
+                        if self.text.chars().nth(self.cursor_index - 1).unwrap() == '\n' {
+                            cursor_x = text_content_box.x + self.continuation_marker.len() as u16;
+                            cursor_y = text_content_box.y + lines.len() as u16;
+                        } else {
+                            cursor_x = text_content_box.x + (self.cursor_index - line_start_index + self.continuation_marker.len()) as u16;
+                            cursor_y = text_content_box.y + lines.len() as u16 - 1;
+                        }
+                    }
 
-                if (line_start_index..(line_start_index + current.len())).contains(&self.cursor_index) {
-                    cursor_x += (self.cursor_index - line_start_index
-                        + self.continuation_marker.len()) as u16;
-                    cursor_y += (lines.len()) as u16;
+                    line_start_index += current.len();
                 }
 
                 lines.push(Spans::from(vec![
                     Span::from(self.continuation_marker.as_str()),
                     Span::from(next),
                 ]));
+
+                // plus 1 to include 1 past text length
+                if (line_start_index..(line_start_index + next.len() + 1)).contains(&self.cursor_index) {
+                    if self.text.chars().nth(self.cursor_index - 1).unwrap() == '\n' {
+                        cursor_x = text_content_box.x + self.continuation_marker.len() as u16;
+                        cursor_y = text_content_box.y + lines.len() as u16;
+                    } else {
+                        cursor_x = text_content_box.x + (self.cursor_index - line_start_index + self.continuation_marker.len()) as u16;
+                        cursor_y = text_content_box.y + lines.len() as u16 - 1;
+                    }
+                }
+
+                line_start_index += next.len();
             }
         }
 
@@ -338,7 +359,7 @@ mod tests {
     fn cursor_is_one_past_end() {
         let mut edit = TextEditPanel::new();
         edit.text = "123456789\n123456".to_string();
-        edit.cursor_index = edit.text.len();
+        edit.set_cursor_to_end();
 
         let (spans, cursor) = edit.make_text_content(Rect::new(10, 10, 20, 20));
 
@@ -349,10 +370,56 @@ mod tests {
     fn cursor_is_next_line_when_after_newline() {
         let mut edit = TextEditPanel::new();
         edit.text = "123456789\n123456\n".to_string();
-        edit.cursor_index = edit.text.len();
+        edit.set_cursor_to_end();
 
         let (spans, cursor) = edit.make_text_content(Rect::new(10, 10, 20, 20));
 
         assert_eq!(cursor, (10, 12));
+    }
+
+    #[test]
+    fn cursor_on_continuation_line() {
+        let mut edit = TextEditPanel::new();
+        edit.text = "123456789012345678901234567890".to_string();
+        edit.cursor_index = 25;
+
+        let (spans, cursor) = edit.make_text_content(Rect::new(10, 10, 20, 20));
+
+        assert_eq!(cursor, (edit.cursor_index as u16 - 10 + edit.continuation_marker.len() as u16, 11));
+    }
+
+    #[test]
+    fn cursor_end_of_continuation_line() {
+        let mut edit = TextEditPanel::new();
+        edit.text = "123456789012345678901234567890".to_string();
+        edit.set_cursor_to_end();
+
+        let (spans, cursor) = edit.make_text_content(Rect::new(10, 10, 20, 20));
+
+        assert_eq!(cursor, (edit.cursor_index as u16 - 10 + edit.continuation_marker.len() as u16, 11));
+    }
+
+    #[test]
+    fn cursor_end_of_multiple_continuation_line() {
+        let mut edit = TextEditPanel::new();
+        //           |                   |               |
+        edit.text = "12345678901234567890123456789012345678901234567890".to_string();
+        edit.set_cursor_to_end();
+
+        let (spans, cursor) = edit.make_text_content(Rect::new(10, 10, 20, 20));
+
+        assert_eq!(cursor, (24 + edit.continuation_marker.len() as u16, 12));
+    }
+
+    #[test]
+    fn line_after_line_with_continuations() {
+        let mut edit = TextEditPanel::new();
+        //           |                   |               |
+        edit.text = "12345678901234567890123456789012345678901234567890\n1234567890".to_string();
+        edit.set_cursor_to_end();
+
+        let (spans, cursor) = edit.make_text_content(Rect::new(10, 10, 20, 20));
+
+        assert_eq!(cursor, (21, 13));
     }
 }
