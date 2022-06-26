@@ -1,4 +1,3 @@
-use std::cmp::min;
 use std::{env, iter};
 use std::fs;
 use std::io::Read;
@@ -22,10 +21,8 @@ use crate::{
 pub const EDIT_PANEL_TYPE_ID: &str = "Edit";
 
 pub struct TextEditPanel {
-    cursor_index: usize,
     current_line: usize,
     cursor_index_in_line: usize,
-    text: String,
     title: String,
     commands: Commands<EditCommand>,
     file_path: PathBuf,
@@ -40,11 +37,9 @@ impl TextEditPanel {
     pub fn new() -> Self {
         TextEditPanel {
             scroll_y: 0,
-            cursor_index: 0,
             current_line: 0,
             cursor_index_in_line: 0,
             gutter_size: 5,
-            text: String::new(),
             title: "Buffer".to_string(),
             commands: Commands::<EditCommand>::new(),
             file_path: PathBuf::new(),
@@ -54,13 +49,11 @@ impl TextEditPanel {
     }
 
     pub fn get_text(&self) -> &str {
-        &self.text
+        ""
     }
 
     pub fn set_text<T: ToString>(&mut self, text: T) {
-        self.text = text.to_string();
-
-        for line in self.text.split('\n') {
+        for line in text.to_string().split('\n') {
             self.lines.push(line.to_string());
         }
     }
@@ -109,16 +102,6 @@ impl TextEditPanel {
     ) -> (bool, Vec<StateChangeRequest>) {
         match code {
             KeyCode::Backspace => {
-                match self.text.pop() {
-                    None => {
-                        self.cursor_index = 0;
-                    }
-                    Some(_) => {
-                        self.cursor_index -= 1;
-                    }
-                }
-
-                // new
                 if self.cursor_index_in_line == 0 {
                     self.remove_line();
                 } else {
@@ -137,19 +120,11 @@ impl TextEditPanel {
                 }
             }
             KeyCode::Enter => {
-                self.text.push('\n');
-                self.cursor_index += 1;
-
-                // new
                 self.lines.push(String::new());
                 self.current_line += 1;
                 self.cursor_index_in_line = 0;
             }
             KeyCode::Char(c) => {
-                self.text.push(c);
-                self.cursor_index += 1;
-
-                // new
                 match self.lines.get_mut(self.current_line) {
                     None => {
                         // start new
@@ -184,7 +159,6 @@ impl TextEditPanel {
     }
 
     fn set_cursor_to_end(&mut self) {
-        self.cursor_index = self.text.len();
         if self.lines.len() > 0 {
             self.current_line = self.lines.len() - 1;
             self.cursor_index_in_line = match self.lines.get(self.current_line) {
@@ -195,10 +169,6 @@ impl TextEditPanel {
             self.current_line = 0;
             self.cursor_index_in_line = 0;
         }
-    }
-
-    fn set_cursor_index(&mut self, index: usize) {
-        self.cursor_index = min(self.text.len(), index);
     }
 
     fn move_to_next_character(
@@ -320,7 +290,7 @@ impl TextEditPanel {
         _code: KeyCode,
         _state: &mut AppState,
     ) -> (bool, Vec<StateChangeRequest>) {
-        let limit = self.text.lines().count() as u16;
+        let limit = self.lines.len() as u16;
         self.scroll_down(10);
 
         if self.scroll_y > limit {
@@ -429,8 +399,8 @@ impl Panel for TextEditPanel {
         rect: Rect,
         _is_active: bool,
     ) -> RenderDetails {
-        if !self.text.is_empty() {
-            let line_count = self.text.lines().count();
+        if !self.lines.is_empty() {
+            let line_count = self.lines.len();
             let line_count_size = line_count.to_string().len().min(u16::MAX as usize) as u16;
 
             let layout = Layout::default()
@@ -532,7 +502,6 @@ impl Panel for TextEditPanel {
             }
         };
 
-        self.cursor_index = 0;
         self.scroll_y = 0;
 
         changes
@@ -614,7 +583,6 @@ mod tests {
     fn cursor_on_continuation_line() {
         let mut edit = TextEditPanel::new();
         edit.set_text("123456789012345678901234567890");
-        edit.cursor_index = 25;
         edit.current_line = 0;
         edit.cursor_index_in_line = 25;
 
@@ -623,7 +591,7 @@ mod tests {
         assert_eq!(
             cursor,
             (
-                edit.cursor_index as u16 - 10 + edit.continuation_marker.len() as u16,
+                edit.cursor_index_in_line as u16 - 10 + edit.continuation_marker.len() as u16,
                 11
             )
         );
@@ -718,7 +686,6 @@ mod tests {
             .map(|i| i.to_string())
             .collect::<Vec<String>>()
             .join("\n"));
-        edit.cursor_index = 49;
         edit.current_line = 12;
         edit.cursor_index_in_line = 1;
         edit.scroll_y = 10;
@@ -775,7 +742,6 @@ mod tests {
     fn handle_character_key_middle_of_line() {
         let mut edit = TextEditPanel::new();
         edit.set_text("ac");
-        edit.cursor_index = 1;
         edit.cursor_index_in_line = 1;
 
         let mut state = AppState::new();
@@ -819,7 +785,6 @@ mod tests {
     fn handle_backspace_key() {
         let mut edit = TextEditPanel::new();
         edit.set_text("a");
-        edit.cursor_index = 1;
         edit.cursor_index_in_line = 1;
 
         let mut state = AppState::new();
@@ -835,7 +800,6 @@ mod tests {
     fn handle_backspace_key_middle_of_line() {
         let mut edit = TextEditPanel::new();
         edit.set_text("abc");
-        edit.cursor_index = 1;
         edit.cursor_index_in_line = 2;
 
         let mut state = AppState::new();
@@ -851,7 +815,6 @@ mod tests {
     fn handle_backspace_key_start_of_non_empty_line() {
         let mut edit = TextEditPanel::new();
         edit.set_text("abc\ndef");
-        edit.cursor_index = 1;
         edit.current_line = 1;
         edit.cursor_index_in_line = 0;
 
@@ -868,7 +831,6 @@ mod tests {
     fn handle_backspace_key_on_newline() {
         let mut edit = TextEditPanel::new();
         edit.set_text("a\na");
-        edit.cursor_index = 2;
         edit.cursor_index_in_line = 1;
         edit.current_line = 1;
 
@@ -886,7 +848,6 @@ mod tests {
     fn handle_delete_key() {
         let mut edit = TextEditPanel::new();
         edit.set_text("a");
-        edit.cursor_index = 1;
         edit.cursor_index_in_line = 0;
 
         let mut state = AppState::new();
@@ -902,7 +863,6 @@ mod tests {
     fn handle_delete_key_middle_of_line() {
         let mut edit = TextEditPanel::new();
         edit.set_text("abc");
-        edit.cursor_index = 1;
         edit.cursor_index_in_line = 1;
 
         let mut state = AppState::new();
@@ -918,7 +878,6 @@ mod tests {
     fn handle_delete_key_on_empty_line() {
         let mut edit = TextEditPanel::new();
         edit.set_text("abc\n\ndef");
-        edit.cursor_index = 1;
         edit.current_line = 1;
         edit.cursor_index_in_line = 0;
 
@@ -935,7 +894,6 @@ mod tests {
     fn handle_delete_key_end_of_line() {
         let mut edit = TextEditPanel::new();
         edit.set_text("abc\ndef");
-        edit.cursor_index = 1;
         edit.current_line = 0;
         edit.cursor_index_in_line = 3;
 
@@ -1212,16 +1170,4 @@ mod tests {
         assert_eq!(edit.cursor_index_in_line, 5);
         assert_eq!(edit.current_line, 0);
     }
-
-    // #[test]
-    // fn next_line_longer_than_previous_with_additional_line() {
-    //     let mut edit = TextEditPanel::new();
-    //     edit.set_text("12345\n1234567890\n12345".to_string());
-    //     edit.cursor_index = 19;
-    //     let mut state = AppState::new();
-    //
-    //     edit.move_to_previous_line(KeyCode::Null, &mut state);
-    //
-    //     assert_eq!(edit.cursor_index, 8);
-    // }
 }
