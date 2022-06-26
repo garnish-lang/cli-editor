@@ -30,6 +30,7 @@ pub struct TextEditPanel {
     gutter_size: u16,
     continuation_marker: String,
     scroll_y: u16,
+    lines: Vec<String>
 }
 
 #[allow(dead_code)]
@@ -44,6 +45,7 @@ impl TextEditPanel {
             commands: Commands::<EditCommand>::new(),
             file_path: PathBuf::new(),
             continuation_marker: "... ".to_string(),
+            lines: vec![]
         }
     }
 
@@ -53,6 +55,7 @@ impl TextEditPanel {
 
     pub fn set_text(&mut self, text: String) {
         self.text = text;
+        self.lines = self.text.lines().map(|s| s.to_string()).collect();
     }
 
     fn handle_key_stroke(
@@ -509,7 +512,8 @@ impl Panel for TextEditPanel {
                 match file.read_to_string(&mut s) {
                     Err(e) => changes.push(StateChangeRequest::error(e)),
                     Ok(_) => {
-                        self.text = s;
+                        self.set_text(s);
+
                         self.title = if self.file_path.starts_with(&current_dir) {
                             match self.file_path.strip_prefix(&current_dir) {
                                 Err(e) => {
@@ -526,7 +530,8 @@ impl Panel for TextEditPanel {
             }
         };
 
-        self.set_cursor_to_end();
+        self.cursor_index = 0;
+        self.scroll_y = 0;
 
         changes
     }
@@ -784,10 +789,10 @@ mod tests {
     #[test]
     fn scroll_down_one() {
         let mut edit = TextEditPanel::new();
-        edit.text = (100..200)
+        edit.set_text((100..200)
             .map(|i| i.to_string())
             .collect::<Vec<String>>()
-            .join("\n");
+            .join("\n"));
         edit.scroll_y = 95;
 
         let mut state = AppState::new();
@@ -800,10 +805,10 @@ mod tests {
     #[test]
     fn scroll_down_past_text() {
         let mut edit = TextEditPanel::new();
-        edit.text = (100..200)
+        edit.set_text((100..200)
             .map(|i| i.to_string())
             .collect::<Vec<String>>()
-            .join("\n");
+            .join("\n"));
         edit.scroll_y = 95;
 
         let mut state = AppState::new();
@@ -837,10 +842,10 @@ mod tests {
     #[test]
     fn set_cursor() {
         let mut edit = TextEditPanel::new();
-        edit.text = (100..200)
+        edit.set_text((100..200)
             .map(|i| i.to_string())
             .collect::<Vec<String>>()
-            .join("\n");
+            .join("\n"));
 
         edit.set_cursor_index(10);
 
@@ -850,10 +855,10 @@ mod tests {
     #[test]
     fn set_cursor_past_text() {
         let mut edit = TextEditPanel::new();
-        edit.text = (100..200)
+        edit.set_text((100..200)
             .map(|i| i.to_string())
             .collect::<Vec<String>>()
-            .join("\n");
+            .join("\n"));
 
         edit.set_cursor_index(usize::MAX);
 
@@ -863,10 +868,10 @@ mod tests {
     #[test]
     fn next_character() {
         let mut edit = TextEditPanel::new();
-        edit.text = (100..200)
+        edit.set_text((100..200)
             .map(|i| i.to_string())
             .collect::<Vec<String>>()
-            .join("\n");
+            .join("\n"));
         edit.cursor_index = 10;
         let mut state = AppState::new();
 
@@ -878,10 +883,10 @@ mod tests {
     #[test]
     fn previous_character() {
         let mut edit = TextEditPanel::new();
-        edit.text = (100..200)
+        edit.set_text((100..200)
             .map(|i| i.to_string())
             .collect::<Vec<String>>()
-            .join("\n");
+            .join("\n"));
         edit.cursor_index = 10;
         let mut state = AppState::new();
 
@@ -893,11 +898,10 @@ mod tests {
     #[test]
     fn previous_character_at_zero() {
         let mut edit = TextEditPanel::new();
-        edit.text = (100..200)
+        edit.set_text((100..200)
             .map(|i| i.to_string())
             .collect::<Vec<String>>()
-            .join("\n");
-        edit.cursor_index = 0;
+            .join("\n"));
         let mut state = AppState::new();
 
         edit.move_to_previous_character(KeyCode::Null, &mut state);
@@ -908,7 +912,7 @@ mod tests {
     #[test]
     fn next_line() {
         let mut edit = TextEditPanel::new();
-        edit.text = "12345\n12345\n".to_string();
+        edit.set_text("12345\n12345\n".to_string());
         edit.cursor_index = 4;
         let mut state = AppState::new();
 
@@ -920,7 +924,7 @@ mod tests {
     #[test]
     fn next_line_no_line() {
         let mut edit = TextEditPanel::new();
-        edit.text = "1234567890".to_string();
+        edit.set_text("1234567890".to_string());
         edit.cursor_index = 4;
         let mut state = AppState::new();
 
@@ -932,7 +936,7 @@ mod tests {
     #[test]
     fn next_line_longer_than_next() {
         let mut edit = TextEditPanel::new();
-        edit.text = "1234567890\n12345\n1234567890".to_string();
+        edit.set_text("1234567890\n12345\n1234567890".to_string());
         edit.cursor_index = 9;
         let mut state = AppState::new();
 
@@ -944,7 +948,7 @@ mod tests {
     #[test]
     fn next_line_that_is_last_line() {
         let mut edit = TextEditPanel::new();
-        edit.text = "1234567890\n12345\n1234567890".to_string();
+        edit.set_text("1234567890\n12345\n1234567890".to_string());
         edit.cursor_index = 12;
         let mut state = AppState::new();
 
@@ -956,7 +960,7 @@ mod tests {
     #[test]
     fn previous_line() {
         let mut edit = TextEditPanel::new();
-        edit.text = "1234567890\n1234567890".to_string();
+        edit.set_text("1234567890\n1234567890".to_string());
         edit.cursor_index = 17;
         let mut state = AppState::new();
 
@@ -968,7 +972,7 @@ mod tests {
     #[test]
     fn next_line_longer_than_previous() {
         let mut edit = TextEditPanel::new();
-        edit.text = "12345\n1234567890".to_string();
+        edit.set_text("12345\n1234567890".to_string());
         edit.cursor_index = edit.text.len();
         let mut state = AppState::new();
 
@@ -980,7 +984,7 @@ mod tests {
     #[test]
     fn next_line_longer_than_previous_with_additional_line() {
         let mut edit = TextEditPanel::new();
-        edit.text = "12345\n1234567890\n12345".to_string();
+        edit.set_text("12345\n1234567890\n12345".to_string());
         edit.cursor_index = 19;
         let mut state = AppState::new();
 
