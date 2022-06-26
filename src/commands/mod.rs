@@ -355,6 +355,14 @@ pub fn alt_key<T>(key: char) -> CommandKeyBuilder<T> {
     }
 }
 
+pub fn shift_alt_key<T>(key: char) -> CommandKeyBuilder<T> {
+    CommandKeyBuilder {
+        code: KeyCode::Char(key),
+        mods: KeyModifiers::SHIFT | KeyModifiers::ALT,
+        action: None,
+    }
+}
+
 pub fn ctrl_key<T>(key: char) -> CommandKeyBuilder<T> {
     CommandKeyBuilder {
         code: KeyCode::Char(key),

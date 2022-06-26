@@ -11,7 +11,7 @@ use tui::widgets::{Block, Paragraph};
 
 use crate::app::StateChangeRequest;
 use crate::autocomplete::FileAutoCompleter;
-use crate::commands::{alt_key, shift_catch_all};
+use crate::commands::{alt_key, shift_alt_key, shift_catch_all};
 use crate::panels::RenderDetails;
 use crate::{
     catch_all, ctrl_key, AppState, CommandDetails, CommandKeyId, Commands, EditorFrame, Panel,
@@ -104,17 +104,39 @@ impl TextEditPanel {
         self.cursor_index = self.text.len();
     }
 
-    fn scroll_down(&mut self, _code: KeyCode, _state: &mut AppState) -> (bool, Vec<StateChangeRequest>)  {
-        if self.scroll_y < u16::MAX {
-            self.scroll_y += 1;
+    fn scroll_down(&mut self, amount: u16) {
+        if  self.scroll_y < u16::MAX - amount {
+            self.scroll_y += amount;
+        } else {
+            self.scroll_y = u16::MAX;
         }
+    }
+
+    fn scroll_up(&mut self, amount: u16) {
+        if self.scroll_y >= amount {
+            self.scroll_y -= amount;
+        } else {
+            self.scroll_y = 0;
+        }
+    }
+
+    fn scroll_down_one(&mut self, _code: KeyCode, _state: &mut AppState) -> (bool, Vec<StateChangeRequest>)  {
+        self.scroll_down(1);
         (true, vec![])
     }
 
-    fn scroll_up(&mut self, _code: KeyCode, _state: &mut AppState) -> (bool, Vec<StateChangeRequest>)  {
-        if self.scroll_y > 0 {
-            self.scroll_y -= 1;
-        }
+    fn scroll_up_one(&mut self, _code: KeyCode, _state: &mut AppState) -> (bool, Vec<StateChangeRequest>)  {
+        self.scroll_up(1);
+        (true, vec![])
+    }
+
+    fn scroll_down_ten(&mut self, _code: KeyCode, _state: &mut AppState) -> (bool, Vec<StateChangeRequest>)  {
+        self.scroll_down(10);
+        (true, vec![])
+    }
+
+    fn scroll_up_ten(&mut self, _code: KeyCode, _state: &mut AppState) -> (bool, Vec<StateChangeRequest>)  {
+        self.scroll_up(10);
         (true, vec![])
     }
 
@@ -395,12 +417,22 @@ pub fn make_commands() -> Result<Commands<EditCommand>, String> {
 
     commands.insert(|b| {
         b.node(alt_key('i'))
-            .action(CommandDetails::empty(), TextEditPanel::scroll_up)
+            .action(CommandDetails::empty(), TextEditPanel::scroll_up_one)
     })?;
 
     commands.insert(|b| {
         b.node(alt_key('k'))
-            .action(CommandDetails::empty(), TextEditPanel::scroll_down)
+            .action(CommandDetails::empty(), TextEditPanel::scroll_down_one)
+    })?;
+
+    commands.insert(|b| {
+        b.node(shift_alt_key('I'))
+            .action(CommandDetails::empty(), TextEditPanel::scroll_up_ten)
+    })?;
+
+    commands.insert(|b| {
+        b.node(shift_alt_key('K'))
+            .action(CommandDetails::empty(), TextEditPanel::scroll_down_ten)
     })?;
 
     Ok(commands)
@@ -572,11 +604,51 @@ mod tests {
     }
 
     #[test]
+    fn scroll_down() {
+        let mut edit = TextEditPanel::new();
+        edit.scroll_y = 5;
+
+        edit.scroll_down(12);
+
+        assert_eq!(edit.scroll_y, 17);
+    }
+
+    #[test]
+    fn scroll_down_past_limit() {
+        let mut edit = TextEditPanel::new();
+        edit.scroll_y = u16::MAX - 5;
+
+        edit.scroll_down(10);
+
+        assert_eq!(edit.scroll_y, u16::MAX);
+    }
+
+    #[test]
+    fn scroll_up() {
+        let mut edit = TextEditPanel::new();
+        edit.scroll_y = 5;
+
+        edit.scroll_up(4);
+
+        assert_eq!(edit.scroll_y, 1);
+    }
+
+    #[test]
+    fn scroll_up_past_limit() {
+        let mut edit = TextEditPanel::new();
+        edit.scroll_y = 5;
+
+        edit.scroll_up(10);
+
+        assert_eq!(edit.scroll_y, 0);
+    }
+
+    #[test]
     fn scroll_down_one() {
         let mut edit = TextEditPanel::new();
         let mut state = AppState::new();
 
-        edit.scroll_down(KeyCode::Null, &mut state);
+        edit.scroll_down_one(KeyCode::Null, &mut state);
 
         assert_eq!(edit.scroll_y, 1);
     }
@@ -587,7 +659,7 @@ mod tests {
         let mut state = AppState::new();
         edit.scroll_y = u16::MAX;
 
-        edit.scroll_down(KeyCode::Null, &mut state);
+        edit.scroll_down_one(KeyCode::Null, &mut state);
 
         assert_eq!(edit.scroll_y, u16::MAX);
     }
@@ -598,7 +670,7 @@ mod tests {
         let mut state = AppState::new();
         edit.scroll_y = 6;
 
-        edit.scroll_up(KeyCode::Null, &mut state);
+        edit.scroll_up_one(KeyCode::Null, &mut state);
 
         assert_eq!(edit.scroll_y, 5);
     }
@@ -608,7 +680,7 @@ mod tests {
         let mut edit = TextEditPanel::new();
         let mut state = AppState::new();
 
-        edit.scroll_up(KeyCode::Null, &mut state);
+        edit.scroll_up_one(KeyCode::Null, &mut state);
 
         assert_eq!(edit.scroll_y, 0);
     }
