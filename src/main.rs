@@ -5,7 +5,6 @@ use std::io::Stdout;
 
 use crossterm::event::{DisableMouseCapture, Event, KeyCode, read};
 use crossterm::execute;
-use crossterm::style::Print;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };

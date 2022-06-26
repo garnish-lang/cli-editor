@@ -28,12 +28,14 @@ pub struct TextEditPanel {
     file_path: PathBuf,
     gutter_size: u16,
     continuation_marker: String,
+    scroll_y: u16
 }
 
 #[allow(dead_code)]
 impl TextEditPanel {
     pub fn new() -> Self {
         TextEditPanel {
+            scroll_y: 0,
             cursor_index: 0,
             gutter_size: 5,
             text: String::new(),
@@ -112,89 +114,108 @@ impl TextEditPanel {
         let mut real_line_count = 0;
 
         let mut line_start_index = 0;
-        // only take up to maximum we can display
-        for text_line in self.text.lines().take(text_content_box.height as usize) {
-            real_line_count += 1;
-            // add 1 to account for newline character
-            let true_len = text_line.len() + 1;
+        let mut line_iter = self.text.lines();
 
-            // lines.push(Spans::from(format!("{}, {} - {} - {}", true_len, max_text_length, line_start_index, self.cursor_index)));
-            if text_line.len() < max_text_length {
-                lines.push(Spans::from(text_line));
-                gutter.push(Spans::from(Span::from(real_line_count.to_string())));
-
-                // lines.push(Spans::from(format!("{}", (line_start_index..(line_start_index + text_line.len())).contains(&self.cursor_index))));
-
-                // plus 1 to include 1 past a newline character
-                if (line_start_index..(line_start_index + true_len + 1))
-                    .contains(&self.cursor_index)
-                {
-                    cursor_x = text_content_box.x + (self.cursor_index - line_start_index) as u16;
-                    cursor_y = text_content_box.y + lines.len() as u16 - 1;
+        // skip lines we have scrolled
+        for _ in 0..self.scroll_y {
+            match line_iter.next() {
+                None => break,
+                Some(text_line) => {
+                    // add to line start, +1 for newline character
+                    real_line_count += 1;
+                    line_start_index += text_line.len() + 1;
                 }
+            }
+        }
 
-                line_start_index += true_len;
-            } else {
-                let (mut current, mut next) = text_line.split_at(max_text_length);
-                let continuation_length = max_text_length - self.continuation_marker.len();
+        // make lines, maxed to current height
+        for _ in 0..text_content_box.height as usize {
+            match line_iter.next() {
+                None => (),
+                Some(text_line) => {
+                    real_line_count += 1;
+                    // add 1 to account for newline character
+                    let true_len = text_line.len() + 1;
 
-                lines.push(Spans::from(Span::from(current)));
-                gutter.push(Spans::from(Span::from(real_line_count.to_string())));
+                    // lines.push(Spans::from(format!("{}, {} - {} - {}", true_len, max_text_length, line_start_index, self.cursor_index)));
+                    if text_line.len() < max_text_length {
+                        lines.push(Spans::from(text_line));
+                        gutter.push(Spans::from(Span::from(real_line_count.to_string())));
 
-                if (line_start_index..(line_start_index + current.len() + 1))
-                    .contains(&self.cursor_index)
-                {
-                    cursor_x = text_content_box.x + (self.cursor_index - line_start_index) as u16;
-                    cursor_y = text_content_box.y + lines.len() as u16 - 1;
-                }
+                        // lines.push(Spans::from(format!("{}", (line_start_index..(line_start_index + text_line.len())).contains(&self.cursor_index))));
 
-                line_start_index += current.len();
+                        // plus 1 to include 1 past a newline character
+                        if (line_start_index..(line_start_index + true_len + 1))
+                            .contains(&self.cursor_index)
+                        {
+                            cursor_x = text_content_box.x + (self.cursor_index - line_start_index) as u16;
+                            cursor_y = text_content_box.y + lines.len() as u16 - 1;
+                        }
 
-                while next.len() >= continuation_length {
-                    (current, next) = next.split_at(continuation_length);
+                        line_start_index += true_len;
+                    } else {
+                        let (mut current, mut next) = text_line.split_at(max_text_length);
+                        let continuation_length = max_text_length - self.continuation_marker.len();
 
-                    lines.push(Spans::from(vec![
-                        Span::from(self.continuation_marker.as_str()),
-                        Span::from(current),
-                    ]));
-                    gutter.push(Spans::from(Span::from(".")));
+                        lines.push(Spans::from(Span::from(current)));
+                        gutter.push(Spans::from(Span::from(real_line_count.to_string())));
 
-                    if (line_start_index..(line_start_index + current.len() + 1))
-                        .contains(&self.cursor_index)
-                    {
-                        cursor_x = text_content_box.x
-                            + (self.cursor_index - line_start_index
-                                + self.continuation_marker.len())
+                        if (line_start_index..(line_start_index + current.len() + 1))
+                            .contains(&self.cursor_index)
+                        {
+                            cursor_x = text_content_box.x + (self.cursor_index - line_start_index) as u16;
+                            cursor_y = text_content_box.y + lines.len() as u16 - 1;
+                        }
+
+                        line_start_index += current.len();
+
+                        while next.len() >= continuation_length {
+                            (current, next) = next.split_at(continuation_length);
+
+                            lines.push(Spans::from(vec![
+                                Span::from(self.continuation_marker.as_str()),
+                                Span::from(current),
+                            ]));
+                            gutter.push(Spans::from(Span::from(".")));
+
+                            if (line_start_index..(line_start_index + current.len() + 1))
+                                .contains(&self.cursor_index)
+                            {
+                                cursor_x = text_content_box.x
+                                    + (self.cursor_index - line_start_index
+                                    + self.continuation_marker.len())
+                                    as u16;
+                                cursor_y = text_content_box.y + lines.len() as u16 - 1;
+                            }
+
+                            line_start_index += current.len();
+                        }
+
+                        lines.push(Spans::from(vec![
+                            Span::from(self.continuation_marker.as_str()),
+                            Span::from(next),
+                        ]));
+                        gutter.push(Spans::from(Span::from(".")));
+
+                        // plus 1 to include 1 past text length
+                        if (line_start_index..(line_start_index + next.len() + 1))
+                            .contains(&self.cursor_index)
+                        {
+                            cursor_x = text_content_box.x
+                                + (self.cursor_index - line_start_index + self.continuation_marker.len())
                                 as u16;
-                        cursor_y = text_content_box.y + lines.len() as u16 - 1;
+                            cursor_y = text_content_box.y + lines.len() as u16 - 1;
+                        }
+
+                        // plus 1 to include newline character
+                        line_start_index += next.len() + 1;
                     }
 
-                    line_start_index += current.len();
+                    if self.text.chars().nth(self.cursor_index - 1).unwrap() == '\n' {
+                        cursor_x = text_content_box.x;
+                        cursor_y = text_content_box.y + lines.len() as u16;
+                    }
                 }
-
-                lines.push(Spans::from(vec![
-                    Span::from(self.continuation_marker.as_str()),
-                    Span::from(next),
-                ]));
-                gutter.push(Spans::from(Span::from(".")));
-
-                // plus 1 to include 1 past text length
-                if (line_start_index..(line_start_index + next.len() + 1))
-                    .contains(&self.cursor_index)
-                {
-                    cursor_x = text_content_box.x
-                        + (self.cursor_index - line_start_index + self.continuation_marker.len())
-                            as u16;
-                    cursor_y = text_content_box.y + lines.len() as u16 - 1;
-                }
-
-                // plus 1 to include newline character
-                line_start_index += next.len() + 1;
-            }
-
-            if self.text.chars().nth(self.cursor_index - 1).unwrap() == '\n' {
-                cursor_x = text_content_box.x;
-                cursor_y = text_content_box.y + lines.len() as u16;
             }
         }
 
@@ -362,10 +383,9 @@ pub fn make_commands() -> Result<Commands<EditCommand>, String> {
 #[cfg(test)]
 mod tests {
     use tui::layout::Rect;
-    use tui::style::{Color, Style};
     use tui::text::{Span, Spans};
 
-    use crate::{AppState, TextEditPanel};
+    use crate::{TextEditPanel};
 
     #[test]
     fn cursor_is_one_past_end() {
@@ -373,7 +393,7 @@ mod tests {
         edit.text = "123456789\n123456".to_string();
         edit.set_cursor_to_end();
 
-        let (spans, cursor, gutter) = edit.make_text_content(Rect::new(10, 10, 20, 20));
+        let (_, cursor, _) = edit.make_text_content(Rect::new(10, 10, 20, 20));
 
         assert_eq!(cursor, (16, 11));
     }
@@ -384,7 +404,7 @@ mod tests {
         edit.text = "123456789\n123456\n".to_string();
         edit.set_cursor_to_end();
 
-        let (spans, cursor, gutter) = edit.make_text_content(Rect::new(10, 10, 20, 20));
+        let (_, cursor, _) = edit.make_text_content(Rect::new(10, 10, 20, 20));
 
         assert_eq!(cursor, (10, 12));
     }
@@ -395,7 +415,7 @@ mod tests {
         edit.text = "123456789012345678901234567890".to_string();
         edit.cursor_index = 25;
 
-        let (spans, cursor, gutter) = edit.make_text_content(Rect::new(10, 10, 20, 20));
+        let (_, cursor, _) = edit.make_text_content(Rect::new(10, 10, 20, 20));
 
         assert_eq!(
             cursor,
@@ -412,7 +432,7 @@ mod tests {
         edit.text = "123456789012345678901234567890".to_string();
         edit.set_cursor_to_end();
 
-        let (spans, cursor, gutter) = edit.make_text_content(Rect::new(10, 10, 20, 20));
+        let (_, cursor, _) = edit.make_text_content(Rect::new(10, 10, 20, 20));
 
         assert_eq!(
             cursor,
@@ -430,7 +450,7 @@ mod tests {
         edit.text = "12345678901234567890123456789012345678901234567890".to_string();
         edit.set_cursor_to_end();
 
-        let (spans, cursor, gutter) = edit.make_text_content(Rect::new(10, 10, 20, 20));
+        let (_, cursor, _) = edit.make_text_content(Rect::new(10, 10, 20, 20));
 
         assert_eq!(cursor, (24 + edit.continuation_marker.len() as u16, 12));
     }
@@ -442,7 +462,7 @@ mod tests {
         edit.text = "12345678901234567890123456789012345678901234567890\n1234567890".to_string();
         edit.set_cursor_to_end();
 
-        let (spans, cursor, gutter) = edit.make_text_content(Rect::new(10, 10, 20, 20));
+        let (_, cursor, gutter) = edit.make_text_content(Rect::new(10, 10, 20, 20));
 
         assert_eq!(cursor, (20, 13));
         assert_eq!(gutter, vec![
@@ -460,7 +480,7 @@ mod tests {
         edit.text = "12345678901234567890123456789012345678901234567890\n".to_string();
         edit.set_cursor_to_end();
 
-        let (spans, cursor, gutter) = edit.make_text_content(Rect::new(10, 10, 20, 20));
+        let (_, cursor, gutter) = edit.make_text_content(Rect::new(10, 10, 20, 20));
 
         assert_eq!(cursor, (10, 13));
         assert_eq!(gutter, vec![
@@ -468,6 +488,44 @@ mod tests {
             Spans::from(Span::from(".")),
             Spans::from(Span::from(".")),
             Spans::from(Span::from("2")),
+        ]);
+    }
+
+    #[test]
+    fn lines_with_scroll() {
+        let mut edit = TextEditPanel::new();
+        edit.text = (100..200).map(|i| i.to_string()).collect::<Vec<String>>().join("\n");
+        edit.cursor_index = 49;
+        edit.scroll_y = 10;
+
+        let (spans, cursor, gutter) = edit.make_text_content(Rect::new(10, 10, 20, 10));
+
+        assert_eq!(cursor, (11, 12));
+
+        assert_eq!(spans, vec![
+            Spans::from(Span::from("110")),
+            Spans::from(Span::from("111")),
+            Spans::from(Span::from("112")),
+            Spans::from(Span::from("113")),
+            Spans::from(Span::from("114")),
+            Spans::from(Span::from("115")),
+            Spans::from(Span::from("116")),
+            Spans::from(Span::from("117")),
+            Spans::from(Span::from("118")),
+            Spans::from(Span::from("119")),
+        ]);
+
+        assert_eq!(gutter, vec![
+            Spans::from(Span::from("11")),
+            Spans::from(Span::from("12")),
+            Spans::from(Span::from("13")),
+            Spans::from(Span::from("14")),
+            Spans::from(Span::from("15")),
+            Spans::from(Span::from("16")),
+            Spans::from(Span::from("17")),
+            Spans::from(Span::from("18")),
+            Spans::from(Span::from("19")),
+            Spans::from(Span::from("20")),
         ]);
     }
 }
