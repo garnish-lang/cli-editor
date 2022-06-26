@@ -104,6 +104,20 @@ impl TextEditPanel {
         self.cursor_index = self.text.len();
     }
 
+    fn scroll_down(&mut self) {
+        if self.scroll_y == u16::MAX {
+            return;
+        }
+        self.scroll_y += 1;
+    }
+
+    fn scroll_up(&mut self) {
+        if self.scroll_y == 0 {
+            return;
+        }
+        self.scroll_y -= 1;
+    }
+
     fn make_text_content(&self, text_content_box: Rect) -> (Vec<Spans>, (u16, u16), Vec<Spans>) {
         let max_text_length = text_content_box.width as usize;
 
@@ -527,5 +541,43 @@ mod tests {
             Spans::from(Span::from("19")),
             Spans::from(Span::from("20")),
         ]);
+    }
+
+    #[test]
+    fn scroll_down_one() {
+        let mut edit = TextEditPanel::new();
+
+        edit.scroll_down();
+
+        assert_eq!(edit.scroll_y, 1);
+    }
+
+    #[test]
+    fn scroll_down_one_at_max() {
+        let mut edit = TextEditPanel::new();
+        edit.scroll_y = u16::MAX;
+
+        edit.scroll_down();
+
+        assert_eq!(edit.scroll_y, u16::MAX);
+    }
+
+    #[test]
+    fn scroll_up_one() {
+        let mut edit = TextEditPanel::new();
+        edit.scroll_y = 6;
+
+        edit.scroll_up();
+
+        assert_eq!(edit.scroll_y, 5);
+    }
+
+    #[test]
+    fn scroll_up_one_at_zero() {
+        let mut edit = TextEditPanel::new();
+
+        edit.scroll_up();
+
+        assert_eq!(edit.scroll_y, 0);
     }
 }
