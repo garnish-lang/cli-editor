@@ -131,7 +131,7 @@ impl TextEditPanel {
     }
 
     fn scroll_down_ten(&mut self, _code: KeyCode, _state: &mut AppState) -> (bool, Vec<StateChangeRequest>)  {
-        let limit = (self.text.lines().count() - 1) as u16;
+        let limit = self.text.lines().count() as u16;
         self.scroll_down(10);
 
         if self.scroll_y > limit {
@@ -672,7 +672,7 @@ mod tests {
 
         edit.scroll_down_ten(KeyCode::Null, &mut state);
 
-        assert_eq!(edit.scroll_y, 99);
+        assert_eq!(edit.scroll_y, 100);
     }
 
     #[test]
