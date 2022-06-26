@@ -131,7 +131,13 @@ impl TextEditPanel {
     }
 
     fn scroll_down_ten(&mut self, _code: KeyCode, _state: &mut AppState) -> (bool, Vec<StateChangeRequest>)  {
+        let limit = (self.text.lines().count() - 1) as u16;
         self.scroll_down(10);
+
+        if self.scroll_y > limit {
+            self.scroll_y = limit;
+        }
+
         (true, vec![])
     }
 
@@ -646,22 +652,27 @@ mod tests {
     #[test]
     fn scroll_down_one() {
         let mut edit = TextEditPanel::new();
+        edit.text = (100..200).map(|i| i.to_string()).collect::<Vec<String>>().join("\n");
+        edit.scroll_y = 95;
+
         let mut state = AppState::new();
 
         edit.scroll_down_one(KeyCode::Null, &mut state);
 
-        assert_eq!(edit.scroll_y, 1);
+        assert_eq!(edit.scroll_y, 96);
     }
 
     #[test]
-    fn scroll_down_one_at_max() {
+    fn scroll_down_past_text() {
         let mut edit = TextEditPanel::new();
+        edit.text = (100..200).map(|i| i.to_string()).collect::<Vec<String>>().join("\n");
+        edit.scroll_y = 95;
+
         let mut state = AppState::new();
-        edit.scroll_y = u16::MAX;
 
-        edit.scroll_down_one(KeyCode::Null, &mut state);
+        edit.scroll_down_ten(KeyCode::Null, &mut state);
 
-        assert_eq!(edit.scroll_y, u16::MAX);
+        assert_eq!(edit.scroll_y, 99);
     }
 
     #[test]
