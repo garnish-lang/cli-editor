@@ -59,7 +59,10 @@ impl TextEditPanel {
 
     pub fn set_text<T: ToString>(&mut self, text: T) {
         self.text = text.to_string();
-        self.lines = self.text.lines().map(|s| s.to_string()).collect();
+
+        for line in self.text.split('\n') {
+            self.lines.push(line.to_string());
+        }
     }
 
     fn remove_character(&mut self, index_adjustment: usize, movement: usize, state: &mut AppState) {
@@ -620,6 +623,14 @@ mod tests {
     use crate::{AppState, TextEditPanel};
 
     #[test]
+    fn set_text() {
+        let mut edit = TextEditPanel::new();
+        edit.set_text("\n123456789\n123456\n");
+
+        assert_eq!(edit.lines, vec!["".to_string(), "123456789".to_string(), "123456".to_string(), "".to_string()])
+    }
+
+    #[test]
     fn cursor_is_one_past_end() {
         let mut edit = TextEditPanel::new();
         edit.set_text("123456789\n123456");
@@ -699,40 +710,37 @@ mod tests {
         );
     }
 
-    // new lines storage doesn't currently create an entry for trailing newlines
-    // so the following test can't be accurate yet
+    #[test]
+    fn cursor_is_next_line_when_after_newline() {
+        let mut edit = TextEditPanel::new();
+        edit.set_text("123456789\n123456\n");
+        edit.set_cursor_to_end();
 
-    // #[test]
-    // fn cursor_is_next_line_when_after_newline() {
-    //     let mut edit = TextEditPanel::new();
-    //     edit.set_text("123456789\n123456\n");
-    //     edit.set_cursor_to_end();
-    //
-    //     let (_, cursor, _) = edit.make_text_content(Rect::new(10, 10, 20, 20));
-    //
-    //     assert_eq!(cursor, (10, 12));
-    // }
+        let (_, cursor, _) = edit.make_text_content(Rect::new(10, 10, 20, 20));
 
-    // #[test]
-    // fn newline_after_line_with_continuations() {
-    //     let mut edit = TextEditPanel::new();
-    //     //           |                   |               |
-    //     edit.set_text("12345678901234567890123456789012345678901234567890\n");
-    //     edit.set_cursor_to_end();
-    //
-    //     let (_, cursor, gutter) = edit.make_text_content(Rect::new(10, 10, 20, 20));
-    //
-    //     assert_eq!(cursor, (10, 13));
-    //     assert_eq!(
-    //         gutter,
-    //         vec![
-    //             Spans::from(Span::from("1")),
-    //             Spans::from(Span::from(".")),
-    //             Spans::from(Span::from(".")),
-    //             Spans::from(Span::from("2")),
-    //         ]
-    //     );
-    // }
+        assert_eq!(cursor, (10, 12));
+    }
+
+    #[test]
+    fn newline_after_line_with_continuations() {
+        let mut edit = TextEditPanel::new();
+        //           |                   |               |
+        edit.set_text("12345678901234567890123456789012345678901234567890\n");
+        edit.set_cursor_to_end();
+
+        let (_, cursor, gutter) = edit.make_text_content(Rect::new(10, 10, 20, 20));
+
+        assert_eq!(cursor, (10, 13));
+        assert_eq!(
+            gutter,
+            vec![
+                Spans::from(Span::from("1")),
+                Spans::from(Span::from(".")),
+                Spans::from(Span::from(".")),
+                Spans::from(Span::from("2")),
+            ]
+        );
+    }
 
     #[test]
     fn lines_with_scroll() {
