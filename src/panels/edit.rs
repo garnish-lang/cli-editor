@@ -48,10 +48,6 @@ impl TextEditPanel {
         }
     }
 
-    pub fn get_text(&self) -> &str {
-        ""
-    }
-
     pub fn set_text<T: ToString>(&mut self, text: T) {
         for line in text.to_string().split('\n') {
             self.lines.push(line.to_string());
