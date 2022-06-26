@@ -11,7 +11,7 @@ use tui::widgets::{Block, Paragraph};
 
 use crate::app::StateChangeRequest;
 use crate::autocomplete::FileAutoCompleter;
-use crate::commands::shift_catch_all;
+use crate::commands::{alt_key, shift_catch_all};
 use crate::panels::RenderDetails;
 use crate::{
     catch_all, ctrl_key, AppState, CommandDetails, CommandKeyId, Commands, EditorFrame, Panel,
@@ -28,7 +28,7 @@ pub struct TextEditPanel {
     file_path: PathBuf,
     gutter_size: u16,
     continuation_marker: String,
-    scroll_y: u16
+    scroll_y: u16,
 }
 
 #[allow(dead_code)]
@@ -104,18 +104,18 @@ impl TextEditPanel {
         self.cursor_index = self.text.len();
     }
 
-    fn scroll_down(&mut self) {
-        if self.scroll_y == u16::MAX {
-            return;
+    fn scroll_down(&mut self, _code: KeyCode, _state: &mut AppState) -> (bool, Vec<StateChangeRequest>)  {
+        if self.scroll_y < u16::MAX {
+            self.scroll_y += 1;
         }
-        self.scroll_y += 1;
+        (true, vec![])
     }
 
-    fn scroll_up(&mut self) {
-        if self.scroll_y == 0 {
-            return;
+    fn scroll_up(&mut self, _code: KeyCode, _state: &mut AppState) -> (bool, Vec<StateChangeRequest>)  {
+        if self.scroll_y > 0 {
+            self.scroll_y -= 1;
         }
-        self.scroll_y -= 1;
+        (true, vec![])
     }
 
     fn make_text_content(&self, text_content_box: Rect) -> (Vec<Spans>, (u16, u16), Vec<Spans>) {
@@ -162,7 +162,8 @@ impl TextEditPanel {
                         if (line_start_index..(line_start_index + true_len + 1))
                             .contains(&self.cursor_index)
                         {
-                            cursor_x = text_content_box.x + (self.cursor_index - line_start_index) as u16;
+                            cursor_x =
+                                text_content_box.x + (self.cursor_index - line_start_index) as u16;
                             cursor_y = text_content_box.y + lines.len() as u16 - 1;
                         }
 
@@ -177,7 +178,8 @@ impl TextEditPanel {
                         if (line_start_index..(line_start_index + current.len() + 1))
                             .contains(&self.cursor_index)
                         {
-                            cursor_x = text_content_box.x + (self.cursor_index - line_start_index) as u16;
+                            cursor_x =
+                                text_content_box.x + (self.cursor_index - line_start_index) as u16;
                             cursor_y = text_content_box.y + lines.len() as u16 - 1;
                         }
 
@@ -197,8 +199,8 @@ impl TextEditPanel {
                             {
                                 cursor_x = text_content_box.x
                                     + (self.cursor_index - line_start_index
-                                    + self.continuation_marker.len())
-                                    as u16;
+                                        + self.continuation_marker.len())
+                                        as u16;
                                 cursor_y = text_content_box.y + lines.len() as u16 - 1;
                             }
 
@@ -216,8 +218,9 @@ impl TextEditPanel {
                             .contains(&self.cursor_index)
                         {
                             cursor_x = text_content_box.x
-                                + (self.cursor_index - line_start_index + self.continuation_marker.len())
-                                as u16;
+                                + (self.cursor_index - line_start_index
+                                    + self.continuation_marker.len())
+                                    as u16;
                             cursor_y = text_content_box.y + lines.len() as u16 - 1;
                         }
 
@@ -287,8 +290,7 @@ impl Panel for TextEditPanel {
 
             let para_text = Text::from(lines);
 
-            let line_numbers_para =
-                Paragraph::new(Text::from(gutter)).alignment(Alignment::Right);
+            let line_numbers_para = Paragraph::new(Text::from(gutter)).alignment(Alignment::Right);
 
             frame.render_widget(line_numbers_para, layout[0]);
 
@@ -391,15 +393,26 @@ pub fn make_commands() -> Result<Commands<EditCommand>, String> {
             .action(CommandDetails::open_file(), TextEditPanel::open_file)
     })?;
 
+    commands.insert(|b| {
+        b.node(alt_key('i'))
+            .action(CommandDetails::empty(), TextEditPanel::scroll_up)
+    })?;
+
+    commands.insert(|b| {
+        b.node(alt_key('k'))
+            .action(CommandDetails::empty(), TextEditPanel::scroll_down)
+    })?;
+
     Ok(commands)
 }
 
 #[cfg(test)]
 mod tests {
+    use crossterm::event::KeyCode;
     use tui::layout::Rect;
     use tui::text::{Span, Spans};
 
-    use crate::{TextEditPanel};
+    use crate::{AppState, TextEditPanel};
 
     #[test]
     fn cursor_is_one_past_end() {
@@ -479,12 +492,15 @@ mod tests {
         let (_, cursor, gutter) = edit.make_text_content(Rect::new(10, 10, 20, 20));
 
         assert_eq!(cursor, (20, 13));
-        assert_eq!(gutter, vec![
-            Spans::from(Span::from("1")),
-            Spans::from(Span::from(".")),
-            Spans::from(Span::from(".")),
-            Spans::from(Span::from("2")),
-        ]);
+        assert_eq!(
+            gutter,
+            vec![
+                Spans::from(Span::from("1")),
+                Spans::from(Span::from(".")),
+                Spans::from(Span::from(".")),
+                Spans::from(Span::from("2")),
+            ]
+        );
     }
 
     #[test]
@@ -497,18 +513,24 @@ mod tests {
         let (_, cursor, gutter) = edit.make_text_content(Rect::new(10, 10, 20, 20));
 
         assert_eq!(cursor, (10, 13));
-        assert_eq!(gutter, vec![
-            Spans::from(Span::from("1")),
-            Spans::from(Span::from(".")),
-            Spans::from(Span::from(".")),
-            Spans::from(Span::from("2")),
-        ]);
+        assert_eq!(
+            gutter,
+            vec![
+                Spans::from(Span::from("1")),
+                Spans::from(Span::from(".")),
+                Spans::from(Span::from(".")),
+                Spans::from(Span::from("2")),
+            ]
+        );
     }
 
     #[test]
     fn lines_with_scroll() {
         let mut edit = TextEditPanel::new();
-        edit.text = (100..200).map(|i| i.to_string()).collect::<Vec<String>>().join("\n");
+        edit.text = (100..200)
+            .map(|i| i.to_string())
+            .collect::<Vec<String>>()
+            .join("\n");
         edit.cursor_index = 49;
         edit.scroll_y = 10;
 
@@ -516,38 +538,45 @@ mod tests {
 
         assert_eq!(cursor, (11, 12));
 
-        assert_eq!(spans, vec![
-            Spans::from(Span::from("110")),
-            Spans::from(Span::from("111")),
-            Spans::from(Span::from("112")),
-            Spans::from(Span::from("113")),
-            Spans::from(Span::from("114")),
-            Spans::from(Span::from("115")),
-            Spans::from(Span::from("116")),
-            Spans::from(Span::from("117")),
-            Spans::from(Span::from("118")),
-            Spans::from(Span::from("119")),
-        ]);
+        assert_eq!(
+            spans,
+            vec![
+                Spans::from(Span::from("110")),
+                Spans::from(Span::from("111")),
+                Spans::from(Span::from("112")),
+                Spans::from(Span::from("113")),
+                Spans::from(Span::from("114")),
+                Spans::from(Span::from("115")),
+                Spans::from(Span::from("116")),
+                Spans::from(Span::from("117")),
+                Spans::from(Span::from("118")),
+                Spans::from(Span::from("119")),
+            ]
+        );
 
-        assert_eq!(gutter, vec![
-            Spans::from(Span::from("11")),
-            Spans::from(Span::from("12")),
-            Spans::from(Span::from("13")),
-            Spans::from(Span::from("14")),
-            Spans::from(Span::from("15")),
-            Spans::from(Span::from("16")),
-            Spans::from(Span::from("17")),
-            Spans::from(Span::from("18")),
-            Spans::from(Span::from("19")),
-            Spans::from(Span::from("20")),
-        ]);
+        assert_eq!(
+            gutter,
+            vec![
+                Spans::from(Span::from("11")),
+                Spans::from(Span::from("12")),
+                Spans::from(Span::from("13")),
+                Spans::from(Span::from("14")),
+                Spans::from(Span::from("15")),
+                Spans::from(Span::from("16")),
+                Spans::from(Span::from("17")),
+                Spans::from(Span::from("18")),
+                Spans::from(Span::from("19")),
+                Spans::from(Span::from("20")),
+            ]
+        );
     }
 
     #[test]
     fn scroll_down_one() {
         let mut edit = TextEditPanel::new();
+        let mut state = AppState::new();
 
-        edit.scroll_down();
+        edit.scroll_down(KeyCode::Null, &mut state);
 
         assert_eq!(edit.scroll_y, 1);
     }
@@ -555,9 +584,10 @@ mod tests {
     #[test]
     fn scroll_down_one_at_max() {
         let mut edit = TextEditPanel::new();
+        let mut state = AppState::new();
         edit.scroll_y = u16::MAX;
 
-        edit.scroll_down();
+        edit.scroll_down(KeyCode::Null, &mut state);
 
         assert_eq!(edit.scroll_y, u16::MAX);
     }
@@ -565,9 +595,10 @@ mod tests {
     #[test]
     fn scroll_up_one() {
         let mut edit = TextEditPanel::new();
+        let mut state = AppState::new();
         edit.scroll_y = 6;
 
-        edit.scroll_up();
+        edit.scroll_up(KeyCode::Null, &mut state);
 
         assert_eq!(edit.scroll_y, 5);
     }
@@ -575,8 +606,9 @@ mod tests {
     #[test]
     fn scroll_up_one_at_zero() {
         let mut edit = TextEditPanel::new();
+        let mut state = AppState::new();
 
-        edit.scroll_up();
+        edit.scroll_up(KeyCode::Null, &mut state);
 
         assert_eq!(edit.scroll_y, 0);
     }
