@@ -62,6 +62,43 @@ impl TextEditPanel {
         self.lines = self.text.lines().map(|s| s.to_string()).collect();
     }
 
+    fn remove_character(&mut self, index_adjustment: usize, movement: usize, state: &mut AppState) {
+        match self.lines.get_mut(self.current_line) {
+            None => (), // no text, do nothing
+            Some(line) => {
+                if self.cursor_index_in_line - index_adjustment < line.len() {
+                    line.remove(self.cursor_index_in_line - index_adjustment);
+                    self.cursor_index_in_line -= movement;
+                } else {
+                    // cursor isn't in line
+                    // implementation error
+                    // log message and reset cursor to start of line
+                    self.cursor_index_in_line = 0;
+                    state.add_error("Cursor outside of current line. Resetting to start of line.");
+                }
+            }
+        }
+    }
+
+    fn remove_line(&mut self) {
+        if self.current_line != 0 {
+            let remaining = self.lines.remove(self.current_line);
+            self.current_line -= 1;
+            self.cursor_index_in_line = match self.lines.get_mut(self.current_line) {
+                None => 0, // needs a test
+                Some(line) => {
+                    // add remaining characters to this line
+                    // but cursor will be at end of existing characters
+                    let existing_len = line.len();
+
+                    line.extend(remaining.chars());
+
+                    existing_len
+                }
+            }
+        }
+    }
+
     fn handle_key_stroke(
         &mut self,
         code: KeyCode,
@@ -79,47 +116,22 @@ impl TextEditPanel {
                 }
 
                 // new
-                let remove = match self.lines.get_mut(self.current_line) {
-                    None => false, // no text, do nothing
-                    Some(line) => {
-                        if self.cursor_index_in_line == 0 {
-                            // at start of line
-                            // removing line to merge into previous one
-                            true
-                        } else if self.cursor_index_in_line - 1 < line.len() {
-                            line.remove(self.cursor_index_in_line - 1);
-                            self.cursor_index_in_line -= 1;
-                            false
-                        } else {
-                            // cursor isn't in line
-                            // implementation error
-                            // log message and reset cursor to start of line
-                            self.cursor_index_in_line = 0;
-                            state.add_error("Cursor outside of current line. Resetting to start of line.");
-                            false
-                        }
-                    }
-                };
-
-                if remove && self.current_line != 0 {
-                    let remaining = self.lines.remove(self.current_line);
-                    self.current_line -= 1;
-                    self.cursor_index_in_line = match self.lines.get_mut(self.current_line) {
-                        None => 0, // needs a test
-                        Some(line) => {
-                            // add remaining characters to this line
-                            // but cursor will be at end of existing characters
-                            let existing_len = line.len();
-
-                            line.extend(remaining.chars());
-
-                            existing_len
-                        }
-                    }
+                if self.cursor_index_in_line == 0 {
+                    self.remove_line();
+                } else {
+                    self.remove_character(1, 1, state);
                 }
             },
             KeyCode::Delete => {
-                // ??
+                match self.lines.get(self.current_line) {
+                    None => (),
+                    Some(line) => if self.cursor_index_in_line == line.len() {
+                        self.current_line += 1;
+                        self.remove_line();
+                    } else {
+                        self.remove_character(0, 0, state);
+                    }
+                }
             }
             KeyCode::Enter => {
                 self.text.push('\n');
@@ -932,6 +944,72 @@ mod tests {
         assert_eq!(edit.cursor_index_in_line, 1);
     }
 
+    #[test]
+    fn handle_delete_key() {
+        let mut edit = TextEditPanel::new();
+        edit.set_text("a");
+        edit.cursor_index = 1;
+        edit.cursor_index_in_line = 0;
+
+        let mut state = AppState::new();
+
+        edit.handle_key_stroke(KeyCode::Delete, &mut state);
+
+        assert_eq!(edit.lines, vec!["".to_string()]);
+        assert_eq!(edit.current_line, 0);
+        assert_eq!(edit.cursor_index_in_line, 0);
+    }
+
+    #[test]
+    fn handle_delete_key_middle_of_line() {
+        let mut edit = TextEditPanel::new();
+        edit.set_text("abc");
+        edit.cursor_index = 1;
+        edit.cursor_index_in_line = 1;
+
+        let mut state = AppState::new();
+
+        edit.handle_key_stroke(KeyCode::Delete, &mut state);
+
+        assert_eq!(edit.lines, vec!["ac".to_string()]);
+        assert_eq!(edit.current_line, 0);
+        assert_eq!(edit.cursor_index_in_line, 1);
+    }
+
+    #[test]
+    fn handle_delete_key_on_empty_line() {
+        let mut edit = TextEditPanel::new();
+        edit.set_text("abc\n\ndef");
+        edit.cursor_index = 1;
+        edit.current_line = 1;
+        edit.cursor_index_in_line = 0;
+
+        let mut state = AppState::new();
+
+        edit.handle_key_stroke(KeyCode::Delete, &mut state);
+
+        assert_eq!(edit.lines, vec!["abc".to_string(), "def".to_string()]);
+        assert_eq!(edit.current_line, 1);
+        assert_eq!(edit.cursor_index_in_line, 0);
+    }
+
+    #[test]
+    fn handle_delete_key_end_of_line() {
+        let mut edit = TextEditPanel::new();
+        edit.set_text("abc\ndef");
+        edit.cursor_index = 1;
+        edit.current_line = 0;
+        edit.cursor_index_in_line = 3;
+
+        let mut state = AppState::new();
+
+        edit.handle_key_stroke(KeyCode::Delete, &mut state);
+
+        assert_eq!(edit.lines, vec!["abcdef".to_string()]);
+        assert_eq!(edit.current_line, 0);
+        assert_eq!(edit.cursor_index_in_line, 3);
+    }
+    
     #[test]
     fn scroll_down() {
         let mut edit = TextEditPanel::new();
