@@ -65,7 +65,7 @@ impl TextEditPanel {
     fn handle_key_stroke(
         &mut self,
         code: KeyCode,
-        _state: &mut AppState,
+        state: &mut AppState,
     ) -> (bool, Vec<StateChangeRequest>) {
         match code {
             KeyCode::Backspace => {
@@ -82,22 +82,39 @@ impl TextEditPanel {
                 let remove = match self.lines.get_mut(self.current_line) {
                     None => false, // no text, do nothing
                     Some(line) => {
-                        match line.pop() {
-                            None => true, // empty, flag to remove
-                            Some(_) => {
-                                self.cursor_index_in_line -= 1;
-                                false
-                            }
+                        if self.cursor_index_in_line == 0 {
+                            // at start of line
+                            // removing line to merge into previous one
+                            true
+                        } else if self.cursor_index_in_line - 1 < line.len() {
+                            line.remove(self.cursor_index_in_line - 1);
+                            self.cursor_index_in_line -= 1;
+                            false
+                        } else {
+                            // cursor isn't in line
+                            // implementation error
+                            // log message and reset cursor to start of line
+                            self.cursor_index_in_line = 0;
+                            state.add_error("Cursor outside of current line. Resetting to start of line.");
+                            false
                         }
                     }
                 };
 
                 if remove && self.current_line != 0 {
-                    self.lines.remove(self.current_line);
+                    let remaining = self.lines.remove(self.current_line);
                     self.current_line -= 1;
-                    self.cursor_index_in_line = match self.lines.get(self.current_line) {
+                    self.cursor_index_in_line = match self.lines.get_mut(self.current_line) {
                         None => 0, // needs a test
-                        Some(line) => line.len()
+                        Some(line) => {
+                            // add remaining characters to this line
+                            // but cursor will be at end of existing characters
+                            let existing_len = line.len();
+
+                            line.extend(remaining.chars());
+
+                            existing_len
+                        }
                     }
                 }
             },
@@ -125,7 +142,7 @@ impl TextEditPanel {
                     }
                     Some(s) => {
                         // add to existing
-                        s.push(c);
+                        s.insert(self.cursor_index_in_line, c);
                     }
                 }
                 self.cursor_index_in_line += 1;
@@ -805,6 +822,21 @@ mod tests {
     }
 
     #[test]
+    fn handle_character_key_middle_of_line() {
+        let mut edit = TextEditPanel::new();
+        edit.set_text("ac");
+        edit.cursor_index = 1;
+        edit.cursor_index_in_line = 1;
+
+        let mut state = AppState::new();
+
+        edit.handle_key_stroke(KeyCode::Char('b'), &mut state);
+
+        assert_eq!(edit.lines, vec!["abc".to_string()]);
+        assert_eq!(edit.cursor_index_in_line, 2);
+    }
+
+    #[test]
     fn handle_character_key_with_existing_text() {
         let mut edit = TextEditPanel::new();
         edit.set_text("a");
@@ -847,6 +879,39 @@ mod tests {
         assert_eq!(edit.lines, vec!["".to_string()]);
         assert_eq!(edit.current_line, 0);
         assert_eq!(edit.cursor_index_in_line, 0);
+    }
+
+    #[test]
+    fn handle_backspace_key_middle_of_line() {
+        let mut edit = TextEditPanel::new();
+        edit.set_text("abc");
+        edit.cursor_index = 1;
+        edit.cursor_index_in_line = 2;
+
+        let mut state = AppState::new();
+
+        edit.handle_key_stroke(KeyCode::Backspace, &mut state);
+
+        assert_eq!(edit.lines, vec!["ac".to_string()]);
+        assert_eq!(edit.current_line, 0);
+        assert_eq!(edit.cursor_index_in_line, 1);
+    }
+
+    #[test]
+    fn handle_backspace_key_start_of_non_empty_line() {
+        let mut edit = TextEditPanel::new();
+        edit.set_text("abc\ndef");
+        edit.cursor_index = 1;
+        edit.current_line = 1;
+        edit.cursor_index_in_line = 0;
+
+        let mut state = AppState::new();
+
+        edit.handle_key_stroke(KeyCode::Backspace, &mut state);
+
+        assert_eq!(edit.lines, vec!["abcdef".to_string()]);
+        assert_eq!(edit.current_line, 0);
+        assert_eq!(edit.cursor_index_in_line, 3);
     }
 
     #[test]
