@@ -23,6 +23,8 @@ pub const EDIT_PANEL_TYPE_ID: &str = "Edit";
 
 pub struct TextEditPanel {
     cursor_index: usize,
+    current_line: usize,
+    cursor_index_in_line: usize,
     text: String,
     title: String,
     commands: Commands<EditCommand>,
@@ -39,6 +41,8 @@ impl TextEditPanel {
         TextEditPanel {
             scroll_y: 0,
             cursor_index: 0,
+            current_line: 0,
+            cursor_index_in_line: 0,
             gutter_size: 5,
             text: String::new(),
             title: "Buffer".to_string(),
@@ -53,8 +57,8 @@ impl TextEditPanel {
         &self.text
     }
 
-    pub fn set_text(&mut self, text: String) {
-        self.text = text;
+    pub fn set_text<T: ToString>(&mut self, text: T) {
+        self.text = text.to_string();
         self.lines = self.text.lines().map(|s| s.to_string()).collect();
     }
 
@@ -64,12 +68,37 @@ impl TextEditPanel {
         _state: &mut AppState,
     ) -> (bool, Vec<StateChangeRequest>) {
         match code {
-            KeyCode::Backspace => match self.text.pop() {
-                None => {
-                    self.cursor_index = 0;
+            KeyCode::Backspace => {
+                match self.text.pop() {
+                    None => {
+                        self.cursor_index = 0;
+                    }
+                    Some(_) => {
+                        self.cursor_index -= 1;
+                    }
                 }
-                Some(_) => {
-                    self.cursor_index -= 1;
+
+                // new
+                let remove = match self.lines.get_mut(self.current_line) {
+                    None => false, // no text, do nothing
+                    Some(line) => {
+                        match line.pop() {
+                            None => true, // empty, flag to remove
+                            Some(_) => {
+                                self.cursor_index_in_line -= 1;
+                                false
+                            }
+                        }
+                    }
+                };
+
+                if remove && self.current_line != 0 {
+                    self.lines.remove(self.current_line);
+                    self.current_line -= 1;
+                    self.cursor_index_in_line = match self.lines.get(self.current_line) {
+                        None => 0, // needs a test
+                        Some(line) => line.len()
+                    }
                 }
             },
             KeyCode::Delete => {
@@ -78,10 +107,28 @@ impl TextEditPanel {
             KeyCode::Enter => {
                 self.text.push('\n');
                 self.cursor_index += 1;
+
+                // new
+                self.lines.push(String::new());
+                self.current_line += 1;
+                self.cursor_index_in_line = 0;
             }
             KeyCode::Char(c) => {
                 self.text.push(c);
                 self.cursor_index += 1;
+
+                // new
+                match self.lines.get_mut(self.current_line) {
+                    None => {
+                        // start new
+                        self.lines.push(c.to_string());
+                    }
+                    Some(s) => {
+                        // add to existing
+                        s.push(c);
+                    }
+                }
+                self.cursor_index_in_line += 1;
             }
             _ => return (false, vec![]),
         }
@@ -744,6 +791,80 @@ mod tests {
                 Spans::from(Span::from("20")),
             ]
         );
+    }
+
+    #[test]
+    fn handle_character_key() {
+        let mut edit = TextEditPanel::new();
+        let mut state = AppState::new();
+
+        edit.handle_key_stroke(KeyCode::Char('a'), &mut state);
+
+        assert_eq!(edit.lines, vec!["a".to_string()]);
+        assert_eq!(edit.cursor_index_in_line, 1);
+    }
+
+    #[test]
+    fn handle_character_key_with_existing_text() {
+        let mut edit = TextEditPanel::new();
+        edit.set_text("a");
+        edit.cursor_index_in_line = 1;
+
+        let mut state = AppState::new();
+
+        edit.handle_key_stroke(KeyCode::Char('b'), &mut state);
+
+        assert_eq!(edit.lines, vec!["ab".to_string()]);
+        assert_eq!(edit.cursor_index_in_line, 2);
+    }
+
+    #[test]
+    fn handle_enter_key() {
+        let mut edit = TextEditPanel::new();
+        edit.set_text("a");
+        edit.cursor_index_in_line = 1;
+
+        let mut state = AppState::new();
+
+        edit.handle_key_stroke(KeyCode::Enter, &mut state);
+
+        assert_eq!(edit.lines, vec!["a".to_string(), String::new()]);
+        assert_eq!(edit.current_line, 1);
+        assert_eq!(edit.cursor_index_in_line, 0);
+    }
+
+    #[test]
+    fn handle_backspace_key() {
+        let mut edit = TextEditPanel::new();
+        edit.set_text("a");
+        edit.cursor_index = 1;
+        edit.cursor_index_in_line = 1;
+
+        let mut state = AppState::new();
+
+        edit.handle_key_stroke(KeyCode::Backspace, &mut state);
+
+        assert_eq!(edit.lines, vec!["".to_string()]);
+        assert_eq!(edit.current_line, 0);
+        assert_eq!(edit.cursor_index_in_line, 0);
+    }
+
+    #[test]
+    fn handle_backspace_key_on_newline() {
+        let mut edit = TextEditPanel::new();
+        edit.set_text("a\na");
+        edit.cursor_index = 2;
+        edit.cursor_index_in_line = 1;
+        edit.current_line = 1;
+
+        let mut state = AppState::new();
+
+        edit.handle_key_stroke(KeyCode::Backspace, &mut state);
+        edit.handle_key_stroke(KeyCode::Backspace, &mut state);
+
+        assert_eq!(edit.lines, vec!["a".to_string()]);
+        assert_eq!(edit.current_line, 0);
+        assert_eq!(edit.cursor_index_in_line, 1);
     }
 
     #[test]
