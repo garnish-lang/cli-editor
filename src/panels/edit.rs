@@ -206,7 +206,17 @@ impl TextEditPanel {
         _code: KeyCode,
         _state: &mut AppState,
     ) -> (bool, Vec<StateChangeRequest>) {
-        self.set_cursor_index(self.cursor_index + 1);
+        match self.lines.get(self.current_line) {
+            None => self.cursor_index_in_line = 0,
+            Some(line) => {
+                if self.cursor_index_in_line + 1 > line.len() && self.current_line + 1 < self.lines.len() {
+                    self.cursor_index_in_line = 0;
+                    self.current_line += 1;
+                } else {
+                    self.cursor_index_in_line += 1;
+                }
+            }
+        }
 
         (true, vec![])
     }
@@ -216,8 +226,14 @@ impl TextEditPanel {
         _code: KeyCode,
         _state: &mut AppState,
     ) -> (bool, Vec<StateChangeRequest>) {
-        if self.cursor_index > 0 {
-            self.set_cursor_index(self.cursor_index - 1);
+        if self.cursor_index_in_line > 0 {
+            self.cursor_index_in_line -= 1;
+        } else if self.current_line > 0 {
+            self.current_line -= 1;
+            self.cursor_index_in_line = match self.lines.get(self.current_line) {
+                None => 0,
+                Some(l) => l.len()
+            }
         }
 
         (true, vec![])
@@ -228,42 +244,16 @@ impl TextEditPanel {
         _code: KeyCode,
         _state: &mut AppState,
     ) -> (bool, Vec<StateChangeRequest>) {
-        // split at current index
-        // count back to newline for current line index
-        // advance forward to find next line
-        // advance again equal to current line index, or end of line
-        let (front, back) = self.text.split_at(self.cursor_index);
-        // split at, splits before index, putting current character in back
-        let distance_from_start = match front.rfind('\n') {
-            // reached start of text, distance is len of front
-            None => front.len(),
-            // found newline, distance is len minus index and additional 1 to exclude newline
-            Some(index) => front.len() - index - 1,
-        };
+        if self.current_line + 1 < self.lines.len() {
+            self.current_line += 1;
 
-        match back.find('\n') {
-            // reach end of text
-            None => {
-                self.set_cursor_to_end();
-            }
-            Some(index) => {
-                let current_line_start = index + 1;
-                // if distance would put us past this next line
-                // stop at end of line
-                let current_line_len = match back[current_line_start..].find('\n') {
-                    // subtract index + 1, for all character that aren't a part of current line
-                    None => back.len() - current_line_start,
-                    // this index is relative to slice in match
-                    // len will be the index itself + 1 for newline
-                    Some(index) => index,
-                };
-
-                let back_index = min(current_line_start + distance_from_start, index + current_line_len);
-
-                let l = front.len();
-                // index is relative to back, add front len for real index
-                // add distance for new index
-                self.set_cursor_index(l + back_index);
+            match self.lines.get(self.current_line) {
+                None => self.cursor_index_in_line = 0,
+                Some(line) => {
+                    if self.cursor_index_in_line > line.len() {
+                        self.cursor_index_in_line = line.len();
+                    }
+                }
             }
         }
 
@@ -275,37 +265,16 @@ impl TextEditPanel {
         _code: KeyCode,
         _state: &mut AppState,
     ) -> (bool, Vec<StateChangeRequest>) {
-        // split at current index
-        // count back to find last newline and distance from newline
-        // count again from first newline to find second
-        // add distance to get new index
+        if self.current_line > 0 {
+            self.current_line -= 1;
 
-        let (front, _) = self.text.split_at(self.cursor_index);
-
-        let (newline_index, distance) = match front.rfind('\n') {
-            // beginning of text, set to start and end
-            None => {
-                self.cursor_index = 0;
-                return (true, vec![])
-            }
-            Some(index) => (index, front.len() - index)
-        };
-
-        match front[..newline_index].rfind('\n') {
-            // beginning of text, set to lowest of distance and newline index, then end
-            None => {
-                self.set_cursor_index(min(newline_index, distance - 1));
-                return (true, vec![])
-            }
-            Some(index) => {
-                // if distance would put us past this next line
-                // stop at end of line
-
-                let current_line_len = front[..newline_index].len();
-
-                let back_index = min(current_line_len, distance);
-
-                self.set_cursor_index(index + back_index);
+            match self.lines.get(self.current_line) {
+                None => self.cursor_index_in_line = 0,
+                Some(line) => {
+                    if self.cursor_index_in_line > line.len() {
+                        self.cursor_index_in_line = line.len();
+                    }
+                }
             }
         }
 
@@ -1073,44 +1042,38 @@ mod tests {
     }
 
     #[test]
-    fn set_cursor() {
-        let mut edit = TextEditPanel::new();
-        edit.set_text((100..200)
-            .map(|i| i.to_string())
-            .collect::<Vec<String>>()
-            .join("\n"));
-
-        edit.set_cursor_index(10);
-
-        assert_eq!(edit.cursor_index, 10);
-    }
-
-    #[test]
-    fn set_cursor_past_text() {
-        let mut edit = TextEditPanel::new();
-        edit.set_text((100..200)
-            .map(|i| i.to_string())
-            .collect::<Vec<String>>()
-            .join("\n"));
-
-        edit.set_cursor_index(usize::MAX);
-
-        assert_eq!(edit.cursor_index, edit.text.len());
-    }
-
-    #[test]
     fn next_character() {
         let mut edit = TextEditPanel::new();
         edit.set_text((100..200)
             .map(|i| i.to_string())
             .collect::<Vec<String>>()
             .join("\n"));
-        edit.cursor_index = 10;
+        edit.cursor_index_in_line = 2;
+        edit.current_line = 2;
         let mut state = AppState::new();
 
         edit.move_to_next_character(KeyCode::Null, &mut state);
 
-        assert_eq!(edit.cursor_index, 11);
+        assert_eq!(edit.cursor_index_in_line, 3);
+    }
+
+    #[test]
+    fn next_character_to_next_line() {
+        let mut edit = TextEditPanel::new();
+        edit.set_text((100..200)
+            .map(|i| i.to_string())
+            .collect::<Vec<String>>()
+            .join("\n"));
+        edit.cursor_index_in_line = 2;
+        edit.current_line = 2;
+        let mut state = AppState::new();
+
+        edit.move_to_next_character(KeyCode::Null, &mut state);
+        assert_eq!(edit.cursor_index_in_line, 3);
+
+        edit.move_to_next_character(KeyCode::Null, &mut state);
+        assert_eq!(edit.cursor_index_in_line, 0);
+        assert_eq!(edit.current_line, 3);
     }
 
     #[test]
@@ -1120,12 +1083,35 @@ mod tests {
             .map(|i| i.to_string())
             .collect::<Vec<String>>()
             .join("\n"));
-        edit.cursor_index = 10;
+        edit.cursor_index_in_line = 2;
+        edit.current_line = 2;
         let mut state = AppState::new();
 
         edit.move_to_previous_character(KeyCode::Null, &mut state);
 
-        assert_eq!(edit.cursor_index, 9);
+        assert_eq!(edit.cursor_index_in_line, 1);
+    }
+
+    #[test]
+    fn previous_character_to_previous_line() {
+        let mut edit = TextEditPanel::new();
+        edit.set_text((100..200)
+            .map(|i| i.to_string())
+            .collect::<Vec<String>>()
+            .join("\n"));
+        edit.cursor_index_in_line = 2;
+        edit.current_line = 2;
+        let mut state = AppState::new();
+
+        edit.move_to_previous_character(KeyCode::Null, &mut state);
+        assert_eq!(edit.cursor_index_in_line, 1);
+
+        edit.move_to_previous_character(KeyCode::Null, &mut state);
+        assert_eq!(edit.cursor_index_in_line, 0);
+
+        edit.move_to_previous_character(KeyCode::Null, &mut state);
+        assert_eq!(edit.cursor_index_in_line, 3);
+        assert_eq!(edit.current_line, 1);
     }
 
     #[test]
@@ -1139,90 +1125,103 @@ mod tests {
 
         edit.move_to_previous_character(KeyCode::Null, &mut state);
 
-        assert_eq!(edit.cursor_index, 0);
+        assert_eq!(edit.cursor_index_in_line, 0);
+        assert_eq!(edit.current_line, 0);
     }
 
     #[test]
     fn next_line() {
         let mut edit = TextEditPanel::new();
-        edit.set_text("12345\n12345\n".to_string());
-        edit.cursor_index = 4;
+        edit.set_text("12345\n12345".to_string());
+        edit.cursor_index_in_line = 4;
+        edit.current_line = 0;
         let mut state = AppState::new();
 
         edit.move_to_next_line(KeyCode::Null, &mut state);
 
-        assert_eq!(edit.cursor_index, 10);
+        assert_eq!(edit.cursor_index_in_line, 4);
+        assert_eq!(edit.current_line, 1);
     }
 
     #[test]
     fn next_line_no_line() {
         let mut edit = TextEditPanel::new();
-        edit.set_text("1234567890".to_string());
-        edit.cursor_index = 4;
+        edit.set_text("12345\n12345".to_string());
+        edit.cursor_index_in_line = 4;
+        edit.current_line = 1;
         let mut state = AppState::new();
 
         edit.move_to_next_line(KeyCode::Null, &mut state);
 
-        assert_eq!(edit.cursor_index, 10);
+        assert_eq!(edit.cursor_index_in_line, 4);
+        assert_eq!(edit.current_line, 1);
     }
 
     #[test]
     fn next_line_longer_than_next() {
         let mut edit = TextEditPanel::new();
         edit.set_text("1234567890\n12345\n1234567890".to_string());
-        edit.cursor_index = 9;
+        edit.cursor_index_in_line = 9;
+        edit.current_line = 0;
         let mut state = AppState::new();
 
         edit.move_to_next_line(KeyCode::Null, &mut state);
 
-        assert_eq!(edit.cursor_index, 15);
+        assert_eq!(edit.cursor_index_in_line, 5);
+        assert_eq!(edit.current_line, 1);
     }
 
     #[test]
     fn next_line_that_is_last_line() {
         let mut edit = TextEditPanel::new();
         edit.set_text("1234567890\n12345\n1234567890".to_string());
-        edit.cursor_index = 12;
+        edit.cursor_index_in_line = 4;
+        edit.current_line = 1;
         let mut state = AppState::new();
 
         edit.move_to_next_line(KeyCode::Null, &mut state);
 
-        assert_eq!(edit.cursor_index, 18);
+        assert_eq!(edit.cursor_index_in_line, 4);
+        assert_eq!(edit.current_line, 2);
     }
 
     #[test]
     fn previous_line() {
         let mut edit = TextEditPanel::new();
         edit.set_text("1234567890\n1234567890".to_string());
-        edit.cursor_index = 17;
+        edit.cursor_index_in_line = 4;
+        edit.current_line = 1;
         let mut state = AppState::new();
 
         edit.move_to_previous_line(KeyCode::Null, &mut state);
 
-        assert_eq!(edit.cursor_index, 6);
+        assert_eq!(edit.cursor_index_in_line, 4);
+        assert_eq!(edit.current_line, 0);
     }
 
     #[test]
     fn next_line_longer_than_previous() {
         let mut edit = TextEditPanel::new();
         edit.set_text("12345\n1234567890".to_string());
-        edit.cursor_index = edit.text.len();
+        edit.cursor_index_in_line = 9;
+        edit.current_line = 1;
         let mut state = AppState::new();
 
         edit.move_to_previous_line(KeyCode::Null, &mut state);
 
-        assert_eq!(edit.cursor_index, 5);
+        assert_eq!(edit.cursor_index_in_line, 5);
+        assert_eq!(edit.current_line, 0);
     }
 
-    #[test]
-    fn next_line_longer_than_previous_with_additional_line() {
-        let mut edit = TextEditPanel::new();
-        edit.set_text("12345\n1234567890\n12345".to_string());
-        edit.cursor_index = 19;
-        let mut state = AppState::new();
-
-        edit.move_to_previous_line(KeyCode::Null, &mut state);
-
-        assert_eq!(edit.cursor_index, 8);
-    }
+    // #[test]
+    // fn next_line_longer_than_previous_with_additional_line() {
+    //     let mut edit = TextEditPanel::new();
+    //     edit.set_text("12345\n1234567890\n12345".to_string());
+    //     edit.cursor_index = 19;
+    //     let mut state = AppState::new();
+    //
+    //     edit.move_to_previous_line(KeyCode::Null, &mut state);
+    //
+    //     assert_eq!(edit.cursor_index, 8);
+    // }
 }
