@@ -168,9 +168,10 @@ impl TextEditPanel {
 
                 let back_index = min(current_line_start + distance_from_start, index + current_line_len);
 
+                let l = front.len();
                 // index is relative to back, add front len for real index
                 // add distance for new index
-                self.set_cursor_index(front.len() + back_index);
+                self.set_cursor_index(l + back_index);
             }
         }
 
