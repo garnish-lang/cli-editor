@@ -545,6 +545,26 @@ pub fn make_commands() -> Result<Commands<EditCommand>, String> {
             .action(CommandDetails::empty(), TextEditPanel::scroll_down_ten)
     })?;
 
+    commands.insert(|b| {
+        b.node(alt_key('w'))
+            .action(CommandDetails::empty(), TextEditPanel::move_to_previous_line)
+    })?;
+
+    commands.insert(|b| {
+        b.node(alt_key('a'))
+            .action(CommandDetails::empty(), TextEditPanel::move_to_previous_character)
+    })?;
+
+    commands.insert(|b| {
+        b.node(alt_key('s'))
+            .action(CommandDetails::empty(), TextEditPanel::move_to_next_line)
+    })?;
+
+    commands.insert(|b| {
+        b.node(alt_key('d'))
+            .action(CommandDetails::empty(), TextEditPanel::move_to_next_character)
+    })?;
+
     Ok(commands)
 }
 
