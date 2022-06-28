@@ -3,18 +3,18 @@ extern crate core;
 use std::io;
 use std::io::Stdout;
 
-use crossterm::event::{DisableMouseCapture, Event, KeyCode, read};
+use crossterm::event::{read, DisableMouseCapture, Event, KeyCode};
 use crossterm::execute;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
-use tui::{Frame, Terminal};
 use tui::backend::CrosstermBackend;
+use tui::{Frame, Terminal};
 
-use crate::app::{AppState, global_commands};
-use crate::commands::{catch_all, CommandDetails, CommandKeyId, Commands, ctrl_key, key};
+use crate::app::{global_commands, AppState};
+use crate::commands::{catch_all, ctrl_key, key, CommandDetails, CommandKeyId, Commands};
 use crate::panels::{InputPanel, Panel, Panels, TextEditPanel};
-use crate::render::{CURSOR_MAX, render_split};
+use crate::render::{render_split, CURSOR_MAX};
 use crate::splits::{PanelSplit, UserSplits};
 
 mod app;
@@ -80,8 +80,8 @@ fn main() -> Result<(), String> {
                     let (handled, changes) = match app_state.get_active_panel_mut() {
                         Some(lp) => match panels.get_mut(lp.panel_index()) {
                             Some(panel) => panel.receive_key(event, &mut app_state),
-                            None => (false, vec![])
-                        }
+                            None => (false, vec![]),
+                        },
                         None => (false, vec![]), // error?
                     };
 

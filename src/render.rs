@@ -3,9 +3,9 @@ use tui::style::{Color, Modifier, Style};
 use tui::text::{Span, Spans};
 use tui::widgets::{Block, Borders};
 
-use crate::{AppState, EditorFrame, Panels};
 use crate::panels::NULL_PANEL_TYPE_ID;
 use crate::splits::UserSplits;
+use crate::{AppState, EditorFrame, Panels};
 
 pub const CURSOR_MAX: (u16, u16) = (u16::MAX / 2, u16::MAX / 2);
 

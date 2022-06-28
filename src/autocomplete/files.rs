@@ -22,11 +22,13 @@ impl AutoCompleter for FileAutoCompleter {
                 // unix only
                 Component::RootDir => path_selection.push(std::path::MAIN_SEPARATOR.to_string()),
                 // windows only
-                Component::Prefix(p) => path_selection.push(p.as_os_str().to_string_lossy().to_string()),
+                Component::Prefix(p) => {
+                    path_selection.push(p.as_os_str().to_string_lossy().to_string())
+                }
                 Component::CurDir => (),
                 Component::ParentDir => {
                     path_selection.pop();
-                },
+                }
                 Component::Normal(s) => match s.to_string_lossy().to_string().as_str() {
                     "~" => {
                         // home dir in rust std is deprecated, handle manually here
@@ -35,11 +37,11 @@ impl AutoCompleter for FileAutoCompleter {
                         // if not there, replace with root
                         path_selection = PathBuf::from(match env::var("HOME") {
                             Err(_) => "/".to_string(),
-                            Ok(home) => format!("{}/", home)
+                            Ok(home) => format!("{}/", home),
                         });
                     }
-                    s => path_selection.push(s)
-                }
+                    s => path_selection.push(s),
+                },
             }
         }
 

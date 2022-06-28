@@ -69,7 +69,9 @@ mod tests {
     #[test]
     fn create_null_boxed() {
         assert_eq!(
-            PanelFactory::panel(NULL_PANEL_TYPE_ID).unwrap().panel_type(),
+            PanelFactory::panel(NULL_PANEL_TYPE_ID)
+                .unwrap()
+                .panel_type(),
             NULL_PANEL_TYPE_ID
         );
     }
@@ -77,7 +79,9 @@ mod tests {
     #[test]
     fn create_edit_boxed() {
         assert_eq!(
-            PanelFactory::panel(EDIT_PANEL_TYPE_ID).unwrap().panel_type(),
+            PanelFactory::panel(EDIT_PANEL_TYPE_ID)
+                .unwrap()
+                .panel_type(),
             EDIT_PANEL_TYPE_ID
         );
     }

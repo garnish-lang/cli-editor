@@ -1,7 +1,7 @@
-use std::{env, iter};
 use std::fs;
 use std::io::{Read, Write};
 use std::path::PathBuf;
+use std::{env, iter};
 
 use crossterm::event::{KeyCode, KeyEvent};
 use tui::layout::{Alignment, Constraint, Direction, Layout, Rect};
@@ -9,14 +9,14 @@ use tui::style::{Color, Style};
 use tui::text::{Span, Spans, Text};
 use tui::widgets::{Block, Paragraph};
 
-use crate::{
-    AppState, catch_all, CommandDetails, CommandKeyId, Commands, ctrl_key, CURSOR_MAX, EditorFrame,
-    Panel,
-};
-use crate::app::{StateChangeRequest};
+use crate::app::StateChangeRequest;
 use crate::autocomplete::FileAutoCompleter;
 use crate::commands::{alt_key, shift_alt_key, shift_catch_all};
 use crate::panels::RenderDetails;
+use crate::{
+    catch_all, ctrl_key, AppState, CommandDetails, CommandKeyId, Commands, EditorFrame, Panel,
+    CURSOR_MAX,
+};
 
 pub const EDIT_PANEL_TYPE_ID: &str = "Edit";
 
@@ -397,34 +397,49 @@ impl TextEditPanel {
         (true, self.save())
     }
 
-    fn save(
-        &mut self,
-    ) -> Vec<StateChangeRequest> {
+    fn save(&mut self) -> Vec<StateChangeRequest> {
         let mut changes = vec![];
 
         match &self.file_path {
             None => {
                 self.state = EditState::WaitingToSave;
                 return vec![StateChangeRequest::input_request_with_completer(
-                        "File Name".to_string(),
-                        Box::new(FileAutoCompleter::new()),
-                    )];
+                    "File Name".to_string(),
+                    Box::new(FileAutoCompleter::new()),
+                )];
             }
             Some(file_path) => {
-                changes.push(StateChangeRequest::info(format!("Saving file to {:?}", file_path)));
+                changes.push(StateChangeRequest::info(format!(
+                    "Saving file to {:?}",
+                    file_path
+                )));
 
-                match fs::File::options().write(true).create(true).truncate(true).open(file_path) {
+                match fs::File::options()
+                    .write(true)
+                    .create(true)
+                    .truncate(true)
+                    .open(file_path)
+                {
                     Err(err) => {
-                        changes.push(StateChangeRequest::error(format!("Could not open file to save. {}", err.to_string())));
+                        changes.push(StateChangeRequest::error(format!(
+                            "Could not open file to save. {}",
+                            err.to_string()
+                        )));
                     }
                     Ok(mut file) => {
                         self.lines.iter().for_each(|line| {
                             match file.write(line.as_bytes()) {
-                                Err(err) => changes.push(StateChangeRequest::error(format!("Could not write to file. {}", err.to_string()))),
+                                Err(err) => changes.push(StateChangeRequest::error(format!(
+                                    "Could not write to file. {}",
+                                    err.to_string()
+                                ))),
                                 Ok(_) => (),
                             }
                             match file.write("\n".as_bytes()) {
-                                Err(err) => changes.push(StateChangeRequest::error(format!("Could not write to file. {}", err.to_string()))),
+                                Err(err) => changes.push(StateChangeRequest::error(format!(
+                                    "Could not write to file. {}",
+                                    err.to_string()
+                                ))),
                                 Ok(_) => (),
                             }
                         });
@@ -432,7 +447,7 @@ impl TextEditPanel {
                         changes.push(StateChangeRequest::info("Save complete."));
                     }
                 }
-            },
+            }
         }
 
         changes

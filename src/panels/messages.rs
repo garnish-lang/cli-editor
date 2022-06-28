@@ -4,8 +4,8 @@ use tui::text::{Span, Text};
 use tui::widgets::{List, ListItem};
 
 use crate::app::MessageChannel;
-use crate::{AppState, EditorFrame, Panel};
 use crate::panels::RenderDetails;
+use crate::{AppState, EditorFrame, Panel};
 
 pub const MESSAGE_PANEL_TYPE_ID: &str = "Messages";
 
@@ -40,15 +40,11 @@ impl Panel for MessagesPanel {
                     MessageChannel::ERROR => Color::Red,
                 };
 
-                ListItem::new(Text::styled(
-                    m.text().as_str(),
-                    Style::default().fg(color),
-                ))
+                ListItem::new(Text::styled(m.text().as_str(), Style::default().fg(color)))
             })
             .collect();
 
-        let list = List::new(spans)
-            .style(Style::default().fg(Color::White).bg(Color::Black));
+        let list = List::new(spans).style(Style::default().fg(Color::White).bg(Color::Black));
 
         frame.render_widget(list, rect);
 

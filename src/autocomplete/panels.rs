@@ -32,17 +32,32 @@ mod tests {
     fn empty_input_returns_all() {
         let completer = PanelAutoCompleter::new();
 
-        assert_eq!(completer.get_options("").len(), PanelAutoCompleter::options().len());
+        assert_eq!(
+            completer.get_options("").len(),
+            PanelAutoCompleter::options().len()
+        );
     }
 
     #[test]
     fn finds_match() {
         let completer = PanelAutoCompleter::new();
 
-        assert_eq!(completer.get_options("E"), vec![Completion::new("Edit".to_string(), "dit".to_string())]);
-        assert_eq!(completer.get_options("Ed"), vec![Completion::new("Edit".to_string(), "it".to_string())]);
-        assert_eq!(completer.get_options("Edi"), vec![Completion::new("Edit".to_string(), "t".to_string())]);
-        assert_eq!(completer.get_options("Edit"), vec![Completion::new("Edit".to_string(), "".to_string())]);
+        assert_eq!(
+            completer.get_options("E"),
+            vec![Completion::new("Edit".to_string(), "dit".to_string())]
+        );
+        assert_eq!(
+            completer.get_options("Ed"),
+            vec![Completion::new("Edit".to_string(), "it".to_string())]
+        );
+        assert_eq!(
+            completer.get_options("Edi"),
+            vec![Completion::new("Edit".to_string(), "t".to_string())]
+        );
+        assert_eq!(
+            completer.get_options("Edit"),
+            vec![Completion::new("Edit".to_string(), "".to_string())]
+        );
         assert_eq!(completer.get_options("Edits"), Vec::<Completion>::new());
     }
 }

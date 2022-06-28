@@ -2,7 +2,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use tui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Style};
 use tui::text::{Span, Spans, Text};
-use tui::widgets::{Paragraph};
+use tui::widgets::Paragraph;
 
 use crate::app::StateChangeRequest;
 use crate::commands::{alt_catch_all, code, shift_catch_all};
@@ -44,16 +44,14 @@ impl InputPanel {
     ) -> (bool, Vec<StateChangeRequest>) {
         let mut requests = vec![];
         match code {
-            KeyCode::Backspace => {
-                match self.text.pop() {
-                    None => {
-                        self.cursor_index = 0;
-                    }
-                    Some(_) => {
-                        self.cursor_index -= 1;
-                    }
+            KeyCode::Backspace => match self.text.pop() {
+                None => {
+                    self.cursor_index = 0;
                 }
-            }
+                Some(_) => {
+                    self.cursor_index -= 1;
+                }
+            },
             KeyCode::Delete => {
                 // ??
             }
