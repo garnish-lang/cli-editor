@@ -41,7 +41,7 @@ impl Panel for MessagesPanel {
                 };
 
                 ListItem::new(Text::styled(
-                    format!(" {}", m.text()),
+                    m.text().as_str(),
                     Style::default().fg(color),
                 ))
             })
