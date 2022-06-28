@@ -71,6 +71,10 @@ impl StateChangeRequest {
         StateChangeRequest::InputComplete(text)
     }
 
+    pub fn info<T: ToString>(message: T) -> StateChangeRequest {
+        StateChangeRequest::Message(Message::info(message))
+    }
+
     pub fn error<T: ToString>(message: T) -> StateChangeRequest {
         StateChangeRequest::Message(Message::error(message))
     }

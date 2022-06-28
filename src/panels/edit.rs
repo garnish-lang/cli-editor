@@ -1,6 +1,6 @@
 use std::{env, iter};
 use std::fs;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::PathBuf;
 
 use crossterm::event::{KeyCode, KeyEvent};
@@ -9,27 +9,34 @@ use tui::style::{Color, Style};
 use tui::text::{Span, Spans, Text};
 use tui::widgets::{Block, Paragraph};
 
-use crate::app::StateChangeRequest;
+use crate::{
+    AppState, catch_all, CommandDetails, CommandKeyId, Commands, ctrl_key, CURSOR_MAX, EditorFrame,
+    Panel,
+};
+use crate::app::{StateChangeRequest};
 use crate::autocomplete::FileAutoCompleter;
 use crate::commands::{alt_key, shift_alt_key, shift_catch_all};
 use crate::panels::RenderDetails;
-use crate::{
-    catch_all, ctrl_key, AppState, CommandDetails, CommandKeyId, Commands, EditorFrame, Panel,
-    CURSOR_MAX,
-};
 
 pub const EDIT_PANEL_TYPE_ID: &str = "Edit";
+
+enum EditState {
+    Normal,
+    WaitingToOpen,
+    WaitingToSave,
+}
 
 pub struct TextEditPanel {
     current_line: usize,
     cursor_index_in_line: usize,
     title: String,
     commands: Commands<EditCommand>,
-    file_path: PathBuf,
+    file_path: Option<PathBuf>,
     gutter_size: u16,
     continuation_marker: String,
     scroll_y: u16,
-    lines: Vec<String>
+    lines: Vec<String>,
+    state: EditState,
 }
 
 #[allow(dead_code)]
@@ -42,9 +49,10 @@ impl TextEditPanel {
             gutter_size: 5,
             title: "Buffer".to_string(),
             commands: Commands::<EditCommand>::new(),
-            file_path: PathBuf::new(),
+            file_path: None,
             continuation_marker: "... ".to_string(),
-            lines: vec![]
+            lines: vec![],
+            state: EditState::Normal,
         }
     }
 
@@ -103,18 +111,18 @@ impl TextEditPanel {
                 } else {
                     self.remove_character(1, 1, state);
                 }
-            },
-            KeyCode::Delete => {
-                match self.lines.get(self.current_line) {
-                    None => (),
-                    Some(line) => if self.cursor_index_in_line == line.len() {
+            }
+            KeyCode::Delete => match self.lines.get(self.current_line) {
+                None => (),
+                Some(line) => {
+                    if self.cursor_index_in_line == line.len() {
                         self.current_line += 1;
                         self.remove_line();
                     } else {
                         self.remove_character(0, 0, state);
                     }
                 }
-            }
+            },
             KeyCode::Enter => {
                 self.lines.push(String::new());
                 self.current_line += 1;
@@ -142,9 +150,9 @@ impl TextEditPanel {
     fn open_file(
         &mut self,
         _code: KeyCode,
-        state: &mut AppState,
+        _state: &mut AppState,
     ) -> (bool, Vec<StateChangeRequest>) {
-        state.add_info(format!("request open file"));
+        self.state = EditState::WaitingToOpen;
         (
             true,
             vec![StateChangeRequest::input_request_with_completer(
@@ -159,7 +167,7 @@ impl TextEditPanel {
             self.current_line = self.lines.len() - 1;
             self.cursor_index_in_line = match self.lines.get(self.current_line) {
                 None => 0,
-                Some(line) => line.len()
+                Some(line) => line.len(),
             };
         } else {
             self.current_line = 0;
@@ -175,7 +183,9 @@ impl TextEditPanel {
         match self.lines.get(self.current_line) {
             None => self.cursor_index_in_line = 0,
             Some(line) => {
-                if self.cursor_index_in_line + 1 > line.len() && self.current_line + 1 < self.lines.len() {
+                if self.cursor_index_in_line + 1 > line.len()
+                    && self.current_line + 1 < self.lines.len()
+                {
                     self.cursor_index_in_line = 0;
                     self.current_line += 1;
                 } else {
@@ -198,7 +208,7 @@ impl TextEditPanel {
             self.current_line -= 1;
             self.cursor_index_in_line = match self.lines.get(self.current_line) {
                 None => 0,
-                Some(l) => l.len()
+                Some(l) => l.len(),
             }
         }
 
@@ -356,7 +366,9 @@ impl TextEditPanel {
                         if true_index == self.current_line {
                             let continuation_count = lines.len() - starting_lines - 1;
                             let mut cursor_position = self.cursor_index_in_line;
-                            for amount in iter::once(max_text_length).chain(iter::repeat(continuation_length).take(continuation_count)) {
+                            for amount in iter::once(max_text_length)
+                                .chain(iter::repeat(continuation_length).take(continuation_count))
+                            {
                                 if cursor_position <= amount {
                                     break;
                                 }
@@ -365,7 +377,9 @@ impl TextEditPanel {
                             }
 
                             cursor_y = text_content_box.y + lines.len() as u16 - 1;
-                            cursor_x = text_content_box.x + self.continuation_marker.len() as u16 + cursor_position as u16;
+                            cursor_x = text_content_box.x
+                                + self.continuation_marker.len() as u16
+                                + cursor_position as u16;
                         }
                     }
                 }
@@ -373,6 +387,55 @@ impl TextEditPanel {
         }
 
         (lines, (cursor_x, cursor_y), gutter)
+    }
+
+    fn save_buffer(
+        &mut self,
+        _code: KeyCode,
+        _state: &mut AppState,
+    ) -> (bool, Vec<StateChangeRequest>) {
+        (true, self.save())
+    }
+
+    fn save(
+        &mut self,
+    ) -> Vec<StateChangeRequest> {
+        let mut changes = vec![];
+
+        match &self.file_path {
+            None => {
+                self.state = EditState::WaitingToSave;
+                return vec![StateChangeRequest::input_request_with_completer(
+                        "File Name".to_string(),
+                        Box::new(FileAutoCompleter::new()),
+                    )];
+            }
+            Some(file_path) => {
+                changes.push(StateChangeRequest::info(format!("Saving file to {:?}", file_path)));
+
+                match fs::File::options().write(true).create(true).truncate(true).open(file_path) {
+                    Err(err) => {
+                        changes.push(StateChangeRequest::error(format!("Could not open file to save. {}", err.to_string())));
+                    }
+                    Ok(mut file) => {
+                        self.lines.iter().for_each(|line| {
+                            match file.write(line.as_bytes()) {
+                                Err(err) => changes.push(StateChangeRequest::error(format!("Could not write to file. {}", err.to_string()))),
+                                Ok(_) => (),
+                            }
+                            match file.write("\n".as_bytes()) {
+                                Err(err) => changes.push(StateChangeRequest::error(format!("Could not write to file. {}", err.to_string()))),
+                                Ok(_) => (),
+                            }
+                        });
+
+                        changes.push(StateChangeRequest::info("Save complete."));
+                    }
+                }
+            },
+        }
+
+        changes
     }
 }
 
@@ -462,43 +525,64 @@ impl Panel for TextEditPanel {
     fn receive_input(&mut self, input: String) -> Vec<StateChangeRequest> {
         let mut changes = vec![];
 
-        let current_dir = match env::current_dir() {
-            Err(e) => {
-                changes.push(StateChangeRequest::error(e));
-                return changes;
-            }
-            Ok(p) => p,
-        };
-
-        self.file_path = (&current_dir).clone();
-        self.file_path.push(input);
-
-        match fs::File::open(&self.file_path) {
-            Err(e) => changes.push(StateChangeRequest::error(e)),
-            Ok(mut file) => {
-                let mut s = String::new();
-                match file.read_to_string(&mut s) {
-                    Err(e) => changes.push(StateChangeRequest::error(e)),
-                    Ok(_) => {
-                        self.set_text(s);
-
-                        self.title = if self.file_path.starts_with(&current_dir) {
-                            match self.file_path.strip_prefix(&current_dir) {
-                                Err(e) => {
-                                    changes.push(StateChangeRequest::error(e));
-                                    self.file_path.to_string_lossy().to_string()
-                                }
-                                Ok(p) => p.as_os_str().to_string_lossy().to_string(),
-                            }
-                        } else {
-                            self.file_path.to_string_lossy().to_string()
-                        }
+        match self.state {
+            EditState::WaitingToOpen => {
+                let current_dir = match env::current_dir() {
+                    Err(e) => {
+                        changes.push(StateChangeRequest::error(e));
+                        return changes;
                     }
-                }
-            }
-        };
+                    Ok(p) => p,
+                };
 
-        self.scroll_y = 0;
+                let mut file_path = (&current_dir).clone();
+                file_path.push(input);
+
+                match fs::File::open(&file_path) {
+                    Err(e) => changes.push(StateChangeRequest::error(e)),
+                    Ok(mut file) => {
+                        let mut s = String::new();
+                        match file.read_to_string(&mut s) {
+                            Err(e) => changes.push(StateChangeRequest::error(e)),
+                            Ok(_) => {
+                                self.set_text(s);
+
+                                self.title = if file_path.starts_with(&current_dir) {
+                                    match file_path.strip_prefix(&current_dir) {
+                                        Err(e) => {
+                                            changes.push(StateChangeRequest::error(e));
+                                            file_path.to_string_lossy().to_string()
+                                        }
+                                        Ok(p) => p.as_os_str().to_string_lossy().to_string(),
+                                    }
+                                } else {
+                                    file_path.to_string_lossy().to_string()
+                                }
+                            }
+                        }
+                        self.file_path = Some(file_path.clone());
+                    }
+                };
+
+                self.scroll_y = 0;
+            }
+            EditState::WaitingToSave => {
+                let current_dir = match env::current_dir() {
+                    Err(e) => {
+                        changes.push(StateChangeRequest::error(e));
+                        return changes;
+                    }
+                    Ok(p) => p,
+                };
+
+                let mut file_path = (&current_dir).clone();
+                file_path.push(input);
+                self.file_path = Some(file_path.clone());
+
+                changes.extend(self.save());
+            }
+            EditState::Normal => (),
+        }
 
         changes
     }
@@ -526,6 +610,11 @@ pub fn make_commands() -> Result<Commands<EditCommand>, String> {
     })?;
 
     commands.insert(|b| {
+        b.node(ctrl_key('s'))
+            .action(CommandDetails::empty(), TextEditPanel::save_buffer)
+    })?;
+
+    commands.insert(|b| {
         b.node(alt_key('i'))
             .action(CommandDetails::empty(), TextEditPanel::scroll_up_one)
     })?;
@@ -546,13 +635,17 @@ pub fn make_commands() -> Result<Commands<EditCommand>, String> {
     })?;
 
     commands.insert(|b| {
-        b.node(alt_key('w'))
-            .action(CommandDetails::empty(), TextEditPanel::move_to_previous_line)
+        b.node(alt_key('w')).action(
+            CommandDetails::empty(),
+            TextEditPanel::move_to_previous_line,
+        )
     })?;
 
     commands.insert(|b| {
-        b.node(alt_key('a'))
-            .action(CommandDetails::empty(), TextEditPanel::move_to_previous_character)
+        b.node(alt_key('a')).action(
+            CommandDetails::empty(),
+            TextEditPanel::move_to_previous_character,
+        )
     })?;
 
     commands.insert(|b| {
@@ -561,8 +654,10 @@ pub fn make_commands() -> Result<Commands<EditCommand>, String> {
     })?;
 
     commands.insert(|b| {
-        b.node(alt_key('d'))
-            .action(CommandDetails::empty(), TextEditPanel::move_to_next_character)
+        b.node(alt_key('d')).action(
+            CommandDetails::empty(),
+            TextEditPanel::move_to_next_character,
+        )
     })?;
 
     Ok(commands)
@@ -581,7 +676,15 @@ mod tests {
         let mut edit = TextEditPanel::new();
         edit.set_text("\n123456789\n123456\n");
 
-        assert_eq!(edit.lines, vec!["".to_string(), "123456789".to_string(), "123456".to_string(), "".to_string()])
+        assert_eq!(
+            edit.lines,
+            vec![
+                "".to_string(),
+                "123456789".to_string(),
+                "123456".to_string(),
+                "".to_string()
+            ]
+        )
     }
 
     #[test]
@@ -621,13 +724,7 @@ mod tests {
 
         let (_, cursor, _) = edit.make_text_content(Rect::new(10, 10, 20, 20));
 
-        assert_eq!(
-            cursor,
-            (
-                20 + edit.continuation_marker.len() as u16,
-                11
-            )
-        );
+        assert_eq!(cursor, (20 + edit.continuation_marker.len() as u16, 11));
     }
 
     #[test]
@@ -698,10 +795,12 @@ mod tests {
     #[test]
     fn lines_with_scroll() {
         let mut edit = TextEditPanel::new();
-        edit.set_text((100..200)
-            .map(|i| i.to_string())
-            .collect::<Vec<String>>()
-            .join("\n"));
+        edit.set_text(
+            (100..200)
+                .map(|i| i.to_string())
+                .collect::<Vec<String>>()
+                .join("\n"),
+        );
         edit.current_line = 12;
         edit.cursor_index_in_line = 1;
         edit.scroll_y = 10;
@@ -921,7 +1020,7 @@ mod tests {
         assert_eq!(edit.current_line, 0);
         assert_eq!(edit.cursor_index_in_line, 3);
     }
-    
+
     #[test]
     fn scroll_down() {
         let mut edit = TextEditPanel::new();
@@ -965,10 +1064,12 @@ mod tests {
     #[test]
     fn scroll_down_one() {
         let mut edit = TextEditPanel::new();
-        edit.set_text((100..200)
-            .map(|i| i.to_string())
-            .collect::<Vec<String>>()
-            .join("\n"));
+        edit.set_text(
+            (100..200)
+                .map(|i| i.to_string())
+                .collect::<Vec<String>>()
+                .join("\n"),
+        );
         edit.scroll_y = 95;
 
         let mut state = AppState::new();
@@ -981,10 +1082,12 @@ mod tests {
     #[test]
     fn scroll_down_past_text() {
         let mut edit = TextEditPanel::new();
-        edit.set_text((100..200)
-            .map(|i| i.to_string())
-            .collect::<Vec<String>>()
-            .join("\n"));
+        edit.set_text(
+            (100..200)
+                .map(|i| i.to_string())
+                .collect::<Vec<String>>()
+                .join("\n"),
+        );
         edit.scroll_y = 95;
 
         let mut state = AppState::new();
@@ -1018,10 +1121,12 @@ mod tests {
     #[test]
     fn next_character() {
         let mut edit = TextEditPanel::new();
-        edit.set_text((100..200)
-            .map(|i| i.to_string())
-            .collect::<Vec<String>>()
-            .join("\n"));
+        edit.set_text(
+            (100..200)
+                .map(|i| i.to_string())
+                .collect::<Vec<String>>()
+                .join("\n"),
+        );
         edit.cursor_index_in_line = 2;
         edit.current_line = 2;
         let mut state = AppState::new();
@@ -1034,10 +1139,12 @@ mod tests {
     #[test]
     fn next_character_to_next_line() {
         let mut edit = TextEditPanel::new();
-        edit.set_text((100..200)
-            .map(|i| i.to_string())
-            .collect::<Vec<String>>()
-            .join("\n"));
+        edit.set_text(
+            (100..200)
+                .map(|i| i.to_string())
+                .collect::<Vec<String>>()
+                .join("\n"),
+        );
         edit.cursor_index_in_line = 2;
         edit.current_line = 2;
         let mut state = AppState::new();
@@ -1053,10 +1160,12 @@ mod tests {
     #[test]
     fn previous_character() {
         let mut edit = TextEditPanel::new();
-        edit.set_text((100..200)
-            .map(|i| i.to_string())
-            .collect::<Vec<String>>()
-            .join("\n"));
+        edit.set_text(
+            (100..200)
+                .map(|i| i.to_string())
+                .collect::<Vec<String>>()
+                .join("\n"),
+        );
         edit.cursor_index_in_line = 2;
         edit.current_line = 2;
         let mut state = AppState::new();
@@ -1069,10 +1178,12 @@ mod tests {
     #[test]
     fn previous_character_to_previous_line() {
         let mut edit = TextEditPanel::new();
-        edit.set_text((100..200)
-            .map(|i| i.to_string())
-            .collect::<Vec<String>>()
-            .join("\n"));
+        edit.set_text(
+            (100..200)
+                .map(|i| i.to_string())
+                .collect::<Vec<String>>()
+                .join("\n"),
+        );
         edit.cursor_index_in_line = 2;
         edit.current_line = 2;
         let mut state = AppState::new();
@@ -1091,10 +1202,12 @@ mod tests {
     #[test]
     fn previous_character_at_zero() {
         let mut edit = TextEditPanel::new();
-        edit.set_text((100..200)
-            .map(|i| i.to_string())
-            .collect::<Vec<String>>()
-            .join("\n"));
+        edit.set_text(
+            (100..200)
+                .map(|i| i.to_string())
+                .collect::<Vec<String>>()
+                .join("\n"),
+        );
         let mut state = AppState::new();
 
         edit.move_to_previous_character(KeyCode::Null, &mut state);
