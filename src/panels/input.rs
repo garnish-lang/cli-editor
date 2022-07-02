@@ -36,6 +36,20 @@ impl InputPanel {
         self.text = text;
     }
 
+    pub(crate) fn handle_key_stroke(
+        panel: &mut TextPanel,
+        code: KeyCode,
+        state: &mut AppState,
+    ) -> (bool, Vec<StateChangeRequest>) {
+        panel.handle_key_stroke_internal(code, state, InputPanel::submit_input)
+    }
+
+    pub fn submit_input(panel: &mut TextPanel, changes: &mut Vec<StateChangeRequest>) {
+        changes.push(StateChangeRequest::input_complete(panel.text().clone()));
+        panel.set_text("");
+        panel.set_selection(0);
+    }
+
     // fn handle_key_stroke(
     //     panel: &TextPanel,
     //     code: KeyCode,

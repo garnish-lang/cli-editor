@@ -301,6 +301,18 @@ impl TextPanel {
         code: KeyCode,
         state: &mut AppState,
     ) -> (bool, Vec<StateChangeRequest>) {
+        self.handle_key_stroke_internal(code, state, TextPanel::enter_newline)
+    }
+
+    pub(crate) fn handle_key_stroke_internal<Enter>(
+        &mut self,
+        code: KeyCode,
+        state: &mut AppState,
+        enter_func: Enter,
+    ) -> (bool, Vec<StateChangeRequest>)
+    where Enter: FnOnce(&mut TextPanel, &mut Vec<StateChangeRequest>)
+    {
+        let mut changes = vec![];
         match code {
             KeyCode::Backspace => {
                 if self.cursor_index_in_line == 0 {
@@ -321,9 +333,7 @@ impl TextPanel {
                 }
             },
             KeyCode::Enter => {
-                self.lines.push(String::new());
-                self.current_line += 1;
-                self.cursor_index_in_line = 0;
+                enter_func(self, &mut changes)
             }
             KeyCode::Char(c) => {
                 match self.lines.get_mut(self.current_line) {
@@ -341,7 +351,13 @@ impl TextPanel {
             _ => return (false, vec![]),
         }
 
-        (true, vec![])
+        (true, changes)
+    }
+
+    pub fn enter_newline(&mut self, _: &mut Vec<StateChangeRequest>) {
+        self.lines.push(String::new());
+        self.current_line += 1;
+        self.cursor_index_in_line = 0;
     }
 
     pub(crate) fn open_file(

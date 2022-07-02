@@ -140,12 +140,12 @@ pub fn make_input_commands() -> Result<Commands<PanelCommand>, String> {
 
     commands.insert(|b| {
         b.node(catch_all())
-            .action(CommandDetails::empty(), TextPanel::handle_key_stroke)
+            .action(CommandDetails::empty(), InputPanel::handle_key_stroke)
     })?;
 
     commands.insert(|b| {
         b.node(shift_catch_all())
-            .action(CommandDetails::empty(), TextPanel::handle_key_stroke)
+            .action(CommandDetails::empty(), InputPanel::handle_key_stroke)
     })?;
 
     commands.insert(|b| {
