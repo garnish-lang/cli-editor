@@ -22,13 +22,15 @@ pub struct Manager {
 pub struct CommandProgress {
     keys: Vec<CommandKeyId>,
     commands_index: Option<usize>,
+    is_end: bool,
 }
 
 impl CommandProgress {
     pub fn start() -> Self {
         Self {
             keys: vec![],
-            commands_index: None
+            commands_index: None,
+            is_end: false,
         }
     }
 }
@@ -54,6 +56,7 @@ impl Manager {
         CommandProgress {
             keys: vec![progress.keys, vec![by]].concat(),
             commands_index: progress.commands_index,
+            is_end: false,
         }
     }
 }

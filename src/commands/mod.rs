@@ -329,6 +329,28 @@ where
     pub fn progress(&self) -> &Vec<CommandKeyId> {
         &self.path
     }
+
+    pub fn is_end(&self, progress: &Vec<CommandKeyId>) -> bool {
+        let mut current = &self.root;
+
+        for (index, c) in progress.iter().enumerate() {
+
+            match current {
+                CommandKey::Node(_, _, children, _) => match children.get(c) {
+                    Some(next) => current = next,
+                    // not a valid path, always considered to be end
+                    None => return true,
+                },
+                // reached leaf mid way through path, considered end
+                CommandKey::Leaf(_, _, _, a) => return true,
+            }
+        }
+
+        match current {
+            CommandKey::Node(..) => false,
+            CommandKey::Leaf(..) => true,
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -1035,5 +1057,54 @@ mod tests {
         commands.reset();
 
         assert!(!commands.has_progress());
+    }
+
+    #[test]
+    fn is_end() {
+        let mut commands = Commands::<CommandAction>::new();
+
+        commands
+            .insert(|b| {
+                b.node(key('a'))
+                    .node(key('b'))
+                    .node(key('c'))
+                    .action(details("abc".to_string()), no_op)
+            })
+            .unwrap();
+
+        commands
+            .insert(|b| {
+                b.node(key('a'))
+                    .node(key('b'))
+                    .node(key('d'))
+                    .action(details("abd".to_string()), no_op)
+            })
+            .unwrap();
+
+        commands
+            .insert(|b| {
+                b.node(key('a'))
+                    .node(key('e'))
+                    .node(key('f'))
+                    .action(details("aef".to_string()), no_op)
+            })
+            .unwrap();
+
+        assert!(!commands.is_end(&vec![]));
+
+        let mut progress = vec![
+            CommandKeyId::new(KeyCode::Char('a'), KeyModifiers::empty()),
+            CommandKeyId::new(KeyCode::Char('b'), KeyModifiers::empty()),
+        ];
+
+        assert!(!commands.is_end(&progress));
+
+        progress.push(CommandKeyId::new(KeyCode::Char('d'), KeyModifiers::empty()));
+
+        assert!(commands.is_end(&progress));
+
+        progress.push(CommandKeyId::new(KeyCode::Char('e'), KeyModifiers::empty()));
+
+        assert!(commands.is_end(&progress));
     }
 }
