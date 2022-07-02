@@ -32,10 +32,10 @@ pub struct TextPanel {
     state: PanelState,
     continuation_marker: String,
     commands: Commands<PanelCommand>,
-    key_handler: fn(&mut TextPanel, KeyEvent, &mut AppState) -> (bool, Vec<StateChangeRequest>),
-    length_handler: fn(&TextPanel, u16, u16, Direction, &AppState) -> u16,
-    receive_input_handler: fn(&mut TextPanel, String) -> Vec<StateChangeRequest>,
-    render_handler: fn(&TextPanel, &AppState, &mut EditorFrame, Rect),
+    pub(crate) key_handler: fn(&mut TextPanel, KeyEvent, &mut AppState) -> (bool, Vec<StateChangeRequest>),
+    pub(crate) length_handler: fn(&TextPanel, u16, u16, Direction, &AppState) -> u16,
+    pub(crate) receive_input_handler: fn(&mut TextPanel, String) -> Vec<StateChangeRequest>,
+    pub(crate) render_handler: fn(&TextPanel, &AppState, &mut EditorFrame, Rect),
 }
 
 impl Default for TextPanel {

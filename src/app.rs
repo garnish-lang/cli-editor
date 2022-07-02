@@ -1371,7 +1371,7 @@ mod state_changes {
     };
     use crate::autocomplete::PanelAutoCompleter;
     use crate::panels::MESSAGE_PANEL_TYPE_ID;
-    use crate::{AppState, Panel, Panels};
+    use crate::{AppState, Panel, Panels, TextPanel};
 
     #[allow(dead_code)]
     struct TestPanel {
@@ -1379,15 +1379,10 @@ mod state_changes {
         actual_input: String,
     }
 
-    impl Panel for TestPanel {
-        fn panel_type(&self) -> &str {
-            "Test"
-        }
+    fn input_handler(panel: &mut TextPanel, input: String) -> Vec<StateChangeRequest> {
+        panel.set_text(input);
 
-        fn receive_input(&mut self, input: String) -> Vec<StateChangeRequest> {
-            self.actual_input = input;
-            vec![]
-        }
+        vec![]
     }
 
     #[test]
@@ -1459,12 +1454,10 @@ mod state_changes {
         });
         app.active_panel = 0;
 
-        let panel = TestPanel {
-            expected_input: "Test Input".to_string(),
-            actual_input: "".to_string(),
-        };
+        let mut panel = TextPanel::default();
+        panel.receive_input_handler = input_handler;
 
-        app.panels[1] = LayoutPanel::new(0, 'a', panels.push(Box::new(panel)));
+        app.panels[1] = LayoutPanel::new(0, 'a', panels.push(panel));
 
         app.handle_changes(
             vec![StateChangeRequest::input_complete("Test Input".to_string())],
@@ -1473,6 +1466,7 @@ mod state_changes {
 
         assert!(app.input_request.is_none());
         assert_eq!(app.active_panel, 1);
+        assert_eq!(panels.get(app.panels[1].panel_index).unwrap().text(), "Test Input".to_string());
     }
 
     #[test]
@@ -1481,12 +1475,10 @@ mod state_changes {
         let mut app = AppState::new();
         app.init(&mut panels);
 
-        let panel = TestPanel {
-            expected_input: "Test Input".to_string(),
-            actual_input: "".to_string(),
-        };
+        let mut panel = TextPanel::default();
+        panel.receive_input_handler = input_handler;
 
-        app.panels[1] = LayoutPanel::new(0, 'a', panels.push(Box::new(panel)));
+        app.panels[1] = LayoutPanel::new(0, 'a', panels.push(panel));
 
         app.handle_changes(
             vec![StateChangeRequest::input_complete("Test Input".to_string())],
@@ -1494,7 +1486,7 @@ mod state_changes {
         );
 
         assert!(app.input_request.is_none());
-        assert_eq!(app.messages[0].channel, MessageChannel::ERROR)
+        assert_eq!(app.messages[0].channel, MessageChannel::ERROR);
     }
 
     #[test]
@@ -1508,12 +1500,10 @@ mod state_changes {
             auto_completer: None,
         });
 
-        let panel = TestPanel {
-            expected_input: "Test Input".to_string(),
-            actual_input: "".to_string(),
-        };
+        let mut panel = TextPanel::default();
+        panel.receive_input_handler = input_handler;
 
-        app.panels[1] = LayoutPanel::new(0, 'a', panels.push(Box::new(panel)));
+        app.panels[1] = LayoutPanel::new(0, 'a', panels.push(panel));
 
         app.handle_changes(
             vec![StateChangeRequest::input_complete("Test Input".to_string())],
@@ -1521,7 +1511,7 @@ mod state_changes {
         );
 
         assert!(app.input_request.is_none());
-        assert_eq!(app.messages[0].channel, MessageChannel::ERROR)
+        assert_eq!(app.messages[0].channel, MessageChannel::ERROR);
     }
 
     #[test]
