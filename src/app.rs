@@ -1371,7 +1371,7 @@ mod state_changes {
     };
     use crate::autocomplete::PanelAutoCompleter;
     use crate::panels::MESSAGE_PANEL_TYPE_ID;
-    use crate::{AppState, Panel, Panels, TextPanel};
+    use crate::{AppState, Panels, TextPanel};
 
     #[allow(dead_code)]
     struct TestPanel {

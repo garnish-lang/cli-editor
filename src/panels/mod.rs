@@ -19,57 +19,57 @@ mod messages;
 mod null;
 mod text;
 
-pub struct RenderDetails<'a> {
-    pub title: Vec<Span<'a>>,
-    pub cursor: (u16, u16),
-}
-
-impl<'a> RenderDetails<'a> {
-    pub fn new(title: Vec<Span<'a>>, cursor: (u16, u16)) -> Self {
-        Self { title, cursor }
-    }
-}
-
-pub trait Panel {
-    fn panel_type(&self) -> &str;
-    fn init(&mut self, _state: &mut AppState) {}
-    fn make_widget(
-        &self,
-        _state: &AppState,
-        _frame: &mut EditorFrame,
-        _rect: Rect,
-        _is_active: bool,
-    ) -> RenderDetails {
-        RenderDetails {
-            title: vec![],
-            cursor: (0, 0),
-        }
-    }
-    fn get_length(
-        &self,
-        _fixed_length: u16,
-        _flex_length: u16,
-        _direction: Direction,
-        _state: &AppState,
-    ) -> u16 {
-        0
-    }
-    fn receive_key(
-        &mut self,
-        _event: KeyEvent,
-        _state: &mut AppState,
-    ) -> (bool, Vec<StateChangeRequest>) {
-        (false, vec![])
-    }
-    fn receive_input(&mut self, _input: String) -> Vec<StateChangeRequest> {
-        vec![]
-    }
-    fn show(&mut self) {}
-    fn hide(&mut self) {}
-    fn visible(&self) -> bool {
-        true
-    }
-}
+// pub struct RenderDetails<'a> {
+//     pub title: Vec<Span<'a>>,
+//     pub cursor: (u16, u16),
+// }
+//
+// impl<'a> RenderDetails<'a> {
+//     pub fn new(title: Vec<Span<'a>>, cursor: (u16, u16)) -> Self {
+//         Self { title, cursor }
+//     }
+// }
+//
+// pub trait Panel {
+//     fn panel_type(&self) -> &str;
+//     fn init(&mut self, _state: &mut AppState) {}
+//     fn make_widget(
+//         &self,
+//         _state: &AppState,
+//         _frame: &mut EditorFrame,
+//         _rect: Rect,
+//         _is_active: bool,
+//     ) -> RenderDetails {
+//         RenderDetails {
+//             title: vec![],
+//             cursor: (0, 0),
+//         }
+//     }
+//     fn get_length(
+//         &self,
+//         _fixed_length: u16,
+//         _flex_length: u16,
+//         _direction: Direction,
+//         _state: &AppState,
+//     ) -> u16 {
+//         0
+//     }
+//     fn receive_key(
+//         &mut self,
+//         _event: KeyEvent,
+//         _state: &mut AppState,
+//     ) -> (bool, Vec<StateChangeRequest>) {
+//         (false, vec![])
+//     }
+//     fn receive_input(&mut self, _input: String) -> Vec<StateChangeRequest> {
+//         vec![]
+//     }
+//     fn show(&mut self) {}
+//     fn hide(&mut self) {}
+//     fn visible(&self) -> bool {
+//         true
+//     }
+// }
 
 pub struct Panels {
     panels: Vec<TextPanel>,

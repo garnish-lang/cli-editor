@@ -5,11 +5,11 @@ use std::path::PathBuf;
 use crossterm::event::{KeyCode, KeyEvent};
 use tui::layout::{Direction, Rect};
 use tui::text::{Span, Spans, Text};
-use crate::{AppState, catch_all, CommandDetails, Commands, ctrl_key, CURSOR_MAX, EditorFrame, InputPanel, Panel, TextEditPanel};
+use crate::{AppState, catch_all, CommandDetails, Commands, ctrl_key, CURSOR_MAX, EditorFrame, InputPanel, TextEditPanel};
 use crate::app::{Message, StateChangeRequest};
 use crate::autocomplete::FileAutoCompleter;
 use crate::commands::{alt_key, shift_alt_key, shift_catch_all};
-use crate::panels::{EDIT_PANEL_TYPE_ID, MESSAGE_PANEL_TYPE_ID, MessagesPanel, NULL_PANEL_TYPE_ID, PanelFactory, RenderDetails};
+use crate::panels::{EDIT_PANEL_TYPE_ID, MESSAGE_PANEL_TYPE_ID, MessagesPanel, NULL_PANEL_TYPE_ID, PanelFactory};
 use crate::panels::input::INPUT_PANEL_TYPE_ID;
 
 #[derive(Debug, Copy, Clone, PartialOrd, PartialEq)]
@@ -31,6 +31,7 @@ pub struct TextPanel {
     panel_type: &'static str,
     state: PanelState,
     continuation_marker: String,
+    selection: usize,
     commands: Commands<PanelCommand>,
     pub(crate) key_handler: fn(&mut TextPanel, KeyEvent, &mut AppState) -> (bool, Vec<StateChangeRequest>),
     pub(crate) length_handler: fn(&TextPanel, u16, u16, Direction, &AppState) -> u16,
@@ -52,6 +53,7 @@ impl Default for TextPanel {
             panel_type: NULL_PANEL_TYPE_ID,
             state: PanelState::Normal,
             continuation_marker: "... ".to_string(),
+            selection: 0,
             commands: Commands::new(),
             key_handler: TextPanel::empty_key_handler,
             length_handler: TextPanel::empty_length_handler,
@@ -122,6 +124,46 @@ impl TextPanel {
         self.lines.join("\n")
     }
 
+    pub fn set_text<T: ToString>(&mut self, text: T) {
+        self.lines = text.to_string().split('\n').map(|s| s.to_string()).collect();
+    }
+
+    pub fn append_text<T: ToString>(&mut self, text: T) {
+        let new_lines = text.to_string();
+        let mut spliterator = new_lines.split('\n');
+
+        match spliterator.next() {
+            None => return,
+            Some(line) => {
+                // append first line of new text to last line of existing text
+                // first line is empty if starts with newline
+                match self.lines.get_mut(self.current_line) {
+                    None => {
+                        self.lines.push(line.to_string());
+                    }
+                    Some(existing) => existing.extend(line.chars()),
+                }
+            }
+        }
+
+        for line in spliterator {
+            // append remaining lines as new
+            self.lines.push(line.to_string());
+        }
+    }
+
+    pub fn lines(&self) -> &Vec<String> {
+        &self.lines
+    }
+
+    pub fn selection(&self) -> usize {
+        self.selection
+    }
+
+    pub fn set_selection(&mut self, selection: usize) {
+        self.selection = selection;
+    }
+
     pub fn title(&self) -> &String {
         &self.title
     }
@@ -138,8 +180,8 @@ impl TextPanel {
         self.cursor_index_in_line
     }
 
-    pub fn lines(&self) -> &Vec<String> {
-        &self.lines
+    pub fn set_cursor_index(&mut self, index: usize) {
+        self.cursor_index_in_line = index;
     }
 
     pub fn scroll_y(&self) -> u16 {
@@ -217,13 +259,6 @@ impl TextPanel {
         (self.receive_input_handler)(self, input)
     }
 
-
-    pub fn set_text<T: ToString>(&mut self, text: T) {
-        for line in text.to_string().split('\n') {
-            self.lines.push(line.to_string());
-        }
-    }
-
     fn remove_character(&mut self, index_adjustment: usize, movement: usize, state: &mut AppState) {
         match self.lines.get_mut(self.current_line) {
             None => (), // no text, do nothing
@@ -261,7 +296,7 @@ impl TextPanel {
         }
     }
 
-    fn handle_key_stroke(
+    pub(crate) fn handle_key_stroke(
         &mut self,
         code: KeyCode,
         state: &mut AppState,
@@ -309,7 +344,7 @@ impl TextPanel {
         (true, vec![])
     }
 
-    fn open_file(
+    pub(crate) fn open_file(
         &mut self,
         _code: KeyCode,
         _state: &mut AppState,
@@ -337,7 +372,7 @@ impl TextPanel {
         }
     }
 
-    fn move_to_next_character(
+    pub(crate) fn move_to_next_character(
         &mut self,
         _code: KeyCode,
         _state: &mut AppState,
@@ -359,7 +394,7 @@ impl TextPanel {
         (true, vec![])
     }
 
-    fn move_to_previous_character(
+    pub(crate) fn move_to_previous_character(
         &mut self,
         _code: KeyCode,
         _state: &mut AppState,
@@ -377,7 +412,7 @@ impl TextPanel {
         (true, vec![])
     }
 
-    fn move_to_next_line(
+    pub(crate) fn move_to_next_line(
         &mut self,
         _code: KeyCode,
         _state: &mut AppState,
@@ -398,7 +433,7 @@ impl TextPanel {
         (true, vec![])
     }
 
-    fn move_to_previous_line(
+    pub(crate) fn move_to_previous_line(
         &mut self,
         _code: KeyCode,
         _state: &mut AppState,
@@ -435,7 +470,7 @@ impl TextPanel {
         }
     }
 
-    fn scroll_down_one(
+    pub(crate) fn scroll_down_one(
         &mut self,
         _code: KeyCode,
         _state: &mut AppState,
@@ -444,7 +479,7 @@ impl TextPanel {
         (true, vec![])
     }
 
-    fn scroll_up_one(
+    pub(crate) fn scroll_up_one(
         &mut self,
         _code: KeyCode,
         _state: &mut AppState,
@@ -453,7 +488,7 @@ impl TextPanel {
         (true, vec![])
     }
 
-    fn scroll_down_ten(
+    pub(crate) fn scroll_down_ten(
         &mut self,
         _code: KeyCode,
         _state: &mut AppState,
@@ -468,7 +503,7 @@ impl TextPanel {
         (true, vec![])
     }
 
-    fn scroll_up_ten(
+    pub(crate) fn scroll_up_ten(
         &mut self,
         _code: KeyCode,
         _state: &mut AppState,
@@ -551,7 +586,7 @@ impl TextPanel {
         (lines, (cursor_x, cursor_y), gutter)
     }
 
-    fn save_buffer(
+    pub(crate) fn save_buffer(
         &mut self,
         _code: KeyCode,
         _state: &mut AppState,
@@ -615,7 +650,6 @@ impl TextPanel {
         changes
     }
 }
-
 
 type PanelCommand =
 fn(&mut TextPanel, KeyCode, &mut AppState) -> (bool, Vec<StateChangeRequest>);

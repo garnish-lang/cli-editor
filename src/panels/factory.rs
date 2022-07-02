@@ -2,7 +2,7 @@ pub use crate::panels::edit::EDIT_PANEL_TYPE_ID;
 pub use crate::panels::messages::MESSAGE_PANEL_TYPE_ID;
 pub use crate::panels::null::NULL_PANEL_TYPE_ID;
 use crate::panels::{MessagesPanel, NullPanel};
-use crate::{InputPanel, Panel, TextEditPanel, TextPanel};
+use crate::{InputPanel, TextEditPanel, TextPanel};
 
 pub struct PanelFactory {}
 

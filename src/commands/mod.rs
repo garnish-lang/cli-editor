@@ -1,8 +1,12 @@
+mod manager;
+
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::hash::Hash;
 
 use crossterm::event::{KeyCode, KeyModifiers};
+
+pub use manager::Manager;
 
 #[derive(Clone)]
 pub enum CommandKey<T> {

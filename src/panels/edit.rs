@@ -12,8 +12,7 @@ use tui::widgets::{Block, Paragraph};
 use crate::app::StateChangeRequest;
 use crate::autocomplete::FileAutoCompleter;
 use crate::commands::{alt_key, shift_alt_key, shift_catch_all};
-use crate::panels::RenderDetails;
-use crate::{catch_all, ctrl_key, AppState, CommandDetails, CommandKeyId, Commands, EditorFrame, Panel, CURSOR_MAX, TextPanel};
+use crate::{catch_all, ctrl_key, AppState, CommandDetails, CommandKeyId, Commands, EditorFrame, CURSOR_MAX, TextPanel};
 use crate::panels::text::PanelState;
 
 pub const EDIT_PANEL_TYPE_ID: &str = "Edit";
@@ -574,154 +573,154 @@ impl TextEditPanel {
     }
 }
 
-impl Panel for TextEditPanel {
-    fn panel_type(&self) -> &str {
-        EDIT_PANEL_TYPE_ID
-    }
-
-    fn init(&mut self, state: &mut AppState) {
-        match make_commands() {
-            Ok(commands) => self.commands = commands,
-            Err(e) => state.add_error(e),
-        }
-    }
-
-    fn make_widget(
-        &self,
-        _state: &AppState,
-        frame: &mut EditorFrame,
-        rect: Rect,
-        _is_active: bool,
-    ) -> RenderDetails {
-        if !self.lines.is_empty() {
-            let line_count = self.lines.len();
-            let line_count_size = line_count.to_string().len().min(u16::MAX as usize) as u16;
-
-            let layout = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints(vec![
-                    Constraint::Length(line_count_size),
-                    Constraint::Length(self.gutter_size),
-                    Constraint::Length(rect.width - line_count_size - self.gutter_size),
-                ])
-                .split(rect);
-
-            let gutter_layout = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints(vec![
-                    Constraint::Length(1),
-                    Constraint::Length(self.gutter_size - 2),
-                    Constraint::Length(1),
-                ])
-                .split(layout[1]);
-
-            let (lines, cursor, gutter) = self.make_text_content(layout[2]);
-
-            let para_text = Text::from(lines);
-
-            let line_numbers_para = Paragraph::new(Text::from(gutter)).alignment(Alignment::Right);
-
-            frame.render_widget(line_numbers_para, layout[0]);
-
-            let gutter = Block::default().style(Style::default().bg(Color::DarkGray));
-
-            frame.render_widget(gutter, gutter_layout[1]);
-
-            let para =
-                Paragraph::new(para_text).style(Style::default().fg(Color::White).bg(Color::Black));
-
-            frame.render_widget(para, layout[2]);
-
-            RenderDetails::new(vec![Span::raw(self.title.clone())], cursor)
-        } else {
-            RenderDetails::new(vec![Span::raw(self.title.clone())], (1, 1))
-        }
-    }
-
-    fn receive_key(
-        &mut self,
-        event: KeyEvent,
-        state: &mut AppState,
-    ) -> (bool, Vec<StateChangeRequest>) {
-        let (end, action) = self
-            .commands
-            .advance(CommandKeyId::new(event.code, event.modifiers));
-
-        if end {
-            self.commands.reset();
-        }
-
-        match action {
-            Some(a) => a(self, event.code, state),
-            None => (!end, vec![]),
-        }
-    }
-
-    fn receive_input(&mut self, input: String) -> Vec<StateChangeRequest> {
-        let mut changes = vec![];
-
-        match self.state {
-            EditState::WaitingToOpen => {
-                let current_dir = match env::current_dir() {
-                    Err(e) => {
-                        changes.push(StateChangeRequest::error(e));
-                        return changes;
-                    }
-                    Ok(p) => p,
-                };
-
-                let mut file_path = (&current_dir).clone();
-                file_path.push(input);
-
-                match fs::File::open(&file_path) {
-                    Err(e) => changes.push(StateChangeRequest::error(e)),
-                    Ok(mut file) => {
-                        let mut s = String::new();
-                        match file.read_to_string(&mut s) {
-                            Err(e) => changes.push(StateChangeRequest::error(e)),
-                            Ok(_) => {
-                                self.set_text(s);
-
-                                self.title = if file_path.starts_with(&current_dir) {
-                                    match file_path.strip_prefix(&current_dir) {
-                                        Err(e) => {
-                                            changes.push(StateChangeRequest::error(e));
-                                            file_path.to_string_lossy().to_string()
-                                        }
-                                        Ok(p) => p.as_os_str().to_string_lossy().to_string(),
-                                    }
-                                } else {
-                                    file_path.to_string_lossy().to_string()
-                                }
-                            }
-                        }
-                        self.file_path = Some(file_path.clone());
-                    }
-                };
-
-                self.scroll_y = 0;
-            }
-            EditState::WaitingToSave => {
-                let current_dir = match env::current_dir() {
-                    Err(e) => {
-                        changes.push(StateChangeRequest::error(e));
-                        return changes;
-                    }
-                    Ok(p) => p,
-                };
-
-                let mut file_path = (&current_dir).clone();
-                file_path.push(input);
-                self.file_path = Some(file_path.clone());
-
-                changes.extend(self.save());
-            }
-            EditState::Normal => (),
-        }
-
-        changes
-    }
-}
+// impl Panel for TextEditPanel {
+//     fn panel_type(&self) -> &str {
+//         EDIT_PANEL_TYPE_ID
+//     }
+//
+//     fn init(&mut self, state: &mut AppState) {
+//         match make_commands() {
+//             Ok(commands) => self.commands = commands,
+//             Err(e) => state.add_error(e),
+//         }
+//     }
+//
+//     fn make_widget(
+//         &self,
+//         _state: &AppState,
+//         frame: &mut EditorFrame,
+//         rect: Rect,
+//         _is_active: bool,
+//     ) -> RenderDetails {
+//         if !self.lines.is_empty() {
+//             let line_count = self.lines.len();
+//             let line_count_size = line_count.to_string().len().min(u16::MAX as usize) as u16;
+//
+//             let layout = Layout::default()
+//                 .direction(Direction::Horizontal)
+//                 .constraints(vec![
+//                     Constraint::Length(line_count_size),
+//                     Constraint::Length(self.gutter_size),
+//                     Constraint::Length(rect.width - line_count_size - self.gutter_size),
+//                 ])
+//                 .split(rect);
+//
+//             let gutter_layout = Layout::default()
+//                 .direction(Direction::Horizontal)
+//                 .constraints(vec![
+//                     Constraint::Length(1),
+//                     Constraint::Length(self.gutter_size - 2),
+//                     Constraint::Length(1),
+//                 ])
+//                 .split(layout[1]);
+//
+//             let (lines, cursor, gutter) = self.make_text_content(layout[2]);
+//
+//             let para_text = Text::from(lines);
+//
+//             let line_numbers_para = Paragraph::new(Text::from(gutter)).alignment(Alignment::Right);
+//
+//             frame.render_widget(line_numbers_para, layout[0]);
+//
+//             let gutter = Block::default().style(Style::default().bg(Color::DarkGray));
+//
+//             frame.render_widget(gutter, gutter_layout[1]);
+//
+//             let para =
+//                 Paragraph::new(para_text).style(Style::default().fg(Color::White).bg(Color::Black));
+//
+//             frame.render_widget(para, layout[2]);
+//
+//             RenderDetails::new(vec![Span::raw(self.title.clone())], cursor)
+//         } else {
+//             RenderDetails::new(vec![Span::raw(self.title.clone())], (1, 1))
+//         }
+//     }
+//
+//     fn receive_key(
+//         &mut self,
+//         event: KeyEvent,
+//         state: &mut AppState,
+//     ) -> (bool, Vec<StateChangeRequest>) {
+//         let (end, action) = self
+//             .commands
+//             .advance(CommandKeyId::new(event.code, event.modifiers));
+//
+//         if end {
+//             self.commands.reset();
+//         }
+//
+//         match action {
+//             Some(a) => a(self, event.code, state),
+//             None => (!end, vec![]),
+//         }
+//     }
+//
+//     fn receive_input(&mut self, input: String) -> Vec<StateChangeRequest> {
+//         let mut changes = vec![];
+//
+//         match self.state {
+//             EditState::WaitingToOpen => {
+//                 let current_dir = match env::current_dir() {
+//                     Err(e) => {
+//                         changes.push(StateChangeRequest::error(e));
+//                         return changes;
+//                     }
+//                     Ok(p) => p,
+//                 };
+//
+//                 let mut file_path = (&current_dir).clone();
+//                 file_path.push(input);
+//
+//                 match fs::File::open(&file_path) {
+//                     Err(e) => changes.push(StateChangeRequest::error(e)),
+//                     Ok(mut file) => {
+//                         let mut s = String::new();
+//                         match file.read_to_string(&mut s) {
+//                             Err(e) => changes.push(StateChangeRequest::error(e)),
+//                             Ok(_) => {
+//                                 self.set_text(s);
+//
+//                                 self.title = if file_path.starts_with(&current_dir) {
+//                                     match file_path.strip_prefix(&current_dir) {
+//                                         Err(e) => {
+//                                             changes.push(StateChangeRequest::error(e));
+//                                             file_path.to_string_lossy().to_string()
+//                                         }
+//                                         Ok(p) => p.as_os_str().to_string_lossy().to_string(),
+//                                     }
+//                                 } else {
+//                                     file_path.to_string_lossy().to_string()
+//                                 }
+//                             }
+//                         }
+//                         self.file_path = Some(file_path.clone());
+//                     }
+//                 };
+//
+//                 self.scroll_y = 0;
+//             }
+//             EditState::WaitingToSave => {
+//                 let current_dir = match env::current_dir() {
+//                     Err(e) => {
+//                         changes.push(StateChangeRequest::error(e));
+//                         return changes;
+//                     }
+//                     Ok(p) => p,
+//                 };
+//
+//                 let mut file_path = (&current_dir).clone();
+//                 file_path.push(input);
+//                 self.file_path = Some(file_path.clone());
+//
+//                 changes.extend(self.save());
+//             }
+//             EditState::Normal => (),
+//         }
+//
+//         changes
+//     }
+// }
 
 type EditCommand =
     fn(&mut TextEditPanel, KeyCode, &mut AppState) -> (bool, Vec<StateChangeRequest>);
