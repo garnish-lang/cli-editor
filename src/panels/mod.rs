@@ -7,6 +7,7 @@ pub use factory::*;
 pub use input::InputPanel;
 pub use messages::MessagesPanel;
 pub use null::NullPanel;
+pub use text::TextPanel;
 
 use crate::app::StateChangeRequest;
 use crate::{AppState, EditorFrame};
@@ -16,6 +17,7 @@ mod factory;
 mod input;
 mod messages;
 mod null;
+mod text;
 
 pub struct RenderDetails<'a> {
     pub title: Vec<Span<'a>>,
@@ -67,13 +69,10 @@ pub trait Panel {
     fn visible(&self) -> bool {
         true
     }
-    fn update(&mut self) -> Vec<StateChangeRequest> {
-        vec![]
-    }
 }
 
 pub struct Panels {
-    panels: Vec<Box<dyn Panel>>,
+    panels: Vec<TextPanel>,
 }
 
 impl Panels {
@@ -86,7 +85,7 @@ impl Panels {
         self.panels.len()
     }
 
-    pub fn push(&mut self, panel: Box<dyn Panel>) -> usize {
+    pub fn push(&mut self, panel: TextPanel) -> usize {
         for (i, p) in self.panels.iter_mut().enumerate() {
             if p.panel_type() == NULL_PANEL_TYPE_ID {
                 *p = panel;
@@ -102,15 +101,15 @@ impl Panels {
     pub fn remove(&mut self, index: usize) {
         match self.panels.get_mut(index) {
             None => (),
-            Some(panel) => *panel = PanelFactory::null(),
+            Some(panel) => *panel = TextPanel::default(),
         }
     }
 
-    pub fn get(&self, index: usize) -> Option<&Box<dyn Panel>> {
-        self.panels.get(index)
+    pub fn get(&self, index: usize) -> Option<&TextPanel> {
+       self.panels.get(index)
     }
 
-    pub fn get_mut(&mut self, index: usize) -> Option<&mut Box<dyn Panel>> {
+    pub fn get_mut(&mut self, index: usize) -> Option<&mut TextPanel> {
         self.panels.get_mut(index)
     }
 }

@@ -6,7 +6,7 @@ use tui::layout::Direction;
 use crate::autocomplete::{AutoCompleter, PanelAutoCompleter};
 use crate::commands::ctrl_alt_key;
 use crate::panels::{PanelFactory, NULL_PANEL_TYPE_ID};
-use crate::{catch_all, ctrl_key, key, CommandDetails, Commands, PanelSplit, Panels, UserSplits};
+use crate::{catch_all, ctrl_key, key, CommandDetails, Commands, PanelSplit, Panels, UserSplits, TextPanel};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub enum MessageChannel {
@@ -183,9 +183,9 @@ impl AppState {
         let mut edit = PanelFactory::edit();
         let mut messages = PanelFactory::messages();
 
-        input.init(self);
-        edit.init(self);
-        messages.init(self);
+        // input.init(self);
+        // edit.init(self);
+        // messages.init(self);
 
         let input_index = panels.push(input);
         let edit_index = panels.push(edit);
@@ -348,10 +348,7 @@ impl AppState {
                                 match self.get_panel(for_panel) {
                                     None => unimplemented!(),
                                     Some(lp) => match panels.get_mut(lp.panel_index) {
-                                        Some(panel) => match PanelFactory::panel(input.as_str()) {
-                                            Some(new) => *panel = new,
-                                            None => unimplemented!(),
-                                        },
+                                        Some(panel) => *panel = TextPanel::edit_panel(),
                                         None => unimplemented!(),
                                     },
                                 }

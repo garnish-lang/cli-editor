@@ -7,7 +7,7 @@ use tui::widgets::Paragraph;
 use crate::app::StateChangeRequest;
 use crate::commands::{alt_catch_all, code, shift_catch_all};
 use crate::panels::RenderDetails;
-use crate::{catch_all, AppState, CommandDetails, CommandKeyId, Commands, EditorFrame, Panel};
+use crate::{catch_all, AppState, CommandDetails, CommandKeyId, Commands, EditorFrame, Panel, TextPanel};
 
 pub const INPUT_PANEL_TYPE_ID: &str = "Input";
 
@@ -174,6 +174,38 @@ impl InputPanel {
             }
             None => vec![],
         }
+    }
+
+    pub fn length_handler(
+        panel: &TextPanel,
+        fixed_length: u16,
+        _flex_length: u16,
+        _direction: Direction,
+        state: &AppState,
+    ) -> u16 {
+        // minus 2 because of borders
+        let max_text_length = fixed_length - 2;
+        let continuation_length =
+            max_text_length - panel.continuation_marker().len().try_into().unwrap_or(0);
+        let continuation_lines = if panel.text().len() >= max_text_length.into() {
+            let remaining_length = panel.text().len() as u16 - max_text_length;
+            // remaining length will be 0 or more
+            // need at least one line to display cursor on next line if current is full
+            // remaining line count will be number of continuation lines - 1 (due to integer division)
+            1 + remaining_length / continuation_length
+        } else {
+            0
+        };
+
+        // base is 1 line plus 2 for borders
+        // plus additional 2 if completion will be showing, 1 for border and 1 for completion text
+
+        state
+            .input_request()
+            .and_then(|r| r.completer())
+            .map(|_| 5)
+            .unwrap_or(3)
+            + continuation_lines
     }
 }
 

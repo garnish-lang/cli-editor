@@ -13,10 +13,8 @@ use crate::app::StateChangeRequest;
 use crate::autocomplete::FileAutoCompleter;
 use crate::commands::{alt_key, shift_alt_key, shift_catch_all};
 use crate::panels::RenderDetails;
-use crate::{
-    catch_all, ctrl_key, AppState, CommandDetails, CommandKeyId, Commands, EditorFrame, Panel,
-    CURSOR_MAX,
-};
+use crate::{catch_all, ctrl_key, AppState, CommandDetails, CommandKeyId, Commands, EditorFrame, Panel, CURSOR_MAX, TextPanel};
+use crate::panels::text::PanelState;
 
 pub const EDIT_PANEL_TYPE_ID: &str = "Edit";
 
@@ -451,6 +449,128 @@ impl TextEditPanel {
         }
 
         changes
+    }
+
+    pub fn key_handler(panel: &mut TextPanel, event: KeyEvent, state: &mut AppState) -> (bool, Vec<StateChangeRequest>) {
+        let (end, action) = panel
+        .commands_mut()
+        .advance(CommandKeyId::new(event.code, event.modifiers));
+
+        if end {
+            panel.commands_mut().reset();
+        }
+
+        match action {
+            Some(a) => a(panel, event.code, state),
+            None => (!end, vec![]),
+        }
+    }
+
+    pub fn input_handler(panel: &mut TextPanel, input: String) -> Vec<StateChangeRequest> {
+        let mut changes = vec![];
+
+        match panel.state() {
+            PanelState::WaitingToOpen => {
+                let current_dir = match env::current_dir() {
+                    Err(e) => {
+                        changes.push(StateChangeRequest::error(e));
+                        return changes;
+                    }
+                    Ok(p) => p,
+                };
+
+                let mut file_path = (&current_dir).clone();
+                file_path.push(input);
+
+                match fs::File::open(&file_path) {
+                    Err(e) => changes.push(StateChangeRequest::error(e)),
+                    Ok(mut file) => {
+                        let mut s = String::new();
+                        match file.read_to_string(&mut s) {
+                            Err(e) => changes.push(StateChangeRequest::error(e)),
+                            Ok(_) => {
+                                panel.set_text(s);
+
+                                panel.set_title(if file_path.starts_with(&current_dir) {
+                                    match file_path.strip_prefix(&current_dir) {
+                                        Err(e) => {
+                                            changes.push(StateChangeRequest::error(e));
+                                            file_path.to_string_lossy().to_string()
+                                        }
+                                        Ok(p) => p.as_os_str().to_string_lossy().to_string(),
+                                    }
+                                } else {
+                                    file_path.to_string_lossy().to_string()
+                                });
+                            }
+                        }
+                        panel.set_file_path(file_path.clone());
+                    }
+                };
+
+                panel.set_scroll_y(0);
+            }
+            PanelState::WaitingToSave => {
+                let current_dir = match env::current_dir() {
+                    Err(e) => {
+                        changes.push(StateChangeRequest::error(e));
+                        return changes;
+                    }
+                    Ok(p) => p,
+                };
+
+                let mut file_path = (&current_dir).clone();
+                file_path.push(input);
+                panel.set_file_path(file_path.clone());
+
+                changes.extend(panel.save());
+            }
+            PanelState::Normal => (),
+        }
+
+        changes
+    }
+
+    pub fn render_handler(panel: &TextPanel, _state: &AppState, frame: &mut EditorFrame, rect: Rect) {
+        if !panel.lines().is_empty() {
+            let line_count = panel.lines().len();
+            let line_count_size = line_count.to_string().len().min(u16::MAX as usize) as u16;
+
+            let layout = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints(vec![
+                    Constraint::Length(line_count_size),
+                    Constraint::Length(panel.gutter_size()),
+                    Constraint::Length(rect.width - line_count_size - panel.gutter_size()),
+                ])
+                .split(rect);
+
+            let gutter_layout = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints(vec![
+                    Constraint::Length(1),
+                    Constraint::Length(panel.gutter_size() - 2),
+                    Constraint::Length(1),
+                ])
+                .split(layout[1]);
+
+            let (lines, cursor, gutter) = panel.make_text_content(layout[2]);
+
+            let para_text = Text::from(lines);
+
+            let line_numbers_para = Paragraph::new(Text::from(gutter)).alignment(Alignment::Right);
+
+            frame.render_widget(line_numbers_para, layout[0]);
+
+            let gutter = Block::default().style(Style::default().bg(Color::DarkGray));
+
+            frame.render_widget(gutter, gutter_layout[1]);
+
+            let para =
+                Paragraph::new(para_text).style(Style::default().fg(Color::White).bg(Color::Black));
+
+            frame.render_widget(para, layout[2]);
+        }
     }
 }
 

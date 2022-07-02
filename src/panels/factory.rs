@@ -2,7 +2,7 @@ pub use crate::panels::edit::EDIT_PANEL_TYPE_ID;
 pub use crate::panels::messages::MESSAGE_PANEL_TYPE_ID;
 pub use crate::panels::null::NULL_PANEL_TYPE_ID;
 use crate::panels::{MessagesPanel, NullPanel};
-use crate::{InputPanel, Panel, TextEditPanel};
+use crate::{InputPanel, Panel, TextEditPanel, TextPanel};
 
 pub struct PanelFactory {}
 
@@ -16,29 +16,29 @@ impl PanelFactory {
         ]
     }
 
-    pub fn panel(type_id: &str) -> Option<Box<dyn Panel>> {
+    pub fn panel(type_id: &str) -> Option<TextPanel> {
         match type_id {
-            NULL_PANEL_TYPE_ID => Some(Box::new(NullPanel::new())),
-            EDIT_PANEL_TYPE_ID => Some(Box::new(TextEditPanel::new())),
-            MESSAGE_PANEL_TYPE_ID => Some(Box::new(MessagesPanel::new())),
+            NULL_PANEL_TYPE_ID => Some(TextPanel::default()),
+            EDIT_PANEL_TYPE_ID => Some(TextPanel::edit_panel()),
+            MESSAGE_PANEL_TYPE_ID => Some(TextPanel::messages_panel()),
             _ => None,
         }
     }
 
-    pub fn null() -> Box<dyn Panel> {
-        Box::new(NullPanel::new())
+    pub fn null() -> TextPanel {
+        TextPanel::default()
     }
 
-    pub fn input() -> Box<dyn Panel> {
-        Box::new(InputPanel::new())
+    pub fn input() -> TextPanel {
+        TextPanel::input_panel()
     }
 
-    pub fn messages() -> Box<dyn Panel> {
-        Box::new(MessagesPanel::new())
+    pub fn messages() -> TextPanel {
+        TextPanel::messages_panel()
     }
 
-    pub fn edit() -> Box<dyn Panel> {
-        Box::new(TextEditPanel::new())
+    pub fn edit() -> TextPanel {
+        TextPanel::edit_panel()
     }
 }
 

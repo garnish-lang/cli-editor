@@ -167,25 +167,25 @@ pub fn render_split(
                                 let inner_block = block.inner(chunk);
 
                                 let render_details =
-                                    panel.make_widget(app, frame, inner_block, is_active);
+                                    panel.make_widget(app, frame, inner_block);
 
-                                title.extend(render_details.title);
+                                // title.extend(render_details.title());
 
                                 frame.render_widget(block.title(Spans::from(title)), chunk);
 
-                                if is_active {
-                                    if inner_block
-                                        .has_point(render_details.cursor.0, render_details.cursor.1)
-                                    {
-                                        frame.set_cursor(
-                                            render_details.cursor.0,
-                                            render_details.cursor.1,
-                                        );
-                                    } else {
-                                        // set off screen
-                                        frame.set_cursor(CURSOR_MAX.0, CURSOR_MAX.1);
-                                    }
-                                }
+                                // if is_active {
+                                //     if inner_block
+                                //         .has_point(render_details.cursor.0, render_details.cursor.1)
+                                //     {
+                                //         frame.set_cursor(
+                                //             render_details.cursor.0,
+                                //             render_details.cursor.1,
+                                //         );
+                                //     } else {
+                                //         // set off screen
+                                //         frame.set_cursor(CURSOR_MAX.0, CURSOR_MAX.1);
+                                //     }
+                                // }
                             }
                             None => (),
                         },
