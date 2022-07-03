@@ -32,7 +32,6 @@ pub struct TextPanel {
     continuation_marker: String,
     selection: usize,
     command_index: usize,
-    pub(crate) key_handler: fn(&mut TextPanel, KeyEvent, &mut AppState) -> (bool, Vec<StateChangeRequest>),
     pub(crate) length_handler: fn(&TextPanel, u16, u16, Direction, &AppState) -> u16,
     pub(crate) receive_input_handler: fn(&mut TextPanel, String) -> Vec<StateChangeRequest>,
     pub(crate) render_handler: fn(&TextPanel, &AppState, &mut EditorFrame, Rect),
@@ -54,7 +53,6 @@ impl Default for TextPanel {
             continuation_marker: "... ".to_string(),
             selection: 0,
             command_index: 0,
-            key_handler: TextPanel::empty_key_handler,
             length_handler: TextPanel::empty_length_handler,
             receive_input_handler: TextPanel::empty_input_handler,
             render_handler: TextPanel::empty_render_handler,
@@ -63,9 +61,6 @@ impl Default for TextPanel {
 }
 
 impl TextPanel {
-    fn empty_key_handler(_: &mut TextPanel, _: KeyEvent, _: &mut AppState) -> (bool, Vec<StateChangeRequest>) {
-        (false, vec![])
-    }
 
     fn empty_length_handler(_: &TextPanel, _: u16, _: u16, _: Direction, _: &AppState) -> u16 {
         0
@@ -85,7 +80,6 @@ impl TextPanel {
 
         defaults.render_handler = TextEditPanel::render_handler;
         defaults.receive_input_handler = TextEditPanel::input_handler;
-        defaults.key_handler = TextEditPanel::key_handler;
 
         defaults
     }
@@ -96,7 +90,6 @@ impl TextPanel {
 
         defaults.render_handler = TextEditPanel::render_handler;
         defaults.length_handler = InputPanel::length_handler;
-        defaults.key_handler = TextEditPanel::key_handler;
 
         defaults
     }
@@ -221,10 +214,6 @@ impl TextPanel {
 
     pub fn visible(&self) -> bool {
         self.visible
-    }
-
-    pub fn receive_key(&mut self, event: KeyEvent, state: &mut AppState) -> (bool, Vec<StateChangeRequest>) {
-        (self.key_handler)(self, event, state)
     }
 
     pub fn make_widget(
