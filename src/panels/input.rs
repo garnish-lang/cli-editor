@@ -292,7 +292,7 @@ mod tests {
                 "Test".to_string(),
                 Some(Box::new(TestCompleter {})),
             )],
-            &mut panels,
+            &mut panels, &mut commands
         );
 
         let mut input = TextPanel::input_panel();
@@ -313,7 +313,7 @@ mod tests {
                 "Test".to_string(),
                 Some(Box::new(TestCompleter {})),
             )],
-            &mut panels,
+            &mut panels, &mut commands
         );
 
         let mut input = TextPanel::input_panel();
@@ -335,7 +335,7 @@ mod tests {
                 "Test".to_string(),
                 Some(Box::new(TestCompleter {})),
             )],
-            &mut panels,
+            &mut panels, &mut commands
         );
 
         let mut input = TextPanel::input_panel();
@@ -357,7 +357,7 @@ mod tests {
                 "Test".to_string(),
                 Some(Box::new(TestCompleter {})),
             )],
-            &mut panels,
+            &mut panels, &mut commands
         );
 
         let mut input = TextPanel::input_panel();
@@ -379,7 +379,7 @@ mod tests {
                 "Test".to_string(),
                 Some(Box::new(TestCompleter {})),
             )],
-            &mut panels,
+            &mut panels, &mut commands
         );
 
         let mut input = TextPanel::input_panel();
@@ -401,7 +401,7 @@ mod tests {
                 "Test".to_string(),
                 Some(Box::new(TestCompleter {})),
             )],
-            &mut panels,
+            &mut panels, &mut commands
         );
 
         let mut input = TextPanel::input_panel();
@@ -423,7 +423,7 @@ mod tests {
                 "Test".to_string(),
                 Some(Box::new(TestCompleter {})),
             )],
-            &mut panels,
+            &mut panels, &mut commands
         );
 
         let mut input = TextPanel::input_panel();
@@ -445,7 +445,7 @@ mod tests {
                 "Test".to_string(),
                 Some(Box::new(TestCompleter {})),
             )],
-            &mut panels,
+            &mut panels, &mut commands
         );
 
         let mut input = TextPanel::input_panel();
@@ -467,7 +467,7 @@ mod tests {
                 "Test".to_string(),
                 Some(Box::new(TestCompleter {})),
             )],
-            &mut panels,
+            &mut panels, &mut commands
         );
 
         let mut input = TextPanel::input_panel();
@@ -490,7 +490,7 @@ mod tests {
                 "Test".to_string(),
                 Some(Box::new(TestCompleter {})),
             )],
-            &mut panels,
+            &mut panels, &mut commands
         );
 
         let mut input = TextPanel::input_panel();
