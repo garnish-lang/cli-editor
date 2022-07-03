@@ -15,8 +15,6 @@ use crate::commands::{alt_key, shift_alt_key, shift_catch_all};
 use crate::{catch_all, ctrl_key, AppState, CommandDetails, CommandKeyId, Commands, EditorFrame, CURSOR_MAX, TextPanel};
 use crate::panels::text::PanelState;
 
-pub const EDIT_PANEL_TYPE_ID: &str = "Edit";
-
 enum EditState {
     Normal,
     WaitingToOpen,
@@ -451,18 +449,20 @@ impl TextEditPanel {
     }
 
     pub fn key_handler(panel: &mut TextPanel, event: KeyEvent, state: &mut AppState) -> (bool, Vec<StateChangeRequest>) {
-        let (end, action) = panel
-        .commands_mut()
-        .advance(CommandKeyId::new(event.code, event.modifiers));
+        // let (end, action) = panel
+        // .commands_mut()
+        // .advance(CommandKeyId::new(event.code, event.modifiers));
+        //
+        // if end {
+        //     panel.commands_mut().reset();
+        // }
+        //
+        // match action {
+        //     Some(a) => a(panel, event.code, state),
+        //     None => (!end, vec![]),
+        // }
 
-        if end {
-            panel.commands_mut().reset();
-        }
-
-        match action {
-            Some(a) => a(panel, event.code, state),
-            None => (!end, vec![]),
-        }
+        (false, vec![])
     }
 
     pub fn input_handler(panel: &mut TextPanel, input: String) -> Vec<StateChangeRequest> {

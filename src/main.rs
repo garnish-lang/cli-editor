@@ -37,7 +37,8 @@ fn main() -> Result<(), String> {
 
     let mut panels = Panels::new();
     let mut app_state = AppState::new();
-    app_state.init(&mut panels);
+    let mut commands = commands::Manager::default();
+    app_state.init(&mut panels, &mut commands);
     let mut global_commands = global_commands()?;
 
     loop {
@@ -74,36 +75,38 @@ fn main() -> Result<(), String> {
                 //      even though the given char is correct
                 // Shift not working with Backspace or Enter
 
-                let (end, action) = if global_commands.has_progress() {
-                    global_commands.advance(CommandKeyId::new(event.code, event.modifiers))
-                } else {
-                    let (handled, changes) = match app_state.get_active_panel_mut() {
-                        Some(lp) => match panels.get_mut(lp.panel_index()) {
-                            Some(panel) => panel.receive_key(event, &mut app_state),
-                            None => (false, vec![]),
-                        },
-                        None => (false, vec![]), // error?
-                    };
+                commands.advance(CommandKeyId::new(event.code, event.modifiers), &mut app_state, &mut panels);
 
-                    app_state.handle_changes(changes, &mut panels);
+                // let (end, action) = if global_commands.has_progress() {
+                //     global_commands.advance(CommandKeyId::new(event.code, event.modifiers))
+                // } else {
+                //     let (handled, changes) = match app_state.get_active_panel_mut() {
+                //         Some(lp) => match panels.get_mut(lp.panel_index()) {
+                //             Some(panel) => panel.receive_key(event, &mut app_state),
+                //             None => (false, vec![]),
+                //         },
+                //         None => (false, vec![]), // error?
+                //     };
+                //
+                //     app_state.handle_changes(changes, &mut panels);
+                //
+                //     if handled {
+                //         (false, None)
+                //     } else {
+                //         global_commands.advance(CommandKeyId::new(event.code, event.modifiers))
+                //     }
+                // };
+                //
+                // match action {
+                //     Some(action) => action(&mut app_state, event.code, &mut panels),
+                //     None => (),
+                // };
 
-                    if handled {
-                        (false, None)
-                    } else {
-                        global_commands.advance(CommandKeyId::new(event.code, event.modifiers))
-                    }
-                };
-
-                match action {
-                    Some(action) => action(&mut app_state, event.code, &mut panels),
-                    None => (),
-                };
-
-                if end {
-                    // reset
-                    global_commands.reset();
-                    app_state.set_selecting_panel(false);
-                }
+                // if end {
+                //     // reset
+                //     global_commands.reset();
+                //     app_state.set_selecting_panel(false);
+                // }
             }
             Event::Mouse(_event) => (), // println!("{:?}", event),
             Event::Resize(_, _) => (),

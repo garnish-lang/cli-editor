@@ -2,37 +2,21 @@ use crossterm::event::{KeyCode, KeyModifiers};
 use crate::{AppState, catch_all, CommandDetails, CommandKeyId, Commands, ctrl_key, global_commands, InputPanel, Panels, TextPanel};
 use crate::app::StateChangeRequest;
 use crate::commands::{alt_catch_all, alt_key, code, shift_alt_key, shift_catch_all};
+use crate::panels::{EDIT_PANEL_TYPE_ID, INPUT_PANEL_TYPE_ID, PanelTypeID};
 
 type PanelCommand =
 fn(&mut TextPanel, KeyCode, &mut AppState) -> (bool, Vec<StateChangeRequest>);
 
 type GlobalAction = fn(&mut AppState, KeyCode, &mut Panels);
 
+pub const EDIT_COMMAND_INDEX: usize = 0;
+pub const INPUT_COMMAND_INDEX: usize = 1;
+
 pub struct Manager {
     state_commands: Commands<GlobalAction>,
     command_stack: Vec<usize>,
     commands: Vec<Commands<PanelCommand>>,
-
-    // all commands so there only stored once
-    edit_commands: Commands<PanelCommand>,
-    input_commands: Commands<PanelCommand>,
-    // messages_commands: Commands<PanelCommand>,
-}
-
-pub struct CommandProgress {
-    keys: Vec<CommandKeyId>,
-    commands_index: Option<usize>,
-    is_end: bool,
-}
-
-impl CommandProgress {
-    pub fn start() -> Self {
-        Self {
-            keys: vec![],
-            commands_index: None,
-            is_end: false,
-        }
-    }
+    progress: Vec<CommandKeyId>
 }
 
 impl Default for Manager {
@@ -40,23 +24,64 @@ impl Default for Manager {
         Manager {
             state_commands: global_commands().unwrap(),
             command_stack: vec![],
-            commands: vec![],
-            // commands
-            edit_commands: make_edit_commands(),
-            input_commands: make_input_commands().unwrap(),
-            // messages_commands: make_edit_commands(),
-
+            commands: vec![
+                make_edit_commands(),
+                make_input_commands().unwrap(),
+                make_messages_commands().unwrap(),
+            ],
+            progress: vec![],
         }
     }
 }
 
 impl Manager {
-    pub fn advance(&self, progress: CommandProgress, by: CommandKeyId) -> CommandProgress {
+    pub fn advance(&mut self, by: CommandKeyId, state: &mut AppState, panels: &mut Panels) {
+        self.progress.push(by.clone());
 
-        CommandProgress {
-            keys: vec![progress.keys, vec![by]].concat(),
-            commands_index: progress.commands_index,
-            is_end: false,
+        // check current commands
+        // then global
+        let (end, action) = match self.command_stack.last().and_then(|i| self.commands.get(*i)) {
+            None => {
+                let (end, action) = self.state_commands.get(&self.progress);
+
+                match action {
+                    None => (),
+                    Some(action) => action(state, by.code.clone(), panels)
+                }
+
+                (end, None)
+            },
+            Some(commands) => commands.get(&self.progress)
+        };
+
+        if end {
+            self.progress.clear();
+        }
+
+        match action {
+            None => (),
+            Some(action) => match panels.get_mut(state.active_panel()) {
+                None => (),
+                Some(panel) => {
+                    action(panel, by.code.clone(), state);
+                }
+            }
+        }
+    }
+
+    pub fn push_commands_for_panel(&mut self, type_id: PanelTypeID) {
+        self.command_stack.push(match type_id {
+            EDIT_PANEL_TYPE_ID => EDIT_COMMAND_INDEX,
+            INPUT_PANEL_TYPE_ID => INPUT_COMMAND_INDEX,
+            _ => return
+        });
+    }
+
+    pub fn replace_top_with_panel(&mut self, type_id: PanelTypeID) {
+        match self.command_stack.pop() {
+            // nothing to replace
+            None => (),
+            Some(_) => self.push_commands_for_panel(type_id),
         }
     }
 }
@@ -172,6 +197,12 @@ pub fn make_input_commands() -> Result<Commands<PanelCommand>, String> {
         b.node(alt_key('-'))
             .action(CommandDetails::empty(), InputPanel::previous_quick_select)
     })?;
+
+    Ok(commands)
+}
+
+pub fn make_messages_commands() -> Result<Commands<PanelCommand>, String> {
+    let mut commands = Commands::<PanelCommand>::new();
 
     Ok(commands)
 }

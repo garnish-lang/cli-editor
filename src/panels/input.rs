@@ -8,8 +8,6 @@ use crate::app::StateChangeRequest;
 use crate::commands::{alt_catch_all, code, shift_catch_all};
 use crate::{catch_all, AppState, CommandDetails, CommandKeyId, Commands, EditorFrame, TextPanel};
 
-pub const INPUT_PANEL_TYPE_ID: &str = "Input";
-
 pub struct InputPanel {
     cursor_index: usize,
     text: String,
@@ -147,7 +145,9 @@ impl InputPanel {
                 match options.get(input) {
                     Some(selection) => {
                         panel.append_text(selection.remaining());
-                        panel.set_cursor_index(panel.cursor_index_in_line() + selection.remaining().len());
+                        panel.set_cursor_index(
+                            panel.cursor_index_in_line() + selection.remaining().len(),
+                        );
                     }
                     None => return (false, vec![]),
                 }
@@ -464,6 +464,7 @@ mod tests {
 
     use crate::app::StateChangeRequest;
     use crate::autocomplete::{AutoCompleter, Completion};
+    use crate::commands::Manager;
     use crate::{AppState, InputPanel, Panels, TextPanel};
 
     pub struct TestCompleter {}
@@ -482,7 +483,8 @@ mod tests {
     fn next_quick_select() {
         let mut panels = Panels::new();
         let mut state = AppState::new();
-        state.init(&mut panels);
+        let mut commands = Manager::default();
+        state.init(&mut panels, &mut commands);
         state.handle_changes(
             vec![StateChangeRequest::Input(
                 "Test".to_string(),
@@ -502,7 +504,8 @@ mod tests {
     fn next_quick_select_past_options() {
         let mut panels = Panels::new();
         let mut state = AppState::new();
-        state.init(&mut panels);
+        let mut commands = Manager::default();
+        state.init(&mut panels, &mut commands);
         state.handle_changes(
             vec![StateChangeRequest::Input(
                 "Test".to_string(),
@@ -523,7 +526,8 @@ mod tests {
     fn previous_quick_select() {
         let mut panels = Panels::new();
         let mut state = AppState::new();
-        state.init(&mut panels);
+        let mut commands = Manager::default();
+        state.init(&mut panels, &mut commands);
         state.handle_changes(
             vec![StateChangeRequest::Input(
                 "Test".to_string(),
@@ -544,7 +548,8 @@ mod tests {
     fn previous_quick_select_past_options() {
         let mut panels = Panels::new();
         let mut state = AppState::new();
-        state.init(&mut panels);
+        let mut commands = Manager::default();
+        state.init(&mut panels, &mut commands);
         state.handle_changes(
             vec![StateChangeRequest::Input(
                 "Test".to_string(),
@@ -565,7 +570,8 @@ mod tests {
     fn fill_quick_select() {
         let mut panels = Panels::new();
         let mut state = AppState::new();
-        state.init(&mut panels);
+        let mut commands = Manager::default();
+        state.init(&mut panels, &mut commands);
         state.handle_changes(
             vec![StateChangeRequest::Input(
                 "Test".to_string(),
@@ -586,7 +592,8 @@ mod tests {
     fn fill_quick_select_invalid_selection() {
         let mut panels = Panels::new();
         let mut state = AppState::new();
-        state.init(&mut panels);
+        let mut commands = Manager::default();
+        state.init(&mut panels, &mut commands);
         state.handle_changes(
             vec![StateChangeRequest::Input(
                 "Test".to_string(),
@@ -607,7 +614,8 @@ mod tests {
     fn fill_quick_select_invalid_code() {
         let mut panels = Panels::new();
         let mut state = AppState::new();
-        state.init(&mut panels);
+        let mut commands = Manager::default();
+        state.init(&mut panels, &mut commands);
         state.handle_changes(
             vec![StateChangeRequest::Input(
                 "Test".to_string(),
@@ -628,7 +636,8 @@ mod tests {
     fn fill_quick_select_out_of_option_range() {
         let mut panels = Panels::new();
         let mut state = AppState::new();
-        state.init(&mut panels);
+        let mut commands = Manager::default();
+        state.init(&mut panels, &mut commands);
         state.handle_changes(
             vec![StateChangeRequest::Input(
                 "Test".to_string(),
@@ -649,7 +658,8 @@ mod tests {
     fn fill_current_quick_select() {
         let mut panels = Panels::new();
         let mut state = AppState::new();
-        state.init(&mut panels);
+        let mut commands = Manager::default();
+        state.init(&mut panels, &mut commands);
         state.handle_changes(
             vec![StateChangeRequest::Input(
                 "Test".to_string(),
@@ -671,7 +681,8 @@ mod tests {
     fn fill_current_quick_select_out_of_range() {
         let mut panels = Panels::new();
         let mut state = AppState::new();
-        state.init(&mut panels);
+        let mut commands = Manager::default();
+        state.init(&mut panels, &mut commands);
         state.handle_changes(
             vec![StateChangeRequest::Input(
                 "Test".to_string(),

@@ -351,6 +351,36 @@ where
             CommandKey::Leaf(..) => true,
         }
     }
+
+    pub fn get(&self, path: &Vec<CommandKeyId>) -> (bool, Option<T>) {
+        let mut current = &self.root;
+        for c in path {
+            match current {
+                CommandKey::Node(_, _, children, _) => match children.get(c) {
+                    Some(next) => current = next,
+                    // no direct match
+                    // check for catch all Null code, cloning given modifiers
+                    None => match children.get(&CommandKeyId::new(KeyCode::Null, c.mods)) {
+                        Some(next) => current = next,
+                        // current path leads nowhere
+                        // return early with end and no action
+                        None => return (true, None),
+                    },
+                },
+                CommandKey::Leaf(_, _, _, a) => {
+                    // current path goes beyond command
+                    // return early with end result
+                    return (true, Some(*a));
+                }
+            }
+        }
+
+        match current {
+            CommandKey::Node(.., Some(action)) => (false, Some(*action)),
+            CommandKey::Node(_, _, _, _) => (false, None),
+            CommandKey::Leaf(_, _, _, action) => (true, Some(*action)),
+        }
+    }
 }
 
 #[derive(Clone)]

@@ -7,7 +7,7 @@ pub use factory::*;
 pub use input::InputPanel;
 pub use messages::MessagesPanel;
 pub use null::NullPanel;
-pub use text::TextPanel;
+pub use text::{TextPanel, PanelCommand};
 
 use crate::app::StateChangeRequest;
 use crate::{AppState, EditorFrame};
@@ -70,6 +70,13 @@ mod text;
 //         true
 //     }
 // }
+
+pub type PanelTypeID = &'static str;
+
+pub const EDIT_PANEL_TYPE_ID: &str = "Edit";
+pub const INPUT_PANEL_TYPE_ID: &str = "Input";
+pub const MESSAGE_PANEL_TYPE_ID: &str = "Messages";
+pub const NULL_PANEL_TYPE_ID: &str = "Null";
 
 pub struct Panels {
     panels: Vec<TextPanel>,

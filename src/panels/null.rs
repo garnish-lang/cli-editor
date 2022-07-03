@@ -1,7 +1,5 @@
 pub struct NullPanel {}
 
-pub const NULL_PANEL_TYPE_ID: &str = "Null";
-
 impl NullPanel {
     pub fn new() -> Self {
         NullPanel {}

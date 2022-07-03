@@ -9,8 +9,7 @@ use crate::{AppState, catch_all, CommandDetails, Commands, ctrl_key, CURSOR_MAX,
 use crate::app::{Message, StateChangeRequest};
 use crate::autocomplete::FileAutoCompleter;
 use crate::commands::{alt_key, shift_alt_key, shift_catch_all};
-use crate::panels::{EDIT_PANEL_TYPE_ID, MESSAGE_PANEL_TYPE_ID, MessagesPanel, NULL_PANEL_TYPE_ID, PanelFactory};
-use crate::panels::input::INPUT_PANEL_TYPE_ID;
+use crate::panels::{EDIT_PANEL_TYPE_ID, INPUT_PANEL_TYPE_ID, MESSAGE_PANEL_TYPE_ID, MessagesPanel, NULL_PANEL_TYPE_ID, PanelFactory, PanelTypeID};
 
 #[derive(Debug, Copy, Clone, PartialOrd, PartialEq)]
 pub enum PanelState {
@@ -28,11 +27,11 @@ pub struct TextPanel {
     lines: Vec<String>,
     gutter_size: u16,
     visible: bool,
-    panel_type: &'static str,
+    panel_type: PanelTypeID,
     state: PanelState,
     continuation_marker: String,
     selection: usize,
-    commands: Commands<PanelCommand>,
+    command_index: usize,
     pub(crate) key_handler: fn(&mut TextPanel, KeyEvent, &mut AppState) -> (bool, Vec<StateChangeRequest>),
     pub(crate) length_handler: fn(&TextPanel, u16, u16, Direction, &AppState) -> u16,
     pub(crate) receive_input_handler: fn(&mut TextPanel, String) -> Vec<StateChangeRequest>,
@@ -54,7 +53,7 @@ impl Default for TextPanel {
             state: PanelState::Normal,
             continuation_marker: "... ".to_string(),
             selection: 0,
-            commands: Commands::new(),
+            command_index: 0,
             key_handler: TextPanel::empty_key_handler,
             length_handler: TextPanel::empty_length_handler,
             receive_input_handler: TextPanel::empty_input_handler,
@@ -88,8 +87,6 @@ impl TextPanel {
         defaults.receive_input_handler = TextEditPanel::input_handler;
         defaults.key_handler = TextEditPanel::key_handler;
 
-        defaults.commands = make_edit_commands();
-
         defaults
     }
 
@@ -100,8 +97,6 @@ impl TextPanel {
         defaults.render_handler = TextEditPanel::render_handler;
         defaults.length_handler = InputPanel::length_handler;
         defaults.key_handler = TextEditPanel::key_handler;
-
-        defaults.commands = make_edit_commands();
 
         defaults
     }
@@ -116,7 +111,7 @@ impl TextPanel {
     }
 
     fn init(&mut self, _state: &mut AppState) {
-        self.commands = make_edit_commands();
+
     }
 
     // temp
@@ -204,10 +199,6 @@ impl TextPanel {
         self.file_path = Some(path);
     }
 
-    pub fn commands_mut(&mut self) -> &mut Commands<PanelCommand> {
-        &mut self.commands
-    }
-
     pub fn gutter_size(&self) -> u16 {
         self.gutter_size
     }
@@ -216,7 +207,7 @@ impl TextPanel {
         &self.continuation_marker
     }
 
-    pub fn panel_type(&self) -> &str {
+    pub fn panel_type(&self) -> PanelTypeID {
         self.panel_type
     }
 
@@ -667,7 +658,7 @@ impl TextPanel {
     }
 }
 
-type PanelCommand =
+pub type PanelCommand =
 fn(&mut TextPanel, KeyCode, &mut AppState) -> (bool, Vec<StateChangeRequest>);
 
 // unwarps allowed here for now because there shouldn't be any misconfigurations in default settings

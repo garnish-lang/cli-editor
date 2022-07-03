@@ -1,7 +1,4 @@
-pub use crate::panels::edit::EDIT_PANEL_TYPE_ID;
-pub use crate::panels::messages::MESSAGE_PANEL_TYPE_ID;
-pub use crate::panels::null::NULL_PANEL_TYPE_ID;
-use crate::panels::{MessagesPanel, NullPanel};
+use crate::panels::{EDIT_PANEL_TYPE_ID, MESSAGE_PANEL_TYPE_ID, MessagesPanel, NULL_PANEL_TYPE_ID, NullPanel};
 use crate::{InputPanel, TextEditPanel, TextPanel};
 
 pub struct PanelFactory {}
@@ -44,10 +41,8 @@ impl PanelFactory {
 
 #[cfg(test)]
 mod tests {
-    use crate::panels::edit::EDIT_PANEL_TYPE_ID;
     use crate::panels::factory::PanelFactory;
-    use crate::panels::messages::MESSAGE_PANEL_TYPE_ID;
-    use crate::panels::null::NULL_PANEL_TYPE_ID;
+    use crate::panels::{EDIT_PANEL_TYPE_ID, MESSAGE_PANEL_TYPE_ID, NULL_PANEL_TYPE_ID};
 
     #[test]
     fn get_available() {
