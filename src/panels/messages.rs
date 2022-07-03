@@ -9,10 +9,6 @@ use crate::{AppState, EditorFrame, TextPanel};
 pub struct MessagesPanel {}
 
 impl MessagesPanel {
-    pub fn new() -> Self {
-        MessagesPanel {}
-    }
-
     pub fn render_handler(_: &TextPanel, state: &AppState, frame: &mut EditorFrame, rect: Rect) {
         let spans: Vec<ListItem> = state
             .get_messages()
@@ -34,38 +30,3 @@ impl MessagesPanel {
         frame.render_widget(list, rect);
     }
 }
-
-// impl Panel for MessagesPanel {
-//     fn panel_type(&self) -> &str {
-//         MESSAGE_PANEL_TYPE_ID
-//     }
-//
-//     fn make_widget(
-//         &self,
-//         app: &AppState,
-//         frame: &mut EditorFrame,
-//         rect: Rect,
-//         _is_active: bool,
-//     ) -> RenderDetails {
-//         let spans: Vec<ListItem> = app
-//             .get_messages()
-//             .iter()
-//             .rev()
-//             .map(|m| {
-//                 let color = match m.channel() {
-//                     MessageChannel::INFO => Color::White,
-//                     MessageChannel::WARNING => Color::Yellow,
-//                     MessageChannel::ERROR => Color::Red,
-//                 };
-//
-//                 ListItem::new(Text::styled(m.text().as_str(), Style::default().fg(color)))
-//             })
-//             .collect();
-//
-//         let list = List::new(spans).style(Style::default().fg(Color::White).bg(Color::Black));
-//
-//         frame.render_widget(list, rect);
-//
-//         RenderDetails::new(vec![Span::raw("Messages")], (1, 1))
-//     }
-// }

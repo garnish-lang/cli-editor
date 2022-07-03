@@ -8,32 +8,9 @@ use crate::app::StateChangeRequest;
 use crate::commands::{alt_catch_all, code, shift_catch_all};
 use crate::{catch_all, AppState, CommandDetails, CommandKeyId, Commands, EditorFrame, TextPanel};
 
-pub struct InputPanel {
-    cursor_index: usize,
-    text: String,
-    // commands: Commands<InputCommand>,
-    visible: bool,
-    quick_select: usize,
-    continuation_marker: String,
-}
+pub struct InputPanel {}
 
 impl InputPanel {
-    pub fn new() -> Self {
-        InputPanel {
-            cursor_index: 0,
-            text: String::new(),
-            // commands: Commands::<InputCommand>::new(),
-            visible: false,
-            quick_select: 0,
-            continuation_marker: "... ".to_string(),
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn set_text(&mut self, text: String) {
-        self.text = text;
-    }
-
     pub(crate) fn handle_key_stroke(
         panel: &mut TextPanel,
         code: KeyCode,
@@ -47,39 +24,6 @@ impl InputPanel {
         panel.set_text("");
         panel.set_selection(0);
     }
-
-    // fn handle_key_stroke(
-    //     panel: &TextPanel,
-    //     code: KeyCode,
-    //     _state: &mut AppState,
-    // ) -> (bool, Vec<StateChangeRequest>) {
-    //     let mut requests = vec![];
-    //     match code {
-    //         KeyCode::Backspace => match panel.text.pop() {
-    //             None => {
-    //                 panel.cursor_index = 0;
-    //             }
-    //             Some(_) => {
-    //                 panel.cursor_index -= 1;
-    //             }
-    //         },
-    //         KeyCode::Delete => {
-    //             // ??
-    //         }
-    //         KeyCode::Enter => {
-    //             requests.push(StateChangeRequest::input_complete(panel.text.clone()));
-    //             panel.text = String::new();
-    //             panel.cursor_index = 0;
-    //         }
-    //         KeyCode::Char(c) => {
-    //             panel.cursor_index += 1;
-    //             panel.text.push(c);
-    //         }
-    //         _ => return (false, vec![]),
-    //     }
-    //
-    //     (true, requests)
-    // }
 
     pub fn next_quick_select(
         panel: &mut TextPanel,
@@ -229,7 +173,8 @@ mod tests {
     use crate::app::StateChangeRequest;
     use crate::autocomplete::{AutoCompleter, Completion};
     use crate::commands::Manager;
-    use crate::{AppState, InputPanel, Panels, TextPanel};
+    use crate::{AppState, Panels, TextPanel};
+    use crate::panels::input::InputPanel;
 
     pub struct TestCompleter {}
 

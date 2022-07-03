@@ -1,5 +1,5 @@
-use crate::panels::{EDIT_PANEL_TYPE_ID, MESSAGE_PANEL_TYPE_ID, MessagesPanel, NULL_PANEL_TYPE_ID, NullPanel};
-use crate::{InputPanel, TextEditPanel, TextPanel};
+use crate::panels::{EDIT_PANEL_TYPE_ID, MESSAGE_PANEL_TYPE_ID, NULL_PANEL_TYPE_ID};
+use crate::{TextPanel};
 
 pub struct PanelFactory {}
 

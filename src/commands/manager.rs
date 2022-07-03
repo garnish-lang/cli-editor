@@ -1,8 +1,8 @@
 use crossterm::event::{KeyCode, KeyModifiers};
-use crate::{AppState, catch_all, CommandDetails, CommandKeyId, Commands, ctrl_key, global_commands, InputPanel, Panels, TextPanel};
+use crate::{AppState, catch_all, CommandDetails, CommandKeyId, Commands, ctrl_key, global_commands, Panels, TextPanel};
 use crate::app::StateChangeRequest;
 use crate::commands::{alt_catch_all, alt_key, code, shift_alt_key, shift_catch_all};
-use crate::panels::{EDIT_PANEL_TYPE_ID, INPUT_PANEL_TYPE_ID, PanelTypeID};
+use crate::panels::{EDIT_PANEL_TYPE_ID, INPUT_PANEL_TYPE_ID, InputPanel, PanelTypeID};
 
 type PanelCommand =
 fn(&mut TextPanel, KeyCode, &mut AppState) -> (bool, Vec<StateChangeRequest>);

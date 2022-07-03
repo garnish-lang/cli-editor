@@ -5,11 +5,12 @@ use std::path::PathBuf;
 use crossterm::event::{KeyCode, KeyEvent};
 use tui::layout::{Direction, Rect};
 use tui::text::{Span, Spans, Text};
-use crate::{AppState, catch_all, CommandDetails, Commands, ctrl_key, CURSOR_MAX, EditorFrame, InputPanel, TextEditPanel};
+use crate::{AppState, catch_all, CommandDetails, Commands, ctrl_key, CURSOR_MAX, EditorFrame};
 use crate::app::{Message, StateChangeRequest};
 use crate::autocomplete::FileAutoCompleter;
 use crate::commands::{alt_key, shift_alt_key, shift_catch_all};
-use crate::panels::{EDIT_PANEL_TYPE_ID, INPUT_PANEL_TYPE_ID, MESSAGE_PANEL_TYPE_ID, MessagesPanel, NULL_PANEL_TYPE_ID, PanelFactory, PanelTypeID};
+use crate::panels::{EDIT_PANEL_TYPE_ID, INPUT_PANEL_TYPE_ID, InputPanel, MESSAGE_PANEL_TYPE_ID, MessagesPanel, NULL_PANEL_TYPE_ID, PanelFactory, PanelTypeID};
+use crate::panels::edit::TextEditPanel;
 
 #[derive(Debug, Copy, Clone, PartialOrd, PartialEq)]
 pub enum PanelState {
@@ -162,6 +163,10 @@ impl TextPanel {
 
     pub fn current_line(&self) -> usize {
         self.current_line
+    }
+
+    pub fn set_current_line(&mut self, current_line: usize) {
+        self.current_line = current_line;
     }
 
     pub fn cursor_index_in_line(&self) -> usize {
@@ -355,7 +360,7 @@ impl TextPanel {
         )
     }
 
-    fn set_cursor_to_end(&mut self) {
+    pub fn set_cursor_to_end(&mut self) {
         if self.lines.len() > 0 {
             self.current_line = self.lines.len() - 1;
             self.cursor_index_in_line = match self.lines.get(self.current_line) {
