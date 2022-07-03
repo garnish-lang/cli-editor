@@ -1,6 +1,7 @@
 use tui::layout::Direction;
 
 use crate::{AppState, Panels};
+use crate::commands::Manager;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PanelSplit {
@@ -21,7 +22,7 @@ pub enum UserSplits {
 }
 
 impl AppState {
-    pub fn split(&mut self, direction: Direction, panels: &mut Panels) {
+    pub fn split(&mut self, direction: Direction, panels: &mut Panels, commands: &mut Manager) {
         let new_split_index = self.splits_len();
 
         let (active_split, active_panel_id) = match self.get_active_panel_mut() {
@@ -42,7 +43,7 @@ impl AppState {
             return;
         }
 
-        let new_panel_index = self.add_panel(new_split_index, panels);
+        let new_panel_index = self.add_panel(new_split_index, panels, commands);
 
         let new_panel_split = PanelSplit::new(
             direction,

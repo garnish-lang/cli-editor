@@ -13,7 +13,7 @@ use crate::app::StateChangeRequest;
 use crate::autocomplete::FileAutoCompleter;
 use crate::commands::{alt_key, shift_alt_key, shift_catch_all};
 use crate::{catch_all, ctrl_key, AppState, CommandDetails, CommandKeyId, Commands, EditorFrame, CURSOR_MAX, TextPanel};
-use crate::panels::text::PanelState;
+use crate::panels::text::{PanelState, RenderDetails};
 
 pub struct TextEditPanel {}
 
@@ -84,7 +84,7 @@ impl TextEditPanel {
         changes
     }
 
-    pub fn render_handler(panel: &TextPanel, _state: &AppState, frame: &mut EditorFrame, rect: Rect) {
+    pub fn render_handler(panel: &TextPanel, _state: &AppState, frame: &mut EditorFrame, rect: Rect) -> RenderDetails {
         if !panel.lines().is_empty() {
             let line_count = panel.lines().len();
             let line_count_size = line_count.to_string().len().min(u16::MAX as usize) as u16;
@@ -123,7 +123,16 @@ impl TextEditPanel {
                 Paragraph::new(para_text).style(Style::default().fg(Color::White).bg(Color::Black));
 
             frame.render_widget(para, layout[2]);
+
+            let title = match panel.file_path() {
+                None => "Buffer".to_string(),
+                Some(path) => path.to_string_lossy().to_string()
+            };
+
+            return RenderDetails::new(title, cursor)
         }
+
+        RenderDetails::new("Buffer".to_string(), CURSOR_MAX)
     }
 }
 

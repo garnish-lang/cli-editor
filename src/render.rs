@@ -169,23 +169,23 @@ pub fn render_split(
                                 let render_details =
                                     panel.make_widget(app, frame, inner_block);
 
-                                // title.extend(render_details.title());
+                                title.push(Span::from(render_details.title().as_str()));
 
                                 frame.render_widget(block.title(Spans::from(title)), chunk);
 
-                                // if is_active {
-                                //     if inner_block
-                                //         .has_point(render_details.cursor.0, render_details.cursor.1)
-                                //     {
-                                //         frame.set_cursor(
-                                //             render_details.cursor.0,
-                                //             render_details.cursor.1,
-                                //         );
-                                //     } else {
-                                //         // set off screen
-                                //         frame.set_cursor(CURSOR_MAX.0, CURSOR_MAX.1);
-                                //     }
-                                // }
+                                if is_active {
+                                    if inner_block
+                                        .has_point(render_details.cursor().0, render_details.cursor().1)
+                                    {
+                                        frame.set_cursor(
+                                            render_details.cursor().0,
+                                            render_details.cursor().1,
+                                        );
+                                    } else {
+                                        // set off screen
+                                        frame.set_cursor(CURSOR_MAX.0, CURSOR_MAX.1);
+                                    }
+                                }
                             }
                             None => (),
                         },

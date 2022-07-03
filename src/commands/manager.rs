@@ -10,7 +10,7 @@ use crate::{
 
 type PanelCommand = fn(&mut TextPanel, KeyCode, &mut AppState) -> (bool, Vec<StateChangeRequest>);
 
-type GlobalAction = fn(&mut AppState, KeyCode, &mut Panels);
+type GlobalAction = fn(&mut AppState, KeyCode, &mut Panels, &mut Manager);
 
 pub const EDIT_COMMAND_INDEX: usize = 0;
 pub const INPUT_COMMAND_INDEX: usize = 1;
@@ -64,7 +64,7 @@ impl Manager {
                         None => true,
                         Some(panel) => {
                             let (handled, changes) = action(panel, by.code.clone(), state);
-                            state.handle_changes(changes, panels);
+                            state.handle_changes(changes, panels, self);
 
                             !handled
                         }
@@ -84,7 +84,7 @@ impl Manager {
                     }
                     match action {
                         None => (),
-                        Some(action) => action(state, by.code.clone(), panels),
+                        Some(action) => action(state, by.code.clone(), panels, self),
                     }
                 }
             }

@@ -5,7 +5,7 @@ use tui::text::Span;
 pub use factory::*;
 pub use input::InputPanel;
 pub use messages::MessagesPanel;
-pub use text::{TextPanel, PanelCommand};
+pub use text::{TextPanel};
 
 use crate::app::StateChangeRequest;
 use crate::{AppState, EditorFrame};

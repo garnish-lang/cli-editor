@@ -19,6 +19,27 @@ pub enum PanelState {
     WaitingToSave,
 }
 
+pub struct RenderDetails {
+    title: String,
+    cursor: (u16, u16),
+}
+
+impl RenderDetails {
+    pub fn new(title: String, cursor: (u16, u16)) -> Self {
+        Self {
+            title, cursor
+        }
+    }
+
+    pub fn title(&self) -> &String {
+        &self.title
+    }
+
+    pub fn cursor(&self) -> (u16, u16) {
+        self.cursor
+    }
+}
+
 pub struct TextPanel {
     current_line: usize,
     cursor_index_in_line: usize,
@@ -35,7 +56,7 @@ pub struct TextPanel {
     command_index: usize,
     pub(crate) length_handler: fn(&TextPanel, u16, u16, Direction, &AppState) -> u16,
     pub(crate) receive_input_handler: fn(&mut TextPanel, String) -> Vec<StateChangeRequest>,
-    pub(crate) render_handler: fn(&TextPanel, &AppState, &mut EditorFrame, Rect),
+    pub(crate) render_handler: fn(&TextPanel, &AppState, &mut EditorFrame, Rect) -> RenderDetails,
 }
 
 impl Default for TextPanel {
@@ -71,8 +92,8 @@ impl TextPanel {
         vec![]
     }
 
-    fn empty_render_handler(_: &TextPanel, _: &AppState, _: &mut EditorFrame, _: Rect) {
-        // RenderDetails::new(vec![], (0, 0))
+    fn empty_render_handler(_: &TextPanel, _: &AppState, _: &mut EditorFrame, _: Rect) -> RenderDetails {
+        RenderDetails::new(String::new(), CURSOR_MAX)
     }
 
     pub fn edit_panel() -> Self {
@@ -89,7 +110,8 @@ impl TextPanel {
         let mut defaults = TextPanel::default();
         defaults.panel_type = INPUT_PANEL_TYPE_ID;
 
-        defaults.render_handler = TextEditPanel::render_handler;
+        defaults.title = "Input".to_string();
+        defaults.render_handler = InputPanel::render_handler;
         defaults.length_handler = InputPanel::length_handler;
 
         defaults
@@ -226,7 +248,7 @@ impl TextPanel {
         state: &AppState,
         frame: &mut EditorFrame,
         rect: Rect
-    ) {
+    ) -> RenderDetails {
         (self.render_handler)(self, state, frame, rect)
     }
 
@@ -650,80 +672,4 @@ impl TextPanel {
 
         changes
     }
-}
-
-pub type PanelCommand =
-fn(&mut TextPanel, KeyCode, &mut AppState) -> (bool, Vec<StateChangeRequest>);
-
-// unwarps allowed here for now because there shouldn't be any misconfigurations in default settings
-pub fn make_edit_commands() -> Commands<PanelCommand> {
-    let mut commands = Commands::<PanelCommand>::new();
-
-    commands.insert(|b| {
-        b.node(catch_all())
-            .action(CommandDetails::empty(), TextPanel::handle_key_stroke)
-    }).unwrap();
-
-    commands.insert(|b| {
-        b.node(shift_catch_all())
-            .action(CommandDetails::empty(), TextPanel::handle_key_stroke)
-    }).unwrap();
-
-    commands.insert(|b| {
-        b.node(ctrl_key('o'))
-            .action(CommandDetails::open_file(), TextPanel::open_file)
-    }).unwrap();
-
-    commands.insert(|b| {
-        b.node(ctrl_key('s'))
-            .action(CommandDetails::empty(), TextPanel::save_buffer)
-    }).unwrap();
-
-    commands.insert(|b| {
-        b.node(alt_key('i'))
-            .action(CommandDetails::empty(), TextPanel::scroll_up_one)
-    }).unwrap();
-
-    commands.insert(|b| {
-        b.node(alt_key('k'))
-            .action(CommandDetails::empty(), TextPanel::scroll_down_one)
-    }).unwrap();
-
-    commands.insert(|b| {
-        b.node(shift_alt_key('I'))
-            .action(CommandDetails::empty(), TextPanel::scroll_up_ten)
-    }).unwrap();
-
-    commands.insert(|b| {
-        b.node(shift_alt_key('K'))
-            .action(CommandDetails::empty(), TextPanel::scroll_down_ten)
-    }).unwrap();
-
-    commands.insert(|b| {
-        b.node(alt_key('w')).action(
-            CommandDetails::empty(),
-            TextPanel::move_to_previous_line,
-        )
-    }).unwrap();
-
-    commands.insert(|b| {
-        b.node(alt_key('a')).action(
-            CommandDetails::empty(),
-            TextPanel::move_to_previous_character,
-        )
-    }).unwrap();
-
-    commands.insert(|b| {
-        b.node(alt_key('s'))
-            .action(CommandDetails::empty(), TextPanel::move_to_next_line)
-    }).unwrap();
-
-    commands.insert(|b| {
-        b.node(alt_key('d')).action(
-            CommandDetails::empty(),
-            TextPanel::move_to_next_character,
-        )
-    }).unwrap();
-
-    commands
 }

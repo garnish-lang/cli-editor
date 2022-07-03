@@ -2,11 +2,12 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use tui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Style};
 use tui::text::{Span, Spans, Text};
-use tui::widgets::Paragraph;
+use tui::widgets::{Block, Paragraph};
 
 use crate::app::StateChangeRequest;
 use crate::commands::{alt_catch_all, code, shift_catch_all};
-use crate::{catch_all, AppState, CommandDetails, CommandKeyId, Commands, EditorFrame, TextPanel};
+use crate::{catch_all, AppState, CommandDetails, CommandKeyId, Commands, EditorFrame, TextPanel, CURSOR_MAX};
+use crate::panels::text::RenderDetails;
 
 pub struct InputPanel {}
 
@@ -115,7 +116,7 @@ impl InputPanel {
                     None => panel.set_selection(0),
                     Some(selection) => {
                         panel.append_text(selection.remaining());
-                        panel.set_selection(1 + selection.remaining().len());
+                        panel.set_cursor_index(panel.cursor_index_in_line() + selection.remaining().len());
                     }
                 }
             }
@@ -123,15 +124,6 @@ impl InputPanel {
 
         (false, vec![])
     }
-
-    // pub fn make_title(_: &TextPanel, state: &AppState) -> Vec<Span> {
-    //     match state.input_request() {
-    //         Some(request) => {
-    //             vec![Span::raw(request.prompt().clone())]
-    //         }
-    //         None => vec![],
-    //     }
-    // }
 
     pub fn length_handler(
         panel: &TextPanel,
@@ -163,6 +155,107 @@ impl InputPanel {
             .map(|_| 5)
             .unwrap_or(3)
             + continuation_lines
+    }
+
+    pub fn render_handler(panel: &TextPanel, state: &AppState, frame: &mut EditorFrame, rect: Rect) -> RenderDetails {
+        let line_count = panel.lines().len();
+        let line_count_size = line_count.to_string().len().min(u16::MAX as usize) as u16;
+
+        let (complete_text, has_completer) = match state.input_request().and_then(|r| r.completer())
+        {
+            Some(completer) => (
+                completer
+                    .get_options(panel.text().as_str())
+                    .iter()
+                    .take(9)
+                    .enumerate()
+                    .map(|(i, option)| {
+                        vec![
+                            Span::styled(
+                                format!("{} {}", i + 1, option.option()),
+                                Style::default()
+                                    .fg(match i % 2 {
+                                        0 => Color::Cyan,
+                                        1 => Color::Magenta,
+                                        _ => Color::White,
+                                    })
+                                    .bg(match panel.selection() == i {
+                                        true => Color::Gray,
+                                        false => Color::Black,
+                                    }),
+                            ),
+                            Span::raw(" "),
+                        ]
+                    })
+                    .flatten()
+                    .collect::<Vec<Span>>(),
+                true,
+            ),
+            None => (vec![], false),
+        };
+
+        let text_layout = if has_completer {
+            let layout = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints(vec![
+                    Constraint::Length(rect.height - 2),
+                    Constraint::Length(1),
+                    Constraint::Length(1),
+                ])
+                .split(rect);
+
+            // render completion here since we're already in check
+            let divider = Paragraph::new(Span::from("-".repeat(rect.width as usize)))
+                .alignment(Alignment::Center);
+
+            let complete_para = Paragraph::new(Spans::from(complete_text))
+                .style(Style::default().fg(Color::White).bg(Color::Black))
+                .alignment(Alignment::Left);
+
+            frame.render_widget(divider, layout[1]);
+            frame.render_widget(complete_para, layout[2]);
+
+            layout[0]
+        } else {
+            rect
+        };
+
+        let layout = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints(vec![
+                Constraint::Length(line_count_size),
+                Constraint::Length(panel.gutter_size()),
+                Constraint::Length(rect.width - line_count_size - panel.gutter_size()),
+            ])
+            .split(text_layout);
+
+        let gutter_layout = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints(vec![
+                Constraint::Length(1),
+                Constraint::Length(panel.gutter_size() - 2),
+                Constraint::Length(1),
+            ])
+            .split(layout[1]);
+
+        let (lines, cursor, gutter) = panel.make_text_content(layout[2]);
+
+        let para_text = Text::from(lines);
+
+        let line_numbers_para = Paragraph::new(Text::from(gutter)).alignment(Alignment::Right);
+
+        frame.render_widget(line_numbers_para, layout[0]);
+
+        let gutter = Block::default().style(Style::default().bg(Color::DarkGray));
+
+        frame.render_widget(gutter, gutter_layout[1]);
+
+        let para =
+            Paragraph::new(para_text).style(Style::default().fg(Color::White).bg(Color::Black));
+
+        frame.render_widget(para, layout[2]);
+
+        return RenderDetails::new(panel.title().to_string(), cursor)
     }
 }
 

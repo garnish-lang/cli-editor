@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::collections::HashSet;
 
 use crossterm::event::KeyCode;
@@ -5,7 +6,7 @@ use tui::layout::Direction;
 
 use crate::autocomplete::{AutoCompleter, PanelAutoCompleter};
 use crate::commands::{ctrl_alt_key, Manager};
-use crate::panels::{PanelFactory, NULL_PANEL_TYPE_ID, PanelCommand};
+use crate::panels::{PanelFactory, NULL_PANEL_TYPE_ID, INPUT_PANEL_TYPE_ID, EDIT_PANEL_TYPE_ID};
 use crate::{
     catch_all, ctrl_key, key, CommandDetails, Commands, PanelSplit, Panels, TextPanel, UserSplits,
 };
@@ -301,7 +302,7 @@ impl AppState {
         // self.handle_changes(changes);
     }
 
-    pub fn handle_changes(&mut self, changes: Vec<StateChangeRequest>, panels: &mut Panels) {
+    pub fn handle_changes(&mut self, changes: Vec<StateChangeRequest>, panels: &mut Panels, commands: &mut Manager) {
         let active_panel_id = match self.get_active_panel() {
             Some(lp) => lp.id,
             None => {
@@ -328,6 +329,7 @@ impl AppState {
                     });
 
                     self.active_panel = 0;
+                    commands.replace_top_with_panel(INPUT_PANEL_TYPE_ID);
 
                     match self.get_panel(0) {
                         Some(lp) => match panels.get_mut(lp.panel_index) {
@@ -357,7 +359,10 @@ impl AppState {
                                 match self.get_panel(for_panel) {
                                     None => unimplemented!(),
                                     Some(lp) => match panels.get_mut(lp.panel_index) {
-                                        Some(panel) => *panel = TextPanel::edit_panel(),
+                                        Some(panel) => {
+                                            commands.replace_top_with_panel(EDIT_PANEL_TYPE_ID);
+                                            *panel = TextPanel::edit_panel();
+                                        },
                                         None => unimplemented!(),
                                     },
                                 }
@@ -372,7 +377,10 @@ impl AppState {
                     } else {
                         let changes = match self.get_panel(index) {
                             Some(lp) => match panels.get_mut(lp.panel_index) {
-                                Some(panel) => panel.receive_input(input),
+                                Some(panel) => {
+                                    commands.replace_top_with_panel(panel.panel_type());
+                                    panel.receive_input(input)
+                                },
                                 None => unimplemented!(),
                             },
                             None => {
@@ -403,7 +411,7 @@ impl AppState {
                 }
             };
 
-            self.handle_changes(additional_changes, panels);
+            self.handle_changes(additional_changes, panels, commands);
         }
     }
 
@@ -411,11 +419,11 @@ impl AppState {
     // Command Actions
     //
 
-    pub fn start_selecting_panel(&mut self, _code: KeyCode, _panels: &mut Panels) {
+    pub fn start_selecting_panel(&mut self, _code: KeyCode, _panels: &mut Panels, _commands: &mut Manager) {
         self.selecting_panel = true;
     }
 
-    pub fn select_panel(&mut self, code: KeyCode, _panels: &mut Panels) {
+    pub fn select_panel(&mut self, code: KeyCode, panels: &mut Panels, commands: &mut Manager) {
         self.selecting_panel = false;
         match code {
             KeyCode::Char(c) => match self.panels.iter().enumerate().find(|(_, lp)| lp.id == c) {
@@ -425,6 +433,11 @@ impl AppState {
                 }
                 Some((index, _)) => {
                     self.set_active_panel(index);
+                    match self.get_active_panel().and_then(|layout| panels.get(layout.panel_index)) {
+                        None => unimplemented!(),
+                        Some(panel) => commands.replace_top_with_panel(panel.panel_type())
+                    }
+
                     if self.input_request.is_some() {
                         self.input_request = None;
                         self.messages.push(Message::info(
@@ -441,17 +454,17 @@ impl AppState {
         }
     }
 
-    pub fn split_current_panel_horizontal(&mut self, _code: KeyCode, panels: &mut Panels) {
+    pub fn split_current_panel_horizontal(&mut self, _code: KeyCode, panels: &mut Panels, commands: &mut Manager) {
         // opposite direction, because visual like will be vertical for horizontal layout
-        self.split(Direction::Vertical, panels)
+        self.split(Direction::Vertical, panels, commands)
     }
 
-    pub fn split_current_panel_vertical(&mut self, _code: KeyCode, panels: &mut Panels) {
+    pub fn split_current_panel_vertical(&mut self, _code: KeyCode, panels: &mut Panels, commands: &mut Manager) {
         // opposite direction, because visual like will be horizontal for vertical layout
-        self.split(Direction::Horizontal, panels)
+        self.split(Direction::Horizontal, panels, commands)
     }
 
-    pub fn add_panel_to_active_split(&mut self, _code: KeyCode, panels: &mut Panels) {
+    pub fn add_panel_to_active_split(&mut self, _code: KeyCode, panels: &mut Panels, commands: &mut Manager) {
         let active_split = match self.get_active_panel() {
             Some(lp) => lp.split_index,
             None => {
@@ -461,7 +474,7 @@ impl AppState {
             }
         };
 
-        let new_panel_index = self.add_panel(active_split, panels);
+        let new_panel_index = self.add_panel(active_split, panels, commands);
 
         match self.splits.get_mut(active_split) {
             Some(s) => s.panels.push(UserSplits::Panel(new_panel_index)),
@@ -473,7 +486,7 @@ impl AppState {
         }
     }
 
-    pub(crate) fn add_panel(&mut self, split: usize, panels: &mut Panels) -> usize {
+    pub(crate) fn add_panel(&mut self, split: usize, panels: &mut Panels, _commands: &mut Manager) -> usize {
         let new_id = self.first_available_id();
         let new_index = panels.push(PanelFactory::edit());
 
@@ -482,7 +495,7 @@ impl AppState {
         new_index
     }
 
-    pub fn delete_active_panel(&mut self, _code: KeyCode, panels: &mut Panels) {
+    pub fn delete_active_panel(&mut self, _code: KeyCode, panels: &mut Panels, commands: &mut Manager) {
         let (next_active_panel, active_split, active_panel_id, active_panel_index) =
             match (self.next_panel_index(panels), self.get_active_panel()) {
                 (Err(e), None) | (Err(e), _) => {
@@ -606,7 +619,7 @@ impl AppState {
         if active_count <= self.static_panels.len() {
             // use last split that we have for new panel's split
             let last = self.splits_len() - 1;
-            let index = self.add_panel(last, panels);
+            let index = self.add_panel(last, panels, commands);
             match self.get_split_mut(last) {
                 Some(s) => s.panels.push(UserSplits::Panel(index)),
                 None => {
@@ -629,15 +642,15 @@ impl AppState {
         }
     }
 
-    pub fn activate_next_panel(&mut self, _code: KeyCode, panels: &mut Panels) {
+    pub fn activate_next_panel(&mut self, _code: KeyCode, panels: &mut Panels, _commands: &mut Manager) {
         self.resolve_panel_change(self.next_panel_index(panels));
     }
 
-    pub fn activate_previous_panel(&mut self, _code: KeyCode, panels: &mut Panels) {
+    pub fn activate_previous_panel(&mut self, _code: KeyCode, panels: &mut Panels, _commands: &mut Manager) {
         self.resolve_panel_change(self.previous_panel_index(panels));
     }
 
-    pub fn change_active_panel_type(&mut self, _code: KeyCode, panels: &mut Panels) {
+    pub fn change_active_panel_type(&mut self, _code: KeyCode, panels: &mut Panels, _commands: &mut Manager) {
         self.state = State::WaitingPanelType(self.active_panel);
         self.active_panel = 0;
         self.input_request = Some(InputRequest {
@@ -742,7 +755,7 @@ impl AppState {
     }
 }
 
-type GlobalAction = fn(&mut AppState, KeyCode, &mut Panels);
+type GlobalAction = fn(&mut AppState, KeyCode, &mut Panels, &mut Manager);
 
 pub fn global_commands() -> Result<Commands<GlobalAction>, String> {
     let mut commands = Commands::<GlobalAction>::new();
@@ -841,9 +854,9 @@ mod tests {
         let mut app = AppState::new();
         let mut commands = Manager::default();
         app.init(&mut panels, &mut commands);
-        app.split_current_panel_horizontal(KeyCode::Null, &mut panels);
-        app.split_current_panel_horizontal(KeyCode::Null, &mut panels);
-        app.split_current_panel_horizontal(KeyCode::Null, &mut panels);
+        app.split_current_panel_horizontal(KeyCode::Null, &mut panels, &mut commands);
+        app.split_current_panel_horizontal(KeyCode::Null, &mut panels, &mut commands);
+        app.split_current_panel_horizontal(KeyCode::Null, &mut panels, &mut commands);
         app.input_request = Some(InputRequest {
             prompt: "Prompt".to_string(),
             requestor_id: TOP_REQUESTOR_ID,
@@ -864,9 +877,9 @@ mod tests {
         let mut commands = Manager::default();
         app.init(&mut panels, &mut commands);
         app.selecting_panel = true;
-        app.add_panel_to_active_split(KeyCode::Null, &mut panels);
+        app.add_panel_to_active_split(KeyCode::Null, &mut panels, &mut commands);
 
-        app.select_panel(KeyCode::Char('b'), &mut panels);
+        app.select_panel(KeyCode::Char('b'), &mut panels, &mut commands);
 
         assert_eq!(app.active_panel, 2);
         assert!(!app.selecting_panel);
@@ -879,9 +892,9 @@ mod tests {
         let mut commands = Manager::default();
         app.init(&mut panels, &mut commands);
         app.selecting_panel = true;
-        app.add_panel_to_active_split(KeyCode::Null, &mut panels);
+        app.add_panel_to_active_split(KeyCode::Null, &mut panels, &mut commands);
 
-        app.select_panel(KeyCode::Enter, &mut panels);
+        app.select_panel(KeyCode::Enter, &mut panels, &mut commands);
 
         assert_eq!(app.active_panel, 1);
         assert_eq!(app.messages[0].channel, MessageChannel::INFO);
@@ -894,9 +907,9 @@ mod tests {
         let mut commands = Manager::default();
         app.init(&mut panels, &mut commands);
         app.selecting_panel = true;
-        app.add_panel_to_active_split(KeyCode::Null, &mut panels);
+        app.add_panel_to_active_split(KeyCode::Null, &mut panels, &mut commands);
 
-        app.select_panel(KeyCode::Char('z'), &mut panels);
+        app.select_panel(KeyCode::Char('z'), &mut panels, &mut commands);
 
         assert_eq!(app.active_panel, 1);
         assert_eq!(app.messages[0].channel, MessageChannel::INFO);
@@ -909,14 +922,14 @@ mod tests {
         let mut commands = Manager::default();
         app.init(&mut panels, &mut commands);
         app.selecting_panel = true;
-        app.add_panel_to_active_split(KeyCode::Null, &mut panels);
+        app.add_panel_to_active_split(KeyCode::Null, &mut panels, &mut commands);
         app.input_request = Some(InputRequest {
             prompt: "Test".to_string(),
             requestor_id: TOP_REQUESTOR_ID,
             auto_completer: None,
         });
 
-        app.select_panel(KeyCode::Char('b'), &mut panels);
+        app.select_panel(KeyCode::Char('b'), &mut panels, &mut commands);
 
         assert_eq!(app.messages[0].channel, MessageChannel::INFO);
         assert!(app.input_request.is_none());
@@ -929,7 +942,7 @@ mod tests {
         let mut commands = Manager::default();
         app.init(&mut panels, &mut commands);
 
-        app.add_panel_to_active_split(KeyCode::Null, &mut panels);
+        app.add_panel_to_active_split(KeyCode::Null, &mut panels, &mut commands);
 
         assert_eq!(app.panels.len(), 4);
         assert_eq!(app.splits.len(), 1);
@@ -958,7 +971,7 @@ mod tests {
         app.init(&mut panels, &mut commands);
         app.active_panel = 100;
 
-        app.add_panel_to_active_split(KeyCode::Null, &mut panels);
+        app.add_panel_to_active_split(KeyCode::Null, &mut panels, &mut commands);
 
         assert_eq!(app.messages[0].channel, MessageChannel::ERROR)
     }
@@ -973,7 +986,7 @@ mod tests {
             .push(LayoutPanel::new(10, 'b', panels.push(PanelFactory::edit())));
         app.active_panel = 3;
 
-        app.add_panel_to_active_split(KeyCode::Null, &mut panels);
+        app.add_panel_to_active_split(KeyCode::Null, &mut panels, &mut commands);
 
         assert_eq!(app.messages[0].channel, MessageChannel::ERROR)
     }
@@ -985,7 +998,7 @@ mod tests {
         let mut commands = Manager::default();
         app.init(&mut panels, &mut commands);
 
-        app.split_current_panel_horizontal(KeyCode::Null, &mut panels);
+        app.split_current_panel_horizontal(KeyCode::Null, &mut panels, &mut commands);
 
         assert_eq!(app.panels.len(), 4);
         assert_eq!(app.splits.len(), 2);
@@ -1006,7 +1019,7 @@ mod tests {
         app.init(&mut panels, &mut commands);
         app.splits[0].panels.remove(1);
 
-        app.split_current_panel_horizontal(KeyCode::Null, &mut panels);
+        app.split_current_panel_horizontal(KeyCode::Null, &mut panels, &mut commands);
 
         assert_is_default(&app);
         assert_eq!(app.messages[0].channel, MessageChannel::ERROR)
@@ -1020,7 +1033,7 @@ mod tests {
         app.init(&mut panels, &mut commands);
         app.set_active_panel(100);
 
-        app.split_current_panel_horizontal(KeyCode::Null, &mut panels);
+        app.split_current_panel_horizontal(KeyCode::Null, &mut panels, &mut commands);
 
         assert_eq!(app.active_panel, 1);
         assert_eq!(app.messages[0].channel, MessageChannel::ERROR)
@@ -1036,7 +1049,7 @@ mod tests {
             .push(LayoutPanel::new(10, 'b', panels.push(PanelFactory::edit())));
         app.active_panel = 3;
 
-        app.split_current_panel_horizontal(KeyCode::Null, &mut panels);
+        app.split_current_panel_horizontal(KeyCode::Null, &mut panels, &mut commands);
 
         assert_is_default(&app);
         assert_eq!(app.messages[0].channel, MessageChannel::ERROR)
@@ -1050,7 +1063,7 @@ mod tests {
         app.init(&mut panels, &mut commands);
 
         app.set_active_panel(0);
-        app.split_current_panel_horizontal(KeyCode::Null, &mut panels);
+        app.split_current_panel_horizontal(KeyCode::Null, &mut panels, &mut commands);
 
         assert_eq!(app.panels.len(), 3);
         assert_eq!(app.splits.len(), 1);
@@ -1067,7 +1080,7 @@ mod tests {
         app.init(&mut panels, &mut commands);
 
         app.set_active_panel(0);
-        app.delete_active_panel(KeyCode::Null, &mut panels);
+        app.delete_active_panel(KeyCode::Null, &mut panels, &mut commands);
 
         assert_eq!(app.panels.len(), 3);
         assert_eq!(app.splits.len(), 1);
@@ -1085,10 +1098,10 @@ mod tests {
         app.init(&mut panels, &mut commands);
         let next_panel_index = app.panels.len();
 
-        app.split_current_panel_horizontal(KeyCode::Null, &mut panels);
+        app.split_current_panel_horizontal(KeyCode::Null, &mut panels, &mut commands);
         app.set_active_panel(next_panel_index);
 
-        app.delete_active_panel(KeyCode::Null, &mut panels);
+        app.delete_active_panel(KeyCode::Null, &mut panels, &mut commands);
 
         assert_eq!(app.active_panel, 2);
         assert_eq!(app.panels.len(), 4);
@@ -1104,7 +1117,7 @@ mod tests {
         let mut commands = Manager::default();
         app.init(&mut panels, &mut commands);
 
-        app.delete_active_panel(KeyCode::Null, &mut panels);
+        app.delete_active_panel(KeyCode::Null, &mut panels, &mut commands);
 
         match app.get_active_panel() {
             Some(lp) => assert_ne!(
@@ -1126,14 +1139,14 @@ mod tests {
         app.init(&mut panels, &mut commands);
 
         let second = app.panels.len();
-        app.split_current_panel_horizontal(KeyCode::Null, &mut panels);
+        app.split_current_panel_horizontal(KeyCode::Null, &mut panels, &mut commands);
         app.set_active_panel(second);
 
-        app.delete_active_panel(KeyCode::Null, &mut panels);
+        app.delete_active_panel(KeyCode::Null, &mut panels, &mut commands);
 
         app.set_active_panel(second);
 
-        app.delete_active_panel(KeyCode::Null, &mut panels);
+        app.delete_active_panel(KeyCode::Null, &mut panels, &mut commands);
 
         assert_eq!(app.panels.len(), 3);
         assert_eq!(app.splits.len(), 1);
@@ -1147,7 +1160,7 @@ mod tests {
         app.init(&mut panels, &mut commands);
         app.active_panel = 100;
 
-        app.delete_active_panel(KeyCode::Null, &mut panels);
+        app.delete_active_panel(KeyCode::Null, &mut panels, &mut commands);
 
         assert_eq!(app.active_panel, 1);
         assert_eq!(app.messages[0].channel, MessageChannel::ERROR)
@@ -1163,7 +1176,7 @@ mod tests {
             .push(LayoutPanel::new(10, 'b', panels.push(PanelFactory::edit())));
         app.active_panel = 3;
 
-        app.delete_active_panel(KeyCode::Null, &mut panels);
+        app.delete_active_panel(KeyCode::Null, &mut panels, &mut commands);
 
         assert_is_default(&app);
         assert_eq!(app.messages[0].channel, MessageChannel::ERROR)
@@ -1177,7 +1190,7 @@ mod tests {
         app.init(&mut panels, &mut commands);
         app.splits[0].panels.remove(1);
 
-        app.delete_active_panel(KeyCode::Null, &mut panels);
+        app.delete_active_panel(KeyCode::Null, &mut panels, &mut commands);
 
         assert_is_default(&app);
         assert_eq!(app.messages[0].channel, MessageChannel::ERROR)
@@ -1191,18 +1204,18 @@ mod tests {
         app.init(&mut panels, &mut commands);
 
         let second = app.panels.len();
-        app.split_current_panel_horizontal(KeyCode::Null, &mut panels);
+        app.split_current_panel_horizontal(KeyCode::Null, &mut panels, &mut commands);
         app.set_active_panel(second);
 
         let third = app.panels.len();
-        app.split_current_panel_horizontal(KeyCode::Null, &mut panels);
+        app.split_current_panel_horizontal(KeyCode::Null, &mut panels, &mut commands);
         app.set_active_panel(third);
 
         app.splits[1].panels.remove(1);
 
-        app.delete_active_panel(KeyCode::Null, &mut panels);
+        app.delete_active_panel(KeyCode::Null, &mut panels, &mut commands);
         app.set_active_panel(second);
-        app.delete_active_panel(KeyCode::Null, &mut panels);
+        app.delete_active_panel(KeyCode::Null, &mut panels, &mut commands);
 
         assert_is_default(&app);
         assert_eq!(app.messages[0].channel, MessageChannel::ERROR)
@@ -1216,24 +1229,24 @@ mod tests {
         let mut commands = Manager::default();
         app.init(&mut panels, &mut commands);
         // 2
-        app.split_current_panel_vertical(KeyCode::Null, &mut panels);
+        app.split_current_panel_vertical(KeyCode::Null, &mut panels, &mut commands);
         // 3
-        app.split_current_panel_horizontal(KeyCode::Null, &mut panels);
+        app.split_current_panel_horizontal(KeyCode::Null, &mut panels, &mut commands);
         // 4
-        app.add_panel_to_active_split(KeyCode::Null, &mut panels);
+        app.add_panel_to_active_split(KeyCode::Null, &mut panels, &mut commands);
         // 5
-        app.add_panel_to_active_split(KeyCode::Null, &mut panels);
+        app.add_panel_to_active_split(KeyCode::Null, &mut panels, &mut commands);
         app.set_active_panel(2);
         // 6
-        app.split_current_panel_horizontal(KeyCode::Null, &mut panels);
+        app.split_current_panel_horizontal(KeyCode::Null, &mut panels, &mut commands);
         // 7
-        app.add_panel_to_active_split(KeyCode::Null, &mut panels);
+        app.add_panel_to_active_split(KeyCode::Null, &mut panels, &mut commands);
         // 8
-        app.add_panel_to_active_split(KeyCode::Null, &mut panels);
+        app.add_panel_to_active_split(KeyCode::Null, &mut panels, &mut commands);
 
         app.set_active_panel(7);
 
-        app.activate_next_panel(KeyCode::Null, &mut panels);
+        app.activate_next_panel(KeyCode::Null, &mut panels, &mut commands);
 
         assert_eq!(app.active_panel(), 8)
     }
@@ -1246,24 +1259,24 @@ mod tests {
         let mut commands = Manager::default();
         app.init(&mut panels, &mut commands);
         // 3
-        app.split_current_panel_vertical(KeyCode::Null, &mut panels);
+        app.split_current_panel_vertical(KeyCode::Null, &mut panels, &mut commands);
         // 4
-        app.add_panel_to_active_split(KeyCode::Null, &mut panels);
+        app.add_panel_to_active_split(KeyCode::Null, &mut panels, &mut commands);
         // 5
-        app.add_panel_to_active_split(KeyCode::Null, &mut panels);
+        app.add_panel_to_active_split(KeyCode::Null, &mut panels, &mut commands);
         app.set_active_panel(2);
         // 6
-        app.split_current_panel_vertical(KeyCode::Null, &mut panels);
+        app.split_current_panel_vertical(KeyCode::Null, &mut panels, &mut commands);
         // 7
-        app.add_panel_to_active_split(KeyCode::Null, &mut panels);
+        app.add_panel_to_active_split(KeyCode::Null, &mut panels, &mut commands);
         // 8
-        app.add_panel_to_active_split(KeyCode::Null, &mut panels);
+        app.add_panel_to_active_split(KeyCode::Null, &mut panels, &mut commands);
 
         app.set_active_panel(6);
 
         panels.remove(7);
 
-        app.activate_next_panel(KeyCode::Null, &mut panels);
+        app.activate_next_panel(KeyCode::Null, &mut panels, &mut commands);
 
         assert_eq!(app.active_panel(), 8)
     }
@@ -1276,24 +1289,24 @@ mod tests {
         let mut commands = Manager::default();
         app.init(&mut panels, &mut commands);
         // 2
-        app.split_current_panel_vertical(KeyCode::Null, &mut panels);
+        app.split_current_panel_vertical(KeyCode::Null, &mut panels, &mut commands);
         // 3
-        app.split_current_panel_horizontal(KeyCode::Null, &mut panels);
+        app.split_current_panel_horizontal(KeyCode::Null, &mut panels, &mut commands);
         // 4
-        app.add_panel_to_active_split(KeyCode::Null, &mut panels);
+        app.add_panel_to_active_split(KeyCode::Null, &mut panels, &mut commands);
         // 5
-        app.add_panel_to_active_split(KeyCode::Null, &mut panels);
+        app.add_panel_to_active_split(KeyCode::Null, &mut panels, &mut commands);
         app.set_active_panel(2);
         // 6
-        app.split_current_panel_horizontal(KeyCode::Null, &mut panels);
+        app.split_current_panel_horizontal(KeyCode::Null, &mut panels, &mut commands);
         // 7
-        app.add_panel_to_active_split(KeyCode::Null, &mut panels);
+        app.add_panel_to_active_split(KeyCode::Null, &mut panels, &mut commands);
         // 8
-        app.add_panel_to_active_split(KeyCode::Null, &mut panels);
+        app.add_panel_to_active_split(KeyCode::Null, &mut panels, &mut commands);
 
         app.set_active_panel(10);
 
-        app.activate_next_panel(KeyCode::Null, &mut panels);
+        app.activate_next_panel(KeyCode::Null, &mut panels, &mut commands);
 
         assert_eq!(app.active_panel, 1);
         assert_eq!(app.messages[0].channel, MessageChannel::ERROR)
@@ -1307,24 +1320,24 @@ mod tests {
         let mut commands = Manager::default();
         app.init(&mut panels, &mut commands);
         // 3
-        app.split_current_panel_vertical(KeyCode::Null, &mut panels);
+        app.split_current_panel_vertical(KeyCode::Null, &mut panels, &mut commands);
         // 4
-        app.add_panel_to_active_split(KeyCode::Null, &mut panels);
+        app.add_panel_to_active_split(KeyCode::Null, &mut panels, &mut commands);
         // 5
-        app.add_panel_to_active_split(KeyCode::Null, &mut panels);
+        app.add_panel_to_active_split(KeyCode::Null, &mut panels, &mut commands);
         app.set_active_panel(2);
         // 6
-        app.split_current_panel_vertical(KeyCode::Null, &mut panels);
+        app.split_current_panel_vertical(KeyCode::Null, &mut panels, &mut commands);
         // 7
-        app.add_panel_to_active_split(KeyCode::Null, &mut panels);
+        app.add_panel_to_active_split(KeyCode::Null, &mut panels, &mut commands);
         // 8
-        app.add_panel_to_active_split(KeyCode::Null, &mut panels);
+        app.add_panel_to_active_split(KeyCode::Null, &mut panels, &mut commands);
 
         app.set_active_panel(6);
 
         panels.remove(7);
 
-        app.activate_previous_panel(KeyCode::Null, &mut panels);
+        app.activate_previous_panel(KeyCode::Null, &mut panels, &mut commands);
 
         assert_eq!(app.active_panel(), 2)
     }
@@ -1337,24 +1350,24 @@ mod tests {
         let mut commands = Manager::default();
         app.init(&mut panels, &mut commands);
         // 2
-        app.split_current_panel_vertical(KeyCode::Null, &mut panels);
+        app.split_current_panel_vertical(KeyCode::Null, &mut panels, &mut commands);
         // 3
-        app.split_current_panel_horizontal(KeyCode::Null, &mut panels);
+        app.split_current_panel_horizontal(KeyCode::Null, &mut panels, &mut commands);
         // 4
-        app.add_panel_to_active_split(KeyCode::Null, &mut panels);
+        app.add_panel_to_active_split(KeyCode::Null, &mut panels, &mut commands);
         // 5
-        app.add_panel_to_active_split(KeyCode::Null, &mut panels);
+        app.add_panel_to_active_split(KeyCode::Null, &mut panels, &mut commands);
         app.set_active_panel(2);
         // 6
-        app.split_current_panel_horizontal(KeyCode::Null, &mut panels);
+        app.split_current_panel_horizontal(KeyCode::Null, &mut panels, &mut commands);
         // 7
-        app.add_panel_to_active_split(KeyCode::Null, &mut panels);
+        app.add_panel_to_active_split(KeyCode::Null, &mut panels, &mut commands);
         // 8
-        app.add_panel_to_active_split(KeyCode::Null, &mut panels);
+        app.add_panel_to_active_split(KeyCode::Null, &mut panels, &mut commands);
 
         app.set_active_panel(10);
 
-        app.activate_previous_panel(KeyCode::Null, &mut panels);
+        app.activate_previous_panel(KeyCode::Null, &mut panels, &mut commands);
 
         assert_eq!(app.active_panel, 1);
         assert_eq!(app.messages[0].channel, MessageChannel::ERROR)
@@ -1367,14 +1380,14 @@ mod tests {
         let mut commands = Manager::default();
         app.init(&mut panels, &mut commands);
 
-        app.add_panel_to_active_split(KeyCode::Null, &mut panels);
-        app.add_panel_to_active_split(KeyCode::Null, &mut panels);
+        app.add_panel_to_active_split(KeyCode::Null, &mut panels, &mut commands);
+        app.add_panel_to_active_split(KeyCode::Null, &mut panels, &mut commands);
 
-        app.delete_active_panel(KeyCode::Null, &mut panels);
+        app.delete_active_panel(KeyCode::Null, &mut panels, &mut commands);
 
         assert_eq!(panels.get(1).unwrap().panel_type(), NULL_PANEL_TYPE_ID);
 
-        app.add_panel_to_active_split(KeyCode::Null, &mut panels);
+        app.add_panel_to_active_split(KeyCode::Null, &mut panels, &mut commands);
 
         assert_ne!(panels.get(1).unwrap().panel_type(), NULL_PANEL_TYPE_ID);
     }
@@ -1386,14 +1399,14 @@ mod tests {
         let mut commands = Manager::default();
         app.init(&mut panels, &mut commands);
 
-        app.add_panel_to_active_split(KeyCode::Null, &mut panels);
-        app.add_panel_to_active_split(KeyCode::Null, &mut panels);
+        app.add_panel_to_active_split(KeyCode::Null, &mut panels, &mut commands);
+        app.add_panel_to_active_split(KeyCode::Null, &mut panels, &mut commands);
 
-        app.delete_active_panel(KeyCode::Null, &mut panels);
+        app.delete_active_panel(KeyCode::Null, &mut panels, &mut commands);
 
         assert_eq!(panels.get(1).unwrap().panel_type(), NULL_PANEL_TYPE_ID);
 
-        app.split_current_panel_horizontal(KeyCode::Null, &mut panels);
+        app.split_current_panel_horizontal(KeyCode::Null, &mut panels, &mut commands);
 
         assert_ne!(panels.get(1).unwrap().panel_type(), NULL_PANEL_TYPE_ID);
     }
@@ -1436,7 +1449,7 @@ mod state_changes {
                 "Test Input".to_string(),
                 Box::new(PanelAutoCompleter::new()),
             )],
-            &mut panels,
+            &mut panels, &mut commands
         );
 
         let request = app.input_request().unwrap();
@@ -1459,7 +1472,7 @@ mod state_changes {
                 "Test Input".to_string(),
                 Box::new(PanelAutoCompleter::new()),
             )],
-            &mut panels,
+            &mut panels, &mut commands
         );
 
         assert_eq!(app.messages[0].channel, MessageChannel::ERROR)
@@ -1478,7 +1491,7 @@ mod state_changes {
                 "Test Input".to_string(),
                 Box::new(PanelAutoCompleter::new()),
             )],
-            &mut panels,
+            &mut panels, &mut commands
         );
 
         assert_eq!(app.messages[0].channel, MessageChannel::ERROR)
@@ -1504,7 +1517,7 @@ mod state_changes {
 
         app.handle_changes(
             vec![StateChangeRequest::input_complete("Test Input".to_string())],
-            &mut panels,
+            &mut panels, &mut commands
         );
 
         assert!(app.input_request.is_none());
@@ -1529,7 +1542,7 @@ mod state_changes {
 
         app.handle_changes(
             vec![StateChangeRequest::input_complete("Test Input".to_string())],
-            &mut panels,
+            &mut panels, &mut commands
         );
 
         assert!(app.input_request.is_none());
@@ -1555,7 +1568,7 @@ mod state_changes {
 
         app.handle_changes(
             vec![StateChangeRequest::input_complete("Test Input".to_string())],
-            &mut panels,
+            &mut panels, &mut commands
         );
 
         assert!(app.input_request.is_none());
@@ -1571,7 +1584,7 @@ mod state_changes {
 
         app.handle_changes(
             vec![StateChangeRequest::error("Test Input".to_string())],
-            &mut panels,
+            &mut panels, &mut commands
         );
 
         assert_eq!(app.messages[0].channel, MessageChannel::ERROR)
@@ -1584,7 +1597,7 @@ mod state_changes {
         let mut commands = Manager::default();
         app.init(&mut panels, &mut commands);
 
-        app.change_active_panel_type(KeyCode::Null, &mut panels);
+        app.change_active_panel_type(KeyCode::Null, &mut panels, &mut commands);
 
         assert_eq!(app.active_panel, 0);
         assert_eq!(app.state, State::WaitingPanelType(1));
@@ -1611,7 +1624,7 @@ mod state_changes {
 
         app.handle_changes(
             vec![InputComplete(MESSAGE_PANEL_TYPE_ID.to_string())],
-            &mut panels,
+            &mut panels, &mut commands
         );
 
         assert_ne!(app.get_panel(1).unwrap().id, '\0');
