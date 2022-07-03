@@ -76,37 +76,6 @@ fn main() -> Result<(), String> {
                 // Shift not working with Backspace or Enter
 
                 commands.advance(CommandKeyId::new(event.code, event.modifiers), &mut app_state, &mut panels);
-
-                // let (end, action) = if global_commands.has_progress() {
-                //     global_commands.advance(CommandKeyId::new(event.code, event.modifiers))
-                // } else {
-                //     let (handled, changes) = match app_state.get_active_panel_mut() {
-                //         Some(lp) => match panels.get_mut(lp.panel_index()) {
-                //             Some(panel) => panel.receive_key(event, &mut app_state),
-                //             None => (false, vec![]),
-                //         },
-                //         None => (false, vec![]), // error?
-                //     };
-                //
-                //     app_state.handle_changes(changes, &mut panels);
-                //
-                //     if handled {
-                //         (false, None)
-                //     } else {
-                //         global_commands.advance(CommandKeyId::new(event.code, event.modifiers))
-                //     }
-                // };
-                //
-                // match action {
-                //     Some(action) => action(&mut app_state, event.code, &mut panels),
-                //     None => (),
-                // };
-
-                // if end {
-                //     // reset
-                //     global_commands.reset();
-                //     app_state.set_selecting_panel(false);
-                // }
             }
             Event::Mouse(_event) => (), // println!("{:?}", event),
             Event::Resize(_, _) => (),
