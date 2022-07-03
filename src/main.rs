@@ -74,6 +74,8 @@ fn main() -> Result<(), String> {
                 //      even though the given char is correct
                 // Shift not working with Backspace or Enter
 
+                // app_state.add_info(format!("Received key: {:?} {:?}", event.code, event.modifiers));
+
                 commands.advance(CommandKeyId::new(event.code, event.modifiers), &mut app_state, &mut panels);
             }
             Event::Mouse(_event) => (), // println!("{:?}", event),

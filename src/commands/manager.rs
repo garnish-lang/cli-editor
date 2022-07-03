@@ -1,11 +1,14 @@
 use crossterm::event::{KeyCode, KeyModifiers};
-use crate::{AppState, catch_all, CommandDetails, CommandKeyId, Commands, ctrl_key, global_commands, Panels, TextPanel};
+
 use crate::app::StateChangeRequest;
 use crate::commands::{alt_catch_all, alt_key, code, shift_alt_key, shift_catch_all};
-use crate::panels::{EDIT_PANEL_TYPE_ID, INPUT_PANEL_TYPE_ID, InputPanel, PanelTypeID};
+use crate::panels::{InputPanel, PanelTypeID, EDIT_PANEL_TYPE_ID, INPUT_PANEL_TYPE_ID};
+use crate::{
+    catch_all, ctrl_key, global_commands, AppState, CommandDetails, CommandKeyId, Commands, Panels,
+    TextPanel,
+};
 
-type PanelCommand =
-fn(&mut TextPanel, KeyCode, &mut AppState) -> (bool, Vec<StateChangeRequest>);
+type PanelCommand = fn(&mut TextPanel, KeyCode, &mut AppState) -> (bool, Vec<StateChangeRequest>);
 
 type GlobalAction = fn(&mut AppState, KeyCode, &mut Panels);
 
@@ -16,7 +19,7 @@ pub struct Manager {
     state_commands: Commands<GlobalAction>,
     command_stack: Vec<usize>,
     commands: Vec<Commands<PanelCommand>>,
-    progress: Vec<CommandKeyId>
+    progress: Vec<CommandKeyId>,
 }
 
 impl Default for Manager {
@@ -38,32 +41,51 @@ impl Manager {
     pub fn advance(&mut self, by: CommandKeyId, state: &mut AppState, panels: &mut Panels) {
         self.progress.push(by.clone());
 
-        // check current commands
-        // then global
-        let (end, action) = match self.command_stack.last().and_then(|i| self.commands.get(*i)) {
-            None => {
-                let (end, action) = self.state_commands.get(&self.progress);
+        // state.add_info(format!("Checking stack {:?}", self.command_stack));
 
-                match action {
-                    None => (),
-                    Some(action) => action(state, by.code.clone(), panels)
+        let global_result = self.state_commands.get(&self.progress);
+        let panel_result = self
+            .command_stack
+            .last()
+            .and_then(|i| self.commands.get(*i))
+            .and_then(|commands| commands.get(&self.progress));
+
+        let fallthrough = match panel_result {
+            None => true,
+            Some((end, action)) => {
+                // state.add_info(format!("Is end: {:?} | Have action: {:?}", end, action.is_some()));
+
+                if end {
+                    self.progress.clear();
                 }
+                match action {
+                    None => true,
+                    Some(action) => match panels.get_mut(state.active_panel()) {
+                        None => true,
+                        Some(panel) => {
+                            let (handled, changes) = action(panel, by.code.clone(), state);
+                            state.handle_changes(changes, panels);
 
-                (end, None)
-            },
-            Some(commands) => commands.get(&self.progress)
+                            !handled
+                        }
+                    }
+                }
+            }
         };
 
-        if end {
-            self.progress.clear();
-        }
-
-        match action {
-            None => (),
-            Some(action) => match panels.get_mut(state.active_panel()) {
+        if fallthrough {
+            match global_result {
                 None => (),
-                Some(panel) => {
-                    action(panel, by.code.clone(), state);
+                Some((end, action)) => {
+                    // state.add_info(format!("Not handled, checking global. Is end: {:?} | Have action: {:?}", end, action.is_some()));
+
+                    if end {
+                        self.progress.clear();
+                    }
+                    match action {
+                        None => (),
+                        Some(action) => action(state, by.code.clone(), panels),
+                    }
                 }
             }
         }
@@ -73,7 +95,7 @@ impl Manager {
         self.command_stack.push(match type_id {
             EDIT_PANEL_TYPE_ID => EDIT_COMMAND_INDEX,
             INPUT_PANEL_TYPE_ID => INPUT_COMMAND_INDEX,
-            _ => return
+            _ => return,
         });
     }
 
@@ -85,7 +107,6 @@ impl Manager {
         }
     }
 }
-
 
 //
 // Command Defaults
@@ -135,10 +156,8 @@ pub fn make_edit_commands() -> Result<Commands<PanelCommand>, String> {
     })?;
 
     commands.insert(|b| {
-        b.node(alt_key('w')).action(
-            CommandDetails::empty(),
-            TextPanel::move_to_previous_line,
-        )
+        b.node(alt_key('w'))
+            .action(CommandDetails::empty(), TextPanel::move_to_previous_line)
     })?;
 
     commands.insert(|b| {
@@ -154,10 +173,8 @@ pub fn make_edit_commands() -> Result<Commands<PanelCommand>, String> {
     })?;
 
     commands.insert(|b| {
-        b.node(alt_key('d')).action(
-            CommandDetails::empty(),
-            TextPanel::move_to_next_character,
-        )
+        b.node(alt_key('d'))
+            .action(CommandDetails::empty(), TextPanel::move_to_next_character)
     })?;
 
     Ok(commands)
