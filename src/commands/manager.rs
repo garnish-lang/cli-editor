@@ -25,7 +25,7 @@ impl Default for Manager {
             state_commands: global_commands().unwrap(),
             command_stack: vec![],
             commands: vec![
-                make_edit_commands(),
+                make_edit_commands().unwrap(),
                 make_input_commands().unwrap(),
                 make_messages_commands().unwrap(),
             ],
@@ -91,76 +91,76 @@ impl Manager {
 // Command Defaults
 //
 
-pub fn make_edit_commands() -> Commands<PanelCommand> {
+pub fn make_edit_commands() -> Result<Commands<PanelCommand>, String> {
     let mut commands = Commands::<PanelCommand>::new();
 
     commands.insert(|b| {
         b.node(catch_all())
             .action(CommandDetails::empty(), TextPanel::handle_key_stroke)
-    }).unwrap();
+    })?;
 
     commands.insert(|b| {
         b.node(shift_catch_all())
             .action(CommandDetails::empty(), TextPanel::handle_key_stroke)
-    }).unwrap();
+    })?;
 
     commands.insert(|b| {
         b.node(ctrl_key('o'))
             .action(CommandDetails::open_file(), TextPanel::open_file)
-    }).unwrap();
+    })?;
 
     commands.insert(|b| {
         b.node(ctrl_key('s'))
             .action(CommandDetails::empty(), TextPanel::save_buffer)
-    }).unwrap();
+    })?;
 
     commands.insert(|b| {
         b.node(alt_key('i'))
             .action(CommandDetails::empty(), TextPanel::scroll_up_one)
-    }).unwrap();
+    })?;
 
     commands.insert(|b| {
         b.node(alt_key('k'))
             .action(CommandDetails::empty(), TextPanel::scroll_down_one)
-    }).unwrap();
+    })?;
 
     commands.insert(|b| {
         b.node(shift_alt_key('I'))
             .action(CommandDetails::empty(), TextPanel::scroll_up_ten)
-    }).unwrap();
+    })?;
 
     commands.insert(|b| {
         b.node(shift_alt_key('K'))
             .action(CommandDetails::empty(), TextPanel::scroll_down_ten)
-    }).unwrap();
+    })?;
 
     commands.insert(|b| {
         b.node(alt_key('w')).action(
             CommandDetails::empty(),
             TextPanel::move_to_previous_line,
         )
-    }).unwrap();
+    })?;
 
     commands.insert(|b| {
         b.node(alt_key('a')).action(
             CommandDetails::empty(),
             TextPanel::move_to_previous_character,
         )
-    }).unwrap();
+    })?;
 
     commands.insert(|b| {
         b.node(alt_key('s'))
             .action(CommandDetails::empty(), TextPanel::move_to_next_line)
-    }).unwrap();
+    })?;
 
     commands.insert(|b| {
         b.node(alt_key('d')).action(
             CommandDetails::empty(),
             TextPanel::move_to_next_character,
         )
-    }).unwrap();
+    })?;
 
-    commands
+    Ok(commands)
 }
 
 pub fn make_input_commands() -> Result<Commands<PanelCommand>, String> {

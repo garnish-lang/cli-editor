@@ -39,7 +39,6 @@ fn main() -> Result<(), String> {
     let mut app_state = AppState::new();
     let mut commands = commands::Manager::default();
     app_state.init(&mut panels, &mut commands);
-    let mut global_commands = global_commands()?;
 
     loop {
         app_state.update();
