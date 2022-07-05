@@ -5,12 +5,13 @@ use tui::widgets::{List, ListItem};
 
 use crate::app::MessageChannel;
 use crate::{AppState, CURSOR_MAX, EditorFrame, TextPanel};
+use crate::commands::Manager;
 use crate::panels::text::RenderDetails;
 
 pub struct MessagesPanel {}
 
 impl MessagesPanel {
-    pub fn render_handler(_: &TextPanel, state: &AppState, frame: &mut EditorFrame, rect: Rect) -> RenderDetails {
+    pub fn render_handler(_: &TextPanel, state: &AppState, _: &Manager, frame: &mut EditorFrame, rect: Rect) -> RenderDetails {
         let spans: Vec<ListItem> = state
             .get_messages()
             .iter()

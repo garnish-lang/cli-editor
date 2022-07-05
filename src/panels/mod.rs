@@ -15,11 +15,13 @@ mod factory;
 mod input;
 mod messages;
 mod text;
+mod commands;
 
 pub type PanelTypeID = &'static str;
 
 pub const EDIT_PANEL_TYPE_ID: &str = "Edit";
 pub const INPUT_PANEL_TYPE_ID: &str = "Input";
+pub const COMMANDS_PANEL_TYPE_ID: &str = "Commands";
 pub const MESSAGE_PANEL_TYPE_ID: &str = "Messages";
 pub const NULL_PANEL_TYPE_ID: &str = "Null";
 

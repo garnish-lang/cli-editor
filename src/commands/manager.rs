@@ -1,7 +1,7 @@
 use crossterm::event::{KeyCode, KeyModifiers};
 
 use crate::app::StateChangeRequest;
-use crate::commands::{alt_catch_all, alt_key, code, shift_alt_key, shift_catch_all};
+use crate::commands::{alt_catch_all, alt_key, code, shift_alt_key, shift_catch_all, CommandKey};
 use crate::panels::{InputPanel, PanelTypeID, EDIT_PANEL_TYPE_ID, INPUT_PANEL_TYPE_ID};
 use crate::{
     catch_all, ctrl_key, global_commands, AppState, CommandDetails, CommandKeyId, Commands, Panels,
@@ -68,7 +68,7 @@ impl Manager {
 
                             !handled
                         }
-                    }
+                    },
                 }
             }
         };
@@ -105,6 +105,17 @@ impl Manager {
             None => (),
             Some(_) => self.push_commands_for_panel(type_id),
         }
+    }
+
+    pub fn current_global(&self) -> Option<&CommandKey<GlobalAction>> {
+        self.state_commands.get_node(&self.progress)
+    }
+
+    pub fn current_panel(&self) -> Option<&CommandKey<PanelCommand>> {
+        self.command_stack
+            .last()
+            .and_then(|i| self.commands.get(*i))
+            .and_then(|commands| commands.get_node(&self.progress))
     }
 }
 

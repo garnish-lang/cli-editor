@@ -60,12 +60,12 @@ pub struct CommandDetails {
 
 #[allow(dead_code)]
 impl CommandDetails {
-    pub fn name(&self) -> String {
-        self.name.to_string()
+    pub fn name(&self) -> &String {
+        &self.name
     }
 
-    pub fn description(&self) -> String {
-        self.description.to_string()
+    pub fn description(&self) -> &String {
+        &self.description
     }
 
     pub fn empty() -> Self {
@@ -307,6 +307,16 @@ where
     }
 
     pub fn get(&self, path: &Vec<CommandKeyId>) -> Option<(bool, Option<T>)> {
+        self.get_node(path).and_then(|current| {
+            Some(match current {
+                CommandKey::Node(.., Some(action)) => (false, Some(*action)),
+                CommandKey::Node(..) => (false, None),
+                CommandKey::Leaf(.., action) => (true, Some(*action)),
+            })
+        })
+    }
+
+    pub fn get_node(&self, path: &Vec<CommandKeyId>) -> Option<&CommandKey<T>> {
         let mut current = &self.root;
         for c in path {
             match current {
@@ -321,19 +331,15 @@ where
                         None => return None,
                     },
                 },
-                CommandKey::Leaf(_, _, _, a) => {
+                CommandKey::Leaf(..) => {
                     // current path goes beyond command
                     // return early with end result
-                    return Some((true, Some(*a)));
+                    break;
                 }
             }
         }
 
-        Some(match current {
-            CommandKey::Node(.., Some(action)) => (false, Some(*action)),
-            CommandKey::Node(_, _, _, _) => (false, None),
-            CommandKey::Leaf(_, _, _, action) => (true, Some(*action)),
-        })
+        Some(current)
     }
 }
 

@@ -5,7 +5,7 @@ use tui::text::{Span, Spans, Text};
 use tui::widgets::{Block, Paragraph};
 
 use crate::app::StateChangeRequest;
-use crate::commands::{alt_catch_all, code, shift_catch_all};
+use crate::commands::{alt_catch_all, code, Manager, shift_catch_all};
 use crate::{catch_all, AppState, CommandDetails, CommandKeyId, Commands, EditorFrame, TextPanel, CURSOR_MAX};
 use crate::panels::text::RenderDetails;
 
@@ -72,6 +72,7 @@ impl InputPanel {
         code: KeyCode,
         state: &mut AppState,
     ) -> (bool, Vec<StateChangeRequest>) {
+        state.add_info("Filling");
         match state.input_request().and_then(|r| r.completer()) {
             None => (),
             Some(completer) => {
@@ -107,6 +108,7 @@ impl InputPanel {
         _code: KeyCode,
         state: &mut AppState,
     ) -> (bool, Vec<StateChangeRequest>) {
+        state.add_info("Filling current");
         match state.input_request().and_then(|r| r.completer()) {
             None => (),
             Some(completer) => {
@@ -157,13 +159,13 @@ impl InputPanel {
             + continuation_lines
     }
 
-    pub fn render_handler(panel: &TextPanel, state: &AppState, frame: &mut EditorFrame, rect: Rect) -> RenderDetails {
+    pub fn render_handler(panel: &TextPanel, state: &AppState, _: &Manager, frame: &mut EditorFrame, rect: Rect) -> RenderDetails {
         let line_count = panel.lines().len();
         let line_count_size = line_count.to_string().len().min(u16::MAX as usize) as u16;
 
-        let (complete_text, has_completer) = match state.input_request().and_then(|r| r.completer())
+        let (complete_text, has_completer, prompt) = match state.input_request().and_then(|r| Some((r.prompt(), r.completer())))
         {
-            Some(completer) => (
+            Some((prompt, Some(completer))) => (
                 completer
                     .get_options(panel.text().as_str())
                     .iter()
@@ -190,8 +192,9 @@ impl InputPanel {
                     .flatten()
                     .collect::<Vec<Span>>(),
                 true,
+                Some(prompt),
             ),
-            None => (vec![], false),
+            _ => (vec![], false, None),
         };
 
         let text_layout = if has_completer {
@@ -255,7 +258,7 @@ impl InputPanel {
 
         frame.render_widget(para, layout[2]);
 
-        return RenderDetails::new(panel.title().to_string(), cursor)
+        return RenderDetails::new(prompt.unwrap_or(panel.title()).to_string(), cursor)
     }
 }
 

@@ -360,8 +360,15 @@ impl AppState {
                                     None => unimplemented!(),
                                     Some(lp) => match panels.get_mut(lp.panel_index) {
                                         Some(panel) => {
-                                            commands.replace_top_with_panel(EDIT_PANEL_TYPE_ID);
-                                            *panel = TextPanel::edit_panel();
+                                            match PanelFactory::panel(input.as_str()) {
+                                                Some(new_panel) => {
+                                                    commands.replace_top_with_panel(panel.panel_type());
+                                                    *panel = new_panel;
+                                                }
+                                                None => {
+                                                    self.add_error(format!("No panel of type: {:?}", input))
+                                                }
+                                            }
                                         },
                                         None => unimplemented!(),
                                     },
@@ -650,7 +657,7 @@ impl AppState {
         self.resolve_panel_change(self.previous_panel_index(panels));
     }
 
-    pub fn change_active_panel_type(&mut self, _code: KeyCode, panels: &mut Panels, _commands: &mut Manager) {
+    pub fn change_active_panel_type(&mut self, _code: KeyCode, panels: &mut Panels, commands: &mut Manager) {
         self.state = State::WaitingPanelType(self.active_panel);
         self.active_panel = 0;
         self.input_request = Some(InputRequest {
@@ -660,7 +667,10 @@ impl AppState {
         });
         match self.get_panel(0) {
             Some(lp) => match panels.get_mut(lp.panel_index) {
-                Some(panel) => panel.show(),
+                Some(panel) => {
+                    panel.show();
+                    commands.replace_top_with_panel(panel.panel_type());
+                },
                 None => unimplemented!(),
             },
             None => unimplemented!(),

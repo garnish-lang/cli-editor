@@ -1,5 +1,5 @@
 use crate::autocomplete::{AutoCompleter, Completion};
-use crate::panels::{EDIT_PANEL_TYPE_ID, MESSAGE_PANEL_TYPE_ID};
+use crate::panels::{COMMANDS_PANEL_TYPE_ID, EDIT_PANEL_TYPE_ID, MESSAGE_PANEL_TYPE_ID};
 
 pub struct PanelAutoCompleter {}
 
@@ -9,7 +9,7 @@ impl PanelAutoCompleter {
     }
 
     fn options() -> Vec<&'static str> {
-        vec![EDIT_PANEL_TYPE_ID, MESSAGE_PANEL_TYPE_ID]
+        vec![EDIT_PANEL_TYPE_ID, MESSAGE_PANEL_TYPE_ID, COMMANDS_PANEL_TYPE_ID]
     }
 }
 

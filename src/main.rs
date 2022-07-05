@@ -44,7 +44,7 @@ fn main() -> Result<(), String> {
         app_state.update();
 
         terminal
-            .draw(|frame| render_split(0, &app_state, &panels, frame, frame.size()))
+            .draw(|frame| render_split(0, &app_state, &commands, &panels, frame, frame.size()))
             .or_else(|err| Err(err.to_string()))?;
 
         // hide cursor if at max

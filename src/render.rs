@@ -6,6 +6,7 @@ use tui::widgets::{Block, Borders};
 use crate::panels::NULL_PANEL_TYPE_ID;
 use crate::splits::UserSplits;
 use crate::{AppState, EditorFrame, Panels};
+use crate::commands::Manager;
 
 pub const CURSOR_MAX: (u16, u16) = (u16::MAX / 2, u16::MAX / 2);
 
@@ -22,6 +23,7 @@ impl HasPoint for Rect {
 pub fn render_split(
     split: usize,
     app: &AppState,
+    commands: &Manager,
     panels: &Panels,
     frame: &mut EditorFrame,
     chunk: Rect,
@@ -167,7 +169,7 @@ pub fn render_split(
                                 let inner_block = block.inner(chunk);
 
                                 let render_details =
-                                    panel.make_widget(app, frame, inner_block);
+                                    panel.make_widget(app, commands, frame, inner_block);
 
                                 title.push(Span::from(render_details.title().as_str()));
 
@@ -193,7 +195,7 @@ pub fn render_split(
                     UserSplits::Split(split_index) => {
                         match app.get_split(*split_index) {
                             None => (), // error
-                            Some(_) => render_split(*split_index, app, panels, frame, chunk),
+                            Some(_) => render_split(*split_index, app, commands, panels, frame, chunk),
                         }
                     }
                 }

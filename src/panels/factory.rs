@@ -1,4 +1,4 @@
-use crate::panels::{EDIT_PANEL_TYPE_ID, MESSAGE_PANEL_TYPE_ID, NULL_PANEL_TYPE_ID};
+use crate::panels::{EDIT_PANEL_TYPE_ID, MESSAGE_PANEL_TYPE_ID, NULL_PANEL_TYPE_ID, COMMANDS_PANEL_TYPE_ID};
 use crate::{TextPanel};
 
 pub struct PanelFactory {}
@@ -18,6 +18,7 @@ impl PanelFactory {
             NULL_PANEL_TYPE_ID => Some(TextPanel::default()),
             EDIT_PANEL_TYPE_ID => Some(TextPanel::edit_panel()),
             MESSAGE_PANEL_TYPE_ID => Some(TextPanel::messages_panel()),
+            COMMANDS_PANEL_TYPE_ID => Some(TextPanel::commands_panel()),
             _ => None,
         }
     }
@@ -43,18 +44,6 @@ impl PanelFactory {
 mod tests {
     use crate::panels::factory::PanelFactory;
     use crate::panels::{EDIT_PANEL_TYPE_ID, MESSAGE_PANEL_TYPE_ID, NULL_PANEL_TYPE_ID};
-
-    #[test]
-    fn get_available() {
-        assert_eq!(
-            PanelFactory::options(),
-            vec![
-                NULL_PANEL_TYPE_ID,
-                EDIT_PANEL_TYPE_ID,
-                MESSAGE_PANEL_TYPE_ID,
-            ]
-        )
-    }
 
     #[test]
     fn create_invalid() {

@@ -11,7 +11,7 @@ use tui::widgets::{Block, Paragraph};
 
 use crate::app::StateChangeRequest;
 use crate::autocomplete::FileAutoCompleter;
-use crate::commands::{alt_key, shift_alt_key, shift_catch_all};
+use crate::commands::{alt_key, Manager, shift_alt_key, shift_catch_all};
 use crate::{catch_all, ctrl_key, AppState, CommandDetails, CommandKeyId, Commands, EditorFrame, CURSOR_MAX, TextPanel};
 use crate::panels::text::{PanelState, RenderDetails};
 
@@ -84,7 +84,7 @@ impl TextEditPanel {
         changes
     }
 
-    pub fn render_handler(panel: &TextPanel, _state: &AppState, frame: &mut EditorFrame, rect: Rect) -> RenderDetails {
+    pub fn render_handler(panel: &TextPanel, _state: &AppState, _: &Manager, frame: &mut EditorFrame, rect: Rect) -> RenderDetails {
         if !panel.lines().is_empty() {
             let line_count = panel.lines().len();
             let line_count_size = line_count.to_string().len().min(u16::MAX as usize) as u16;

@@ -8,8 +8,8 @@ use tui::text::{Span, Spans, Text};
 use crate::{AppState, catch_all, CommandDetails, Commands, ctrl_key, CURSOR_MAX, EditorFrame};
 use crate::app::{Message, StateChangeRequest};
 use crate::autocomplete::FileAutoCompleter;
-use crate::commands::{alt_key, shift_alt_key, shift_catch_all};
-use crate::panels::{EDIT_PANEL_TYPE_ID, INPUT_PANEL_TYPE_ID, InputPanel, MESSAGE_PANEL_TYPE_ID, MessagesPanel, NULL_PANEL_TYPE_ID, PanelFactory, PanelTypeID};
+use crate::commands::{alt_key, Manager, shift_alt_key, shift_catch_all};
+use crate::panels::{commands, COMMANDS_PANEL_TYPE_ID, EDIT_PANEL_TYPE_ID, INPUT_PANEL_TYPE_ID, InputPanel, MESSAGE_PANEL_TYPE_ID, MessagesPanel, NULL_PANEL_TYPE_ID, PanelFactory, PanelTypeID};
 use crate::panels::edit::TextEditPanel;
 
 #[derive(Debug, Copy, Clone, PartialOrd, PartialEq)]
@@ -56,7 +56,7 @@ pub struct TextPanel {
     command_index: usize,
     pub(crate) length_handler: fn(&TextPanel, u16, u16, Direction, &AppState) -> u16,
     pub(crate) receive_input_handler: fn(&mut TextPanel, String) -> Vec<StateChangeRequest>,
-    pub(crate) render_handler: fn(&TextPanel, &AppState, &mut EditorFrame, Rect) -> RenderDetails,
+    pub(crate) render_handler: fn(&TextPanel, &AppState, &Manager, &mut EditorFrame, Rect) -> RenderDetails,
 }
 
 impl Default for TextPanel {
@@ -92,7 +92,7 @@ impl TextPanel {
         vec![]
     }
 
-    fn empty_render_handler(_: &TextPanel, _: &AppState, _: &mut EditorFrame, _: Rect) -> RenderDetails {
+    fn empty_render_handler(_: &TextPanel, _: &AppState, _: &Manager, _: &mut EditorFrame, _: Rect) -> RenderDetails {
         RenderDetails::new(String::new(), CURSOR_MAX)
     }
 
@@ -122,6 +122,15 @@ impl TextPanel {
         defaults.panel_type = MESSAGE_PANEL_TYPE_ID;
 
         defaults.render_handler = MessagesPanel::render_handler;
+
+        defaults
+    }
+
+    pub fn commands_panel() -> Self {
+        let mut defaults = TextPanel::default();
+        defaults.panel_type = COMMANDS_PANEL_TYPE_ID;
+
+        defaults.render_handler = commands::render_handler;
 
         defaults
     }
@@ -246,10 +255,11 @@ impl TextPanel {
     pub fn make_widget(
         &self,
         state: &AppState,
+        commands: &Manager,
         frame: &mut EditorFrame,
         rect: Rect
     ) -> RenderDetails {
-        (self.render_handler)(self, state, frame, rect)
+        (self.render_handler)(self, state, commands, frame, rect)
     }
 
     pub fn get_length(
