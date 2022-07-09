@@ -9,7 +9,7 @@ use crate::panels::text::RenderDetails;
 use crate::{AppState, EditorFrame, TextPanel, CURSOR_MAX};
 
 pub(crate) fn render_handler(
-    panel: &TextPanel,
+    _panel: &TextPanel,
     _state: &AppState,
     commands: &Manager,
     frame: &mut EditorFrame,
@@ -17,16 +17,12 @@ pub(crate) fn render_handler(
 ) -> RenderDetails {
     let (current_panel_id, current_panel_spans) = match commands.current_panel() {
         None => ("", vec![]),
-        Some((id, command)) => {
-            (id, format_commands(command))
-        }
+        Some((id, command)) => (id, format_commands(command)),
     };
 
     let global_panel_spans = match commands.current_global() {
         None => vec![],
-        Some(command) => {
-            format_commands(command)
-        }
+        Some(command) => format_commands(command),
     };
 
     let mut all_spans = vec![];
@@ -34,13 +30,20 @@ pub(crate) fn render_handler(
     if !global_panel_spans.is_empty() {
         all_spans.push(Spans::from(vec![Span::from("Global Commands")]));
         all_spans.extend(global_panel_spans);
-        all_spans.push(Spans::from(vec![Span::from("-".repeat(rect.width as usize))]));
+        all_spans.push(Spans::from(vec![Span::from(
+            "-".repeat(rect.width as usize),
+        )]));
     }
 
     if !current_panel_spans.is_empty() {
-        all_spans.push(Spans::from(vec![Span::from(current_panel_id), Span::from(" Commands")]));
+        all_spans.push(Spans::from(vec![
+            Span::from(current_panel_id),
+            Span::from(" Commands"),
+        ]));
         all_spans.extend(current_panel_spans);
-        all_spans.push(Spans::from(vec![Span::from("-".repeat(rect.width as usize))]));
+        all_spans.push(Spans::from(vec![Span::from(
+            "-".repeat(rect.width as usize),
+        )]));
     }
 
     let para = Paragraph::new(Text::from(all_spans))
@@ -52,7 +55,11 @@ pub(crate) fn render_handler(
 }
 
 fn format_modifiers(modifiers: KeyModifiers) -> &'static str {
-    match (modifiers.contains(KeyModifiers::ALT), modifiers.contains(KeyModifiers::CONTROL), modifiers.contains(KeyModifiers::SHIFT)) {
+    match (
+        modifiers.contains(KeyModifiers::ALT),
+        modifiers.contains(KeyModifiers::CONTROL),
+        modifiers.contains(KeyModifiers::SHIFT),
+    ) {
         (false, false, false) => "",
         (true, false, false) => "ALT",
         (false, true, false) => "CTRL",
@@ -65,15 +72,19 @@ fn format_modifiers(modifiers: KeyModifiers) -> &'static str {
 }
 
 fn format_modifiers_concise(modifiers: KeyModifiers) -> &'static str {
-    match (modifiers.contains(KeyModifiers::ALT), modifiers.contains(KeyModifiers::CONTROL), modifiers.contains(KeyModifiers::SHIFT)) {
+    match (
+        modifiers.contains(KeyModifiers::ALT),
+        modifiers.contains(KeyModifiers::CONTROL),
+        modifiers.contains(KeyModifiers::SHIFT),
+    ) {
         (false, false, false) => "",
-        (true, false, false) =>  "A",
-        (false, true, false) =>  "C",
-        (false, false, true) =>  "S",
-        (true, true, false) =>   "CA",
-        (true, false, true) =>   "SA",
-        (false, true, true) =>   "SC",
-        (true, true, true) =>    "SCA",
+        (true, false, false) => "A",
+        (false, true, false) => "C",
+        (false, false, true) => "S",
+        (true, true, false) => "CA",
+        (true, false, true) => "SA",
+        (false, true, true) => "SC",
+        (true, true, true) => "SCA",
     }
 }
 
@@ -81,7 +92,7 @@ fn format_code(code: KeyCode) -> String {
     match code {
         KeyCode::Char(c) => c.to_string(),
         KeyCode::Null => "*".to_string(),
-        c => format!("{:?}", c)
+        c => format!("{:?}", c),
     }
 }
 
@@ -99,7 +110,11 @@ fn format_commands<T>(command: &CommandKey<T>) -> Vec<Spans> {
                     false => {
                         let our_str = match modifiers.is_empty() {
                             true => format_code(*code),
-                            false => format!("{} + {}", format_modifiers_concise(*modifiers), format_code(*code))
+                            false => format!(
+                                "{} + {}",
+                                format_modifiers_concise(*modifiers),
+                                format_code(*code)
+                            ),
                         };
 
                         match base.is_empty() {
@@ -116,7 +131,11 @@ fn format_commands<T>(command: &CommandKey<T>) -> Vec<Spans> {
             CommandKey::Leaf(code, modifiers, details, _) => {
                 let our_str = match modifiers.is_empty() {
                     true => format_code(*code),
-                    false => format!("{} + {}", format_modifiers_concise(*modifiers), format_code(*code))
+                    false => format!(
+                        "{} + {}",
+                        format_modifiers_concise(*modifiers),
+                        format_code(*code)
+                    ),
                 };
 
                 let base = match base.is_empty() {
@@ -129,12 +148,19 @@ fn format_commands<T>(command: &CommandKey<T>) -> Vec<Spans> {
                 }
 
                 // push entire command to spans
-                items.push((details,base));
-            },
+                items.push((details, base));
+            }
         }
     }
 
-    items.iter().map(|(details, span)| {
-        Spans::from(vec![Span::from(format!("{:<width$}", details.name(), width=name_length)), Span::from(" | "), Span::from(span.clone())])
-    }).collect()
+    items
+        .iter()
+        .map(|(details, span)| {
+            Spans::from(vec![
+                Span::from(format!("{:<width$}", details.name(), width = name_length)),
+                Span::from(" | "),
+                Span::from(span.clone()),
+            ])
+        })
+        .collect()
 }
