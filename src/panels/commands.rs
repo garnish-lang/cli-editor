@@ -1,34 +1,43 @@
 use crossterm::event::{KeyCode, KeyModifiers};
-use tui::layout::{Constraint, Layout, Rect};
+use tui::layout::{Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Style};
 use tui::text::{Span, Spans, Text};
 use tui::widgets::Paragraph;
 
+use crate::app::StateChangeRequest;
 use crate::commands::{CommandKey, Manager};
 use crate::panels::text::RenderDetails;
-use crate::{AppState, EditorFrame, TextPanel, CURSOR_MAX};
+use crate::{AppState, EditorFrame, TextPanel, CURSOR_MAX, CommandDetails};
 
 pub(crate) fn render_handler(
-    _panel: &TextPanel,
+    panel: &TextPanel,
     _state: &AppState,
     commands: &Manager,
     frame: &mut EditorFrame,
     rect: Rect,
 ) -> RenderDetails {
-    let (current_panel_id, current_panel_spans) = match commands.current_panel() {
-        None => ("", vec![]),
-        Some((id, command)) => (id, format_commands(command)),
+    let mut total_count = 0;
+
+    let (selected_details, global_panel_spans) = match commands.current_global() {
+        None => (None, vec![]),
+        Some(command) => format_commands(panel, command, total_count),
     };
 
-    let global_panel_spans = match commands.current_global() {
-        None => vec![],
-        Some(command) => format_commands(command),
+    total_count += global_panel_spans.len();
+
+    let (current_panel_id, (current_selected_details, current_panel_spans)) = match commands.current_panel() {
+        None => ("", (None, vec![])),
+        Some((id, command)) => (id, format_commands(panel, command, total_count)),
     };
 
     let mut all_spans = vec![];
 
     if !global_panel_spans.is_empty() {
-        all_spans.push(Spans::from(vec![Span::from(format!("{:-<width$}", "Global Commands", width=rect.width as usize))]));
+        all_spans.push(Spans::from(vec![Span::from(format!(
+            "{:-<width$}",
+            "Global Commands",
+            width = rect.width as usize
+        ))]));
         all_spans.extend(global_panel_spans);
         all_spans.push(Spans::default());
     }
@@ -36,18 +45,101 @@ pub(crate) fn render_handler(
     let current_panel_title = format!("{} Commands", current_panel_id);
 
     if !current_panel_spans.is_empty() {
-        all_spans.push(Spans::from(vec![
-            Span::from(format!("{:-<width$}", current_panel_title, width=rect.width as usize))
-        ]));
+        all_spans.push(Spans::from(vec![Span::from(format!(
+            "{:-<width$}",
+            current_panel_title,
+            width = rect.width as usize
+        ))]));
         all_spans.extend(current_panel_spans);
     }
+
+    let commands_rect = match selected_details.or(current_selected_details) {
+        Some(details) => {
+            let layout = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints(vec![
+                    Constraint::Length(rect.height - 10),
+                    Constraint::Length(10),
+                ])
+                .split(rect);
+
+            let spans = vec![
+                Spans::from(Span::from(format!("{:=<width$}", details.name(), width=rect.width as usize))),
+                Spans::from(details.description().as_str()),
+            ];
+
+            let para = Paragraph::new(Text::from(spans));
+
+            frame.render_widget(para, layout[1]);
+
+            layout[0]
+        }
+        None => rect,
+    };
 
     let para = Paragraph::new(Text::from(all_spans))
         .style(Style::default().fg(Color::White).bg(Color::Black));
 
-    frame.render_widget(para, rect);
+    frame.render_widget(para, commands_rect);
 
     RenderDetails::new("Commands".to_string(), CURSOR_MAX)
+}
+
+pub fn next_command(
+    panel: &mut TextPanel,
+    _code: KeyCode,
+    _state: &mut AppState,
+    commands: &mut Manager,
+) -> (bool, Vec<StateChangeRequest>) {
+    let count = match commands.current_panel() {
+        Some(commands) => count_commands(commands.1),
+        None => 0,
+    } + match commands.current_global() {
+        Some(command) => count_commands(command),
+        None => 0,
+    };
+
+    if panel.selection() + 1 > count {
+        panel.set_selection(1);
+    } else {
+        panel.set_selection(panel.selection() + 1);
+    }
+
+    (true, vec![])
+}
+
+pub fn previous_command(
+    panel: &mut TextPanel,
+    _code: KeyCode,
+    _state: &mut AppState,
+    commands: &mut Manager,
+) -> (bool, Vec<StateChangeRequest>) {
+    let count = match commands.current_panel() {
+        Some(commands) => count_commands(commands.1),
+        None => 0,
+    } + match commands.current_global() {
+        Some(command) => count_commands(command),
+        None => 0,
+    };
+
+    if panel.selection() <= 1 {
+        panel.set_selection(count);
+    } else {
+        panel.set_selection(panel.selection() - 1);
+    }
+
+    (true, vec![])
+}
+
+pub fn deselect(
+    panel: &mut TextPanel,
+    _code: KeyCode,
+    _state: &mut AppState,
+    _commands: &mut Manager,
+) -> (bool, Vec<StateChangeRequest>) {
+    panel.set_selection(0);
+
+    (true, vec![])
 }
 
 fn format_modifiers(modifiers: KeyModifiers) -> &'static str {
@@ -92,7 +184,7 @@ fn format_code(code: KeyCode) -> String {
     }
 }
 
-fn format_commands<T>(command: &CommandKey<T>) -> Vec<Spans> {
+fn format_commands<'a, T>(panel: &'a TextPanel, command: &'a CommandKey<T>, total_count: usize) -> (Option<&'a CommandDetails>, Vec<Spans<'a>>) {
     let mut items = vec![];
 
     let mut name_length = 0;
@@ -151,14 +243,53 @@ fn format_commands<T>(command: &CommandKey<T>) -> Vec<Spans> {
 
     items.sort_by(|item, item2| item.0.name().cmp(item2.0.name()));
 
-    items
+    let mut selected = None;
+
+    let items = items
         .iter()
-        .map(|(details, span)| {
+        .enumerate()
+        .map(|(i, (details, span))| {
+            let style = match panel.selection() {
+                0 => Style::default(),
+                n => match total_count + i == n - 1 {
+                    true => {
+                        selected = Some(*details);
+                        Style::default().bg(Color::DarkGray)
+                    }
+                    false => Style::default(),
+                },
+            };
+
             Spans::from(vec![
-                Span::from(format!("{:<width$}", details.name(), width = name_length)),
-                Span::from(" | "),
-                Span::from(span.clone()),
+                Span::styled(
+                    format!("{:<width$}", details.name(), width = name_length),
+                    style,
+                ),
+                Span::styled(" | ", style),
+                Span::styled(span.clone(), style),
             ])
         })
-        .collect()
+        .collect();
+
+    (selected, items)
+}
+
+fn count_commands<T>(root: &CommandKey<T>) -> usize {
+    let mut count = 0;
+    let mut stack = vec![root];
+
+    while let Some(command) = stack.pop() {
+        match command {
+            CommandKey::Node(_, _, children, _) => {
+                for value in children.values() {
+                    stack.push(value);
+                }
+            }
+            CommandKey::Leaf(..) => {
+                count += 1;
+            }
+        }
+    }
+
+    count
 }

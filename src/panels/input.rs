@@ -16,6 +16,7 @@ impl InputPanel {
         panel: &mut TextPanel,
         code: KeyCode,
         state: &mut AppState,
+        commands: &mut Manager,
     ) -> (bool, Vec<StateChangeRequest>) {
         panel.handle_key_stroke_internal(code, state, InputPanel::submit_input)
     }
@@ -30,6 +31,7 @@ impl InputPanel {
         panel: &mut TextPanel,
         _code: KeyCode,
         state: &mut AppState,
+        commands: &mut Manager,
     ) -> (bool, Vec<StateChangeRequest>) {
         match state.input_request().and_then(|r| r.completer()) {
             None => (),
@@ -50,6 +52,7 @@ impl InputPanel {
         panel: &mut TextPanel,
         _code: KeyCode,
         state: &mut AppState,
+        commands: &mut Manager,
     ) -> (bool, Vec<StateChangeRequest>) {
         match state.input_request().and_then(|r| r.completer()) {
             None => (),
@@ -71,6 +74,7 @@ impl InputPanel {
         panel: &mut TextPanel,
         code: KeyCode,
         state: &mut AppState,
+        commands: &mut Manager,
     ) -> (bool, Vec<StateChangeRequest>) {
         state.add_info("Filling");
         match state.input_request().and_then(|r| r.completer()) {
@@ -107,6 +111,7 @@ impl InputPanel {
         panel: &mut TextPanel,
         _code: KeyCode,
         state: &mut AppState,
+        commands: &mut Manager,
     ) -> (bool, Vec<StateChangeRequest>) {
         state.add_info("Filling current");
         match state.input_request().and_then(|r| r.completer()) {

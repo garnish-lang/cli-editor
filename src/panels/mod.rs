@@ -15,7 +15,7 @@ mod factory;
 mod input;
 mod messages;
 mod text;
-mod commands;
+pub mod commands;
 
 pub type PanelTypeID = &'static str;
 

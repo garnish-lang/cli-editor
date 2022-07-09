@@ -317,6 +317,7 @@ impl TextPanel {
         &mut self,
         code: KeyCode,
         state: &mut AppState,
+        commands: &mut Manager,
     ) -> (bool, Vec<StateChangeRequest>) {
         self.handle_key_stroke_internal(code, state, TextPanel::enter_newline)
     }
@@ -381,6 +382,7 @@ impl TextPanel {
         &mut self,
         _code: KeyCode,
         _state: &mut AppState,
+        commands: &mut Manager,
     ) -> (bool, Vec<StateChangeRequest>) {
         self.state = PanelState::WaitingToOpen;
         (
@@ -409,6 +411,7 @@ impl TextPanel {
         &mut self,
         _code: KeyCode,
         _state: &mut AppState,
+        commands: &mut Manager,
     ) -> (bool, Vec<StateChangeRequest>) {
         match self.lines.get(self.current_line) {
             None => self.cursor_index_in_line = 0,
@@ -431,6 +434,7 @@ impl TextPanel {
         &mut self,
         _code: KeyCode,
         _state: &mut AppState,
+        commands: &mut Manager,
     ) -> (bool, Vec<StateChangeRequest>) {
         if self.cursor_index_in_line > 0 {
             self.cursor_index_in_line -= 1;
@@ -449,6 +453,7 @@ impl TextPanel {
         &mut self,
         _code: KeyCode,
         _state: &mut AppState,
+        commands: &mut Manager,
     ) -> (bool, Vec<StateChangeRequest>) {
         if self.current_line + 1 < self.lines.len() {
             self.current_line += 1;
@@ -470,6 +475,7 @@ impl TextPanel {
         &mut self,
         _code: KeyCode,
         _state: &mut AppState,
+        commands: &mut Manager,
     ) -> (bool, Vec<StateChangeRequest>) {
         if self.current_line > 0 {
             self.current_line -= 1;
@@ -507,6 +513,7 @@ impl TextPanel {
         &mut self,
         _code: KeyCode,
         _state: &mut AppState,
+        commands: &mut Manager,
     ) -> (bool, Vec<StateChangeRequest>) {
         self.scroll_down(1);
         (true, vec![])
@@ -516,6 +523,7 @@ impl TextPanel {
         &mut self,
         _code: KeyCode,
         _state: &mut AppState,
+        commands: &mut Manager,
     ) -> (bool, Vec<StateChangeRequest>) {
         self.scroll_up(1);
         (true, vec![])
@@ -525,6 +533,7 @@ impl TextPanel {
         &mut self,
         _code: KeyCode,
         _state: &mut AppState,
+        commands: &mut Manager,
     ) -> (bool, Vec<StateChangeRequest>) {
         let limit = self.lines.len() as u16;
         self.scroll_down(10);
@@ -540,6 +549,7 @@ impl TextPanel {
         &mut self,
         _code: KeyCode,
         _state: &mut AppState,
+        commands: &mut Manager,
     ) -> (bool, Vec<StateChangeRequest>) {
         self.scroll_up(10);
         (true, vec![])
@@ -623,6 +633,7 @@ impl TextPanel {
         &mut self,
         _code: KeyCode,
         _state: &mut AppState,
+        commands: &mut Manager,
     ) -> (bool, Vec<StateChangeRequest>) {
         (true, self.save())
     }

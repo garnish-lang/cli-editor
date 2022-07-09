@@ -6,12 +6,10 @@ use crate::panels::{
     InputPanel, PanelTypeID, COMMANDS_PANEL_TYPE_ID, EDIT_PANEL_TYPE_ID, INPUT_PANEL_TYPE_ID,
     MESSAGE_PANEL_TYPE_ID,
 };
-use crate::{
-    catch_all, ctrl_key, global_commands, AppState, CommandDetails, CommandKeyId, Commands, Panels,
-    TextPanel,
-};
+use crate::{catch_all, ctrl_key, global_commands, AppState, CommandDetails, CommandKeyId, Commands, Panels, TextPanel, key};
+use crate::panels::commands::{next_command, previous_command};
 
-type PanelCommand = fn(&mut TextPanel, KeyCode, &mut AppState) -> (bool, Vec<StateChangeRequest>);
+type PanelCommand = fn(&mut TextPanel, KeyCode, &mut AppState, &mut Manager) -> (bool, Vec<StateChangeRequest>);
 
 type GlobalAction = fn(&mut AppState, KeyCode, &mut Panels, &mut Manager);
 
@@ -69,7 +67,7 @@ impl Manager {
                     Some(action) => match panels.get_mut(state.active_panel()) {
                         None => true,
                         Some(panel) => {
-                            let (handled, changes) = action(panel, by.code.clone(), state);
+                            let (handled, changes) = action(panel, by.code.clone(), state, self);
                             state.handle_changes(changes, panels, self);
 
                             !handled
@@ -317,6 +315,24 @@ pub fn make_messages_commands() -> Result<Commands<PanelCommand>, String> {
 
 pub fn make_commands_commands() -> Result<Commands<PanelCommand>, String> {
     let mut commands = Commands::<PanelCommand>::new();
+
+    commands.insert(|b| {
+        b.node(key('s'))
+            .action(
+                CommandDetails::new(
+                    "Move Up",
+                    "Highlight next command up.",
+                ),next_command)
+    })?;
+
+    commands.insert(|b| {
+        b.node(key('w'))
+            .action(
+                CommandDetails::new(
+                    "Move Down",
+                    "Highlight next command down.",
+                ),previous_command)
+    })?;
 
     Ok(commands)
 }
