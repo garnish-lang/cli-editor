@@ -159,6 +159,14 @@ impl CommandKeyId {
             mods: KeyModifiers::empty(),
         }
     }
+
+    pub fn code(&self) -> KeyCode {
+        self.code
+    }
+
+    pub fn mods(&self) -> KeyModifiers {
+        self.mods
+    }
 }
 
 pub struct Commands<T> {

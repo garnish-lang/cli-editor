@@ -40,6 +40,17 @@ fn main() -> Result<(), String> {
     let mut commands = commands::Manager::default();
     app_state.init(&mut panels, &mut commands);
 
+    // temp
+    // to be replaced when saving layouts is implemented
+    // don't want to change layout in state defaults everytime since it would continually break tests
+    app_state.set_active_panel(2);
+    app_state.split_current_panel_vertical(KeyCode::Null, &mut panels, &mut commands);
+    match panels.get_mut(3) {
+        None => app_state.add_error("Failed to update panel to commands."),
+        Some(panel) => *panel = TextPanel::commands_panel(),
+    }
+    app_state.set_active_panel(1);
+
     loop {
         app_state.update();
 

@@ -2,7 +2,10 @@ use crossterm::event::{KeyCode, KeyModifiers};
 
 use crate::app::StateChangeRequest;
 use crate::commands::{alt_catch_all, alt_key, code, shift_alt_key, shift_catch_all, CommandKey};
-use crate::panels::{InputPanel, PanelTypeID, EDIT_PANEL_TYPE_ID, INPUT_PANEL_TYPE_ID};
+use crate::panels::{
+    InputPanel, PanelTypeID, COMMANDS_PANEL_TYPE_ID, EDIT_PANEL_TYPE_ID, INPUT_PANEL_TYPE_ID,
+    MESSAGE_PANEL_TYPE_ID,
+};
 use crate::{
     catch_all, ctrl_key, global_commands, AppState, CommandDetails, CommandKeyId, Commands, Panels,
     TextPanel,
@@ -14,11 +17,13 @@ type GlobalAction = fn(&mut AppState, KeyCode, &mut Panels, &mut Manager);
 
 pub const EDIT_COMMAND_INDEX: usize = 0;
 pub const INPUT_COMMAND_INDEX: usize = 1;
+pub const MESSAGES_COMMAND_INDEX: usize = 2;
+pub const COMMANDS_COMMAND_INDEX: usize = 3;
 
 pub struct Manager {
     state_commands: Commands<GlobalAction>,
     command_stack: Vec<usize>,
-    commands: Vec<Commands<PanelCommand>>,
+    commands: Vec<(&'static str, Commands<PanelCommand>)>,
     progress: Vec<CommandKeyId>,
 }
 
@@ -28,9 +33,10 @@ impl Default for Manager {
             state_commands: global_commands().unwrap(),
             command_stack: vec![],
             commands: vec![
-                make_edit_commands().unwrap(),
-                make_input_commands().unwrap(),
-                make_messages_commands().unwrap(),
+                (EDIT_PANEL_TYPE_ID, make_edit_commands().unwrap()),
+                (INPUT_PANEL_TYPE_ID, make_input_commands().unwrap()),
+                (MESSAGE_PANEL_TYPE_ID, make_messages_commands().unwrap()),
+                (COMMANDS_PANEL_TYPE_ID, make_commands_commands().unwrap()),
             ],
             progress: vec![],
         }
@@ -48,7 +54,7 @@ impl Manager {
             .command_stack
             .last()
             .and_then(|i| self.commands.get(*i))
-            .and_then(|commands| commands.get(&self.progress));
+            .and_then(|(id, commands)| commands.get(&self.progress));
 
         let fallthrough = match panel_result {
             None => true,
@@ -95,6 +101,8 @@ impl Manager {
         self.command_stack.push(match type_id {
             EDIT_PANEL_TYPE_ID => EDIT_COMMAND_INDEX,
             INPUT_PANEL_TYPE_ID => INPUT_COMMAND_INDEX,
+            MESSAGE_PANEL_TYPE_ID => MESSAGES_COMMAND_INDEX,
+            COMMANDS_PANEL_TYPE_ID => COMMANDS_COMMAND_INDEX,
             _ => return,
         });
     }
@@ -111,11 +119,15 @@ impl Manager {
         self.state_commands.get_node(&self.progress)
     }
 
-    pub fn current_panel(&self) -> Option<&CommandKey<PanelCommand>> {
+    pub fn current_panel(&self) -> Option<(&str, &CommandKey<PanelCommand>)> {
         self.command_stack
             .last()
             .and_then(|i| self.commands.get(*i))
-            .and_then(|commands| commands.get_node(&self.progress))
+            .and_then(|(id, commands)| commands.get_node(&self.progress).map(|k| (*id, k)))
+    }
+
+    pub fn last_progress(&self) -> Option<&CommandKeyId> {
+        self.progress.last()
     }
 }
 
@@ -230,6 +242,12 @@ pub fn make_input_commands() -> Result<Commands<PanelCommand>, String> {
 }
 
 pub fn make_messages_commands() -> Result<Commands<PanelCommand>, String> {
+    let mut commands = Commands::<PanelCommand>::new();
+
+    Ok(commands)
+}
+
+pub fn make_commands_commands() -> Result<Commands<PanelCommand>, String> {
     let mut commands = Commands::<PanelCommand>::new();
 
     Ok(commands)

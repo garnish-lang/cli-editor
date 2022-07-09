@@ -6,7 +6,7 @@ use tui::layout::Direction;
 
 use crate::autocomplete::{AutoCompleter, PanelAutoCompleter};
 use crate::commands::{ctrl_alt_key, Manager};
-use crate::panels::{PanelFactory, NULL_PANEL_TYPE_ID, INPUT_PANEL_TYPE_ID, EDIT_PANEL_TYPE_ID};
+use crate::panels::{PanelFactory, NULL_PANEL_TYPE_ID, INPUT_PANEL_TYPE_ID};
 use crate::{
     catch_all, ctrl_key, key, CommandDetails, Commands, PanelSplit, Panels, TextPanel, UserSplits,
 };
@@ -362,7 +362,7 @@ impl AppState {
                                         Some(panel) => {
                                             match PanelFactory::panel(input.as_str()) {
                                                 Some(new_panel) => {
-                                                    commands.replace_top_with_panel(panel.panel_type());
+                                                    commands.replace_top_with_panel(new_panel.panel_type());
                                                     *panel = new_panel;
                                                 }
                                                 None => {
