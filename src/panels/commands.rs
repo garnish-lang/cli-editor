@@ -28,22 +28,18 @@ pub(crate) fn render_handler(
     let mut all_spans = vec![];
 
     if !global_panel_spans.is_empty() {
-        all_spans.push(Spans::from(vec![Span::from("Global Commands")]));
+        all_spans.push(Spans::from(vec![Span::from(format!("{:-<width$}", "Global Commands", width=rect.width as usize))]));
         all_spans.extend(global_panel_spans);
-        all_spans.push(Spans::from(vec![Span::from(
-            "-".repeat(rect.width as usize),
-        )]));
+        all_spans.push(Spans::default());
     }
+
+    let current_panel_title = format!("{} Commands", current_panel_id);
 
     if !current_panel_spans.is_empty() {
         all_spans.push(Spans::from(vec![
-            Span::from(current_panel_id),
-            Span::from(" Commands"),
+            Span::from(format!("{:-<width$}", current_panel_title, width=rect.width as usize))
         ]));
         all_spans.extend(current_panel_spans);
-        all_spans.push(Spans::from(vec![Span::from(
-            "-".repeat(rect.width as usize),
-        )]));
     }
 
     let para = Paragraph::new(Text::from(all_spans))
