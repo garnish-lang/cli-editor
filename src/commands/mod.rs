@@ -1,5 +1,3 @@
-mod manager;
-
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::hash::Hash;
@@ -7,6 +5,8 @@ use std::hash::Hash;
 use crossterm::event::{KeyCode, KeyModifiers};
 
 pub use manager::Manager;
+
+mod manager;
 
 #[derive(Clone)]
 pub enum CommandKey<T> {
@@ -72,6 +72,13 @@ impl CommandDetails {
         CommandDetails {
             name: String::new(),
             description: String::new(),
+        }
+    }
+
+    pub fn new<T1: ToString, T2: ToString>(name: T1, description: T2) -> Self {
+        CommandDetails {
+            name: name.to_string(),
+            description: description.to_string(),
         }
     }
 
@@ -296,7 +303,6 @@ where
         let mut current = &self.root;
 
         for (index, c) in progress.iter().enumerate() {
-
             match current {
                 CommandKey::Node(_, _, children, _) => match children.get(c) {
                     Some(next) => current = next,

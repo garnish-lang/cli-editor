@@ -139,13 +139,23 @@ pub fn make_edit_commands() -> Result<Commands<PanelCommand>, String> {
     let mut commands = Commands::<PanelCommand>::new();
 
     commands.insert(|b| {
-        b.node(catch_all())
-            .action(CommandDetails::empty(), TextPanel::handle_key_stroke)
+        b.node(catch_all()).action(
+            CommandDetails::new(
+                "Insert Character",
+                "Insert basic characters. Includes letters, special characters, numbers, enter, backspace and delete.",
+            ),
+            TextPanel::handle_key_stroke,
+        )
     })?;
 
     commands.insert(|b| {
         b.node(shift_catch_all())
-            .action(CommandDetails::empty(), TextPanel::handle_key_stroke)
+            .action(
+                CommandDetails::new(
+                    "Insert Shifted Character",
+                    "Insert shifted characters. Includes uppercase letters, special characters.",
+                ),
+                TextPanel::handle_key_stroke)
     })?;
 
     commands.insert(|b| {
@@ -155,49 +165,84 @@ pub fn make_edit_commands() -> Result<Commands<PanelCommand>, String> {
 
     commands.insert(|b| {
         b.node(ctrl_key('s'))
-            .action(CommandDetails::empty(), TextPanel::save_buffer)
+            .action(
+                CommandDetails::new(
+                    "Save",
+                    "Saves text to file. If no file is selected, you will be prompted for one.",
+                ), TextPanel::save_buffer)
     })?;
 
     commands.insert(|b| {
         b.node(alt_key('i'))
-            .action(CommandDetails::empty(), TextPanel::scroll_up_one)
+            .action(
+                CommandDetails::new(
+                    "Scroll Up",
+                    "Move view up by a single line. Cursor remains where it is.",
+                ), TextPanel::scroll_up_one)
     })?;
 
     commands.insert(|b| {
         b.node(alt_key('k'))
-            .action(CommandDetails::empty(), TextPanel::scroll_down_one)
+            .action(
+                CommandDetails::new(
+                    "Scroll Down",
+                    "Move view down by a single line. Cursor remains where it is.",
+                ), TextPanel::scroll_down_one)
     })?;
 
     commands.insert(|b| {
         b.node(shift_alt_key('I'))
-            .action(CommandDetails::empty(), TextPanel::scroll_up_ten)
+            .action(
+                CommandDetails::new(
+                    "Scroll Up 10",
+                    "Move view up by ten lines. Cursor remains where it is.",
+                ), TextPanel::scroll_up_ten)
     })?;
 
     commands.insert(|b| {
         b.node(shift_alt_key('K'))
-            .action(CommandDetails::empty(), TextPanel::scroll_down_ten)
+            .action(
+                CommandDetails::new(
+                    "Scroll Down 10",
+                    "Move view down by ten lines. Cursor remains where it is.",
+                ), TextPanel::scroll_down_ten)
     })?;
 
     commands.insert(|b| {
         b.node(alt_key('w'))
-            .action(CommandDetails::empty(), TextPanel::move_to_previous_line)
+            .action(
+                CommandDetails::new(
+                    "Previous Line",
+                    "Move cursor to previous line. Cursor will appear at end if current line is longer than previous.",
+                ), TextPanel::move_to_previous_line)
     })?;
 
     commands.insert(|b| {
         b.node(alt_key('a')).action(
-            CommandDetails::empty(),
+            CommandDetails::new(
+                "Previous Character",
+                "Move cursor to previous character. Cursor go to previous line if at beginning.",
+            ),
             TextPanel::move_to_previous_character,
         )
     })?;
 
     commands.insert(|b| {
         b.node(alt_key('s'))
-            .action(CommandDetails::empty(), TextPanel::move_to_next_line)
+            .action(
+                CommandDetails::new(
+                    "Next Line",
+                    "Move cursor to next line. Cursor will appear at end if current line is longer than next.",
+                ),TextPanel::move_to_next_line)
     })?;
 
     commands.insert(|b| {
         b.node(alt_key('d'))
-            .action(CommandDetails::empty(), TextPanel::move_to_next_character)
+            .action(
+                CommandDetails::new(
+                    "Next Character",
+                    "Move cursor to next character. Cursor go to next line if at end.",
+                ), TextPanel::move_to_next_character)
     })?;
 
     Ok(commands)
@@ -208,34 +253,57 @@ pub fn make_input_commands() -> Result<Commands<PanelCommand>, String> {
 
     commands.insert(|b| {
         b.node(catch_all())
-            .action(CommandDetails::empty(), InputPanel::handle_key_stroke)
+            .action(
+                CommandDetails::new(
+                    "Insert Character",
+                    "Insert basic characters. Includes letters, special characters, numbers, enter, backspace and delete.",
+                ),InputPanel::handle_key_stroke)
     })?;
 
     commands.insert(|b| {
         b.node(shift_catch_all())
-            .action(CommandDetails::empty(), InputPanel::handle_key_stroke)
+            .action(
+                CommandDetails::new(
+                    "Insert Shifted Character",
+                    "Insert shifted characters. Includes uppercase letters, special characters.",
+                ), InputPanel::handle_key_stroke)
     })?;
 
     commands.insert(|b| {
         b.node(alt_catch_all())
-            .action(CommandDetails::empty(), InputPanel::fill_quick_select)
+            .action(
+                CommandDetails::new(
+                    "Selected Autocomplete",
+                    "Selected one autocomplete option by pressing ALT then a number 0-9.",
+                ), InputPanel::fill_quick_select)
     })?;
 
     commands.insert(|b| {
         b.node(code(KeyCode::Tab)).action(
-            CommandDetails::empty(),
+            CommandDetails::new(
+                "Fill Autocomplete",
+                "Selected the current highlighted autocomplete option.",
+            ),
             InputPanel::fill_current_quick_select,
         )
     })?;
 
     commands.insert(|b| {
         b.node(alt_key('='))
-            .action(CommandDetails::empty(), InputPanel::next_quick_select)
+            .action(
+                CommandDetails::new(
+                    "Next Autocomplete",
+                    "Highlight next autocomplete option.",
+                ), InputPanel::next_quick_select)
     })?;
 
     commands.insert(|b| {
         b.node(alt_key('-'))
-            .action(CommandDetails::empty(), InputPanel::previous_quick_select)
+            .action(
+                CommandDetails::new(
+                    "Previous Autocomplete",
+                    "Highlight previous autocomplete option.",
+                ), InputPanel::previous_quick_select)
     })?;
 
     Ok(commands)
