@@ -153,6 +153,8 @@ fn format_commands<T>(command: &CommandKey<T>) -> Vec<Spans> {
         }
     }
 
+    items.sort_by(|item, item2| item.0.name().cmp(item2.0.name()));
+
     items
         .iter()
         .map(|(details, span)| {
